@@ -1283,6 +1283,13 @@ input:checked + .slider-toggle:before {
   border-radius: var(--border-radius-md);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   flex: 1;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.nav-item * {
+  pointer-events: none;
 }
 
 .nav-item svg {
@@ -1494,8 +1501,8 @@ input:checked + .slider-toggle:before {
 .splash-screen.fade-out {
   opacity: 0;
   transform: scale(1.08);
-  pointer-events: none;
-  visibility: hidden;
+  pointer-events: none !important;
+  visibility: hidden !important;
 }
 
 .splash-ambient-glow {

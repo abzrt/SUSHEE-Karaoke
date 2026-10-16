@@ -14,7 +14,12 @@ class StorageScanner {
 
   async initIndexedDB() {
     return new Promise((resolve) => {
-      const request = indexedDB.open('KaraokeStarDB', 2);
+      if (typeof indexedDB === 'undefined') {
+        console.warn("IndexedDB not supported, falling back to in-memory.");
+        return resolve([]);
+      }
+      try {
+        const request = indexedDB.open('KaraokeStarDB', 2);
       request.onupgradeneeded = (e) => {
         const db = e.target.result;
         if (!db.objectStoreNames.contains('songs')) {
@@ -32,6 +37,10 @@ class StorageScanner {
         console.warn("IndexedDB not available, using in-memory library.");
         resolve([]);
       };
+      } catch (err) {
+        console.warn("IndexedDB open failed:", err);
+        resolve([]);
+      }
     });
   }
 

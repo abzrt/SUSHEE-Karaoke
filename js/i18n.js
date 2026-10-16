@@ -292,7 +292,9 @@ class I18nManager {
     });
 
     // Update HTML lang attribute
-    document.documentElement.lang = this.currentLang;
+    if (document.documentElement) {
+      document.documentElement.lang = this.currentLang;
+    }
   }
 }
 

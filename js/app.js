@@ -88,10 +88,10 @@ async function initApp() {
   }
 
   // --- TAB NAVIGATION ---
-  const navButtons = document.querySelectorAll('.nav-item');
-  const views = document.querySelectorAll('.app-view');
-
   function switchTab(viewId) {
+    if (!viewId) return;
+    const views = document.querySelectorAll('.app-view');
+    const navButtons = document.querySelectorAll('.nav-item');
     views.forEach(v => v.classList.remove('active'));
     navButtons.forEach(b => b.classList.remove('active'));
 
@@ -105,12 +105,26 @@ async function initApp() {
       if (visualizer) visualizer.resizeCanvas();
     }
   }
+  window.switchTab = switchTab;
 
+  const navButtons = document.querySelectorAll('.nav-item');
   navButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
+    const handleNav = (e) => {
+      e.preventDefault();
       const viewId = btn.getAttribute('data-view');
-      switchTab(viewId);
-    });
+      if (viewId) switchTab(viewId);
+    };
+    btn.addEventListener('click', handleNav);
+    btn.addEventListener('touchend', handleNav);
+  });
+
+  // Delegated fallback listener for tab navigation
+  document.addEventListener('click', (e) => {
+    const navBtn = e.target.closest && e.target.closest('.nav-item');
+    if (navBtn) {
+      const viewId = navBtn.getAttribute('data-view');
+      if (viewId) switchTab(viewId);
+    }
   });
 
   // --- LANGUAGE SWITCHING ---
@@ -858,6 +872,8 @@ async function initApp() {
         recorder.downloadRecording(currentModalRecording);
       }
     });
+  }
+
   // --- SETTINGS CONTROLS (MIC PERMISSION & AUDIO QUALITY) ---
   const btnTestMic = document.getElementById('btnTestMic');
   if (btnTestMic) {

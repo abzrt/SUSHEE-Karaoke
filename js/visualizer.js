@@ -16,11 +16,14 @@ class AudioVisualizer {
   }
 
   resizeCanvas() {
-    if (!this.canvas) return;
+    if (!this.canvas || typeof this.canvas.getBoundingClientRect !== 'function') return;
     const rect = this.canvas.getBoundingClientRect();
-    this.canvas.width = (rect.width || 320) * window.devicePixelRatio;
-    this.canvas.height = (rect.height || 100) * window.devicePixelRatio;
-    this.ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    const dpr = window.devicePixelRatio || 1;
+    this.canvas.width = (rect.width || 320) * dpr;
+    this.canvas.height = (rect.height || 100) * dpr;
+    if (this.ctx && typeof this.ctx.scale === 'function') {
+      this.ctx.scale(dpr, dpr);
+    }
   }
 
   start() {
