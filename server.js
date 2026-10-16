@@ -17,7 +17,8 @@ const MIME_TYPES = {
   '.wav': 'audio/wav',
   '.ogg': 'audio/ogg',
   '.flac': 'audio/flac',
-  '.lrc': 'text/plain; charset=utf-8'
+  '.lrc': 'text/plain; charset=utf-8',
+  '.apk': 'application/vnd.android.package-archive'
 };
 
 const server = http.createServer((req, res) => {
