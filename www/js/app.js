@@ -367,19 +367,40 @@ document.addEventListener('DOMContentLoaded', async () => {
       // START KARAOKE
       try {
         await audioEngine.init(audioElement);
-        await audioEngine.startMicrophone();
-        
-        // Start simultaneous recording
-        recorder.startRecording();
 
-        await audioElement.play();
+        let micStarted = false;
+        try {
+          await audioEngine.startMicrophone();
+          micStarted = true;
+        } catch (micErr) {
+          console.warn("Microphone not available or permission denied:", micErr);
+          showToast('Mikrofon belum diizinkan. Memutar musik backing track...', 'warning');
+        }
+
+        // Start simultaneous recording if mic available
+        if (micStarted) {
+          try {
+            recorder.startRecording();
+          } catch (recErr) {
+            console.warn("Recorder start error:", recErr);
+          }
+        }
+
+        try {
+          await audioElement.play();
+        } catch (playErr) {
+          console.error("Audio playback error:", playErr);
+          showToast('Gagal memutar audio: ' + (playErr.message || playErr), 'error');
+          return;
+        }
+
         isKaraokePlaying = true;
         if (visualizer) visualizer.start();
 
         updateKaraokeUIState(true);
-        showToast('Karaoke & Perekaman Dimulai!', 'success');
+        showToast(micStarted ? 'Karaoke & Perekaman Dimulai!' : 'Musik Backing Dimulai!', 'success');
       } catch (err) {
-        showToast(err.message || 'Gagal memulai karaoke / mikrofon.', 'error');
+        showToast(err.message || 'Gagal memulai karaoke.', 'error');
         console.error(err);
       }
     } else {
@@ -836,6 +857,32 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (currentModalRecording) {
         recorder.downloadRecording(currentModalRecording);
       }
+    });
+  // --- SETTINGS CONTROLS (MIC PERMISSION & AUDIO QUALITY) ---
+  const btnTestMic = document.getElementById('btnTestMic');
+  if (btnTestMic) {
+    btnTestMic.addEventListener('click', async () => {
+      try {
+        showToast('Meminta izin mikrofon...', 'info');
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Stop the test tracks immediately
+        stream.getTracks().forEach(t => t.stop());
+        showToast('✓ Izin mikrofon berhasil aktif!', 'success');
+        btnTestMic.innerHTML = `
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          <span style="color: #34d399; font-weight: 700;">Izin Mic Aktif</span>
+        `;
+      } catch (err) {
+        console.error("Mic test error:", err);
+        showToast('Gagal mengakses mikrofon. Pastikan izin mikrofon diberikan di Setelan HP.', 'error');
+      }
+    });
+  }
+
+  const audioQualitySelect = document.getElementById('audioQualitySelect');
+  if (audioQualitySelect) {
+    audioQualitySelect.addEventListener('change', () => {
+      showToast('Kualitas rekaman disesuaikan: ' + (audioQualitySelect.value === 'high' ? 'High (Lossless 48kHz)' : 'Standar'), 'info');
     });
   }
 

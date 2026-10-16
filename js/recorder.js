@@ -20,6 +20,15 @@ class KaraokeRecorder {
   async initDB() {
     return new Promise((resolve) => {
       const request = indexedDB.open('KaraokeStarDB', 2);
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('recordings')) {
+          db.createObjectStore('recordings', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('songs')) {
+          db.createObjectStore('songs', { keyPath: 'id' });
+        }
+      };
       request.onsuccess = (e) => {
         this.db = e.target.result;
         this.loadRecordingsFromDB().then(resolve);

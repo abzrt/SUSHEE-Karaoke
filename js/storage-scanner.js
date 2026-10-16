@@ -47,7 +47,12 @@ class StorageScanner {
         if (saved.length === 0) {
           this.loadSampleSongs();
         } else {
-          this.songs = saved;
+          this.songs = saved.map(s => {
+            if (s.audioBlob && !s.audioUrl) {
+              s.audioUrl = URL.createObjectURL(s.audioBlob);
+            }
+            return s;
+          });
         }
         resolve(this.songs);
       };
@@ -256,13 +261,14 @@ class StorageScanner {
       newSongs.push(songObj);
       this.songs.unshift(songObj);
 
-      // Save metadata without file Blob
+      // Save metadata and audio Blob for persistent playback
       this.saveSongToDB({
         id: songObj.id,
         title: songObj.title,
         artist: songObj.artist,
         format: songObj.format,
         source: 'local',
+        audioBlob: audioFile,
         hasLyrics: songObj.hasLyrics,
         lrcContent: songObj.lrcContent,
         dateAdded: songObj.dateAdded
