@@ -1,0 +1,26 @@
+{
+  "name": "sushee-karaoke-android",
+  "version": "1.0.0",
+  "description": "SUSHEE - Songbook Karaoke Android dengan Efek Vokal StarMaker, Perekaman Simultan, dan Scan File (.mp3, .m4a, .wav, .lrc)",
+  "main": "index.html",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "keywords": [
+    "sushee",
+    "karaoke",
+    "songbook",
+    "android",
+    "starmaker",
+    "audio-recorder",
+    "lrc"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/core": "^8.5.3"
+  }
+}

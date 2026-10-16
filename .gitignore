@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+android/app/build/
+android/build/
+android/.gradle/
+android/capacitor-cordova-android-plugins/build/
+
+# Local Android SDK configuration
+android/local.properties
+.gradle/
+
+# APK outputs (keep repo lightweight, download via releases or build locally)
+*.apk
+app-debug.apk
+
+# OS & IDE files
+.DS_Store
+Thumbs.db
+*.swp
+*.log
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.local

@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>SUSHEE - Songbook Karaoke & Android App</title>
+  <meta name="description" content="Aplikasi Karaoke Android Modern dengan Efek Vokal StarMaker, Perekaman Audio Simultan, Scan Memori HP (.mp3, .m4a, .wav, .lrc).">
+  <meta name="theme-color" content="#07080d">
+  
+  <!-- Manifest for Android PWA -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/jpeg" href="assets/icon.jpg">
+
+  <!-- Google Fonts: Outfit & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- App Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+<body>
+
+  <!-- ================= COOL OPENING INTRO / SPLASH SCREEN ================= -->
+  <div id="splashScreen" class="splash-screen">
+    <div class="splash-ambient-glow"></div>
+    <div class="splash-content">
+      <!-- Animated Avatar with Rotating Neon Conic Border & Ripples -->
+      <div class="splash-avatar-container">
+        <div class="splash-pulse-ring ring-1"></div>
+        <div class="splash-pulse-ring ring-2"></div>
+        <div class="splash-pulse-ring ring-3"></div>
+        <div class="splash-neon-orbit"></div>
+        <div class="splash-avatar-border">
+          <img src="assets/icon.jpg" alt="SUSHEE" class="splash-logo-img">
+        </div>
+      </div>
+
+      <!-- Kinetic Typography Reveal -->
+      <div class="splash-brand">
+        <h1 class="splash-title">
+          <span style="--i:0">S</span><span style="--i:1">U</span><span style="--i:2">S</span><span style="--i:3">H</span><span style="--i:4">E</span><span style="--i:5">E</span>
+        </h1>
+        <div class="splash-tagline-wrapper">
+          <span class="splash-tagline-line left"></span>
+          <p class="splash-subtitle">SONGBOOK KARAOKE</p>
+          <span class="splash-tagline-line right"></span>
+        </div>
+      </div>
+
+      <!-- Neon Mini Equalizer -->
+      <div class="splash-equalizer">
+        <span class="eq-bar bar-1"></span>
+        <span class="eq-bar bar-2"></span>
+        <span class="eq-bar bar-3"></span>
+        <span class="eq-bar bar-4"></span>
+        <span class="eq-bar bar-5"></span>
+      </div>
+    </div>
+    
+    <!-- Quick Tap Dismiss -->
+    <div class="splash-tap-hint">Ketuk untuk melanjutkan</div>
+  </div>
+
+  <!-- Audio Element for Backing Music -->
+  <audio id="musicAudio" preload="auto" crossorigin="anonymous"></audio>
+
+  <!-- Hidden Inputs for Storage Scanning & File Picking -->
+  <input type="file" id="fileInputFolder" webkitdirectory directory multiple style="display: none;">
+  <input type="file" id="fileInputMulti" accept=".mp3,.m4a,.wav,.ogg,.flac,.lrc,audio/*" multiple style="display: none;">
+  <input type="file" id="lrcManualInput" accept=".lrc,text/plain" style="display: none;">
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Mobile App Wrapper -->
+  <div class="app-container">
+
+    <!-- Top App Header -->
+    <header class="app-header">
+      <div class="brand-section">
+        <div class="brand-logo">
+          <img src="assets/icon.jpg" alt="SUSHEE Logo" class="brand-logo-img">
+        </div>
+        <div>
+          <h1 class="brand-title" data-i18n="appTitle">SUSHEE</h1>
+          <p class="brand-subtitle" data-i18n="appSubtitle">Songbook Karaoke</p>
+        </div>
+      </div>
+
+      <!-- Language Toggle Switcher (ID / EN) -->
+      <div class="header-actions">
+        <div class="lang-switcher">
+          <button class="lang-btn active" data-lang="id">ID</button>
+          <button class="lang-btn" data-lang="en">EN</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Dynamic Views -->
+    <main class="main-content">
+
+      <!-- ================= VIEW 1: SONG LIBRARY ================= -->
+      <section class="app-view active" id="viewSongs">
+        <!-- Scan Phone Storage Card -->
+        <div class="scan-hero-card">
+          <div class="scan-hero-content">
+            <h3 class="scan-hero-title" data-i18n="libraryTitle">Koleksi Lagu</h3>
+            <p class="scan-hero-desc" data-i18n="libraryDesc">Pindai memori HP untuk menemukan lagu (.mp3, .m4a) dan lirik (.lrc)</p>
+            <div class="hero-btn-row">
+              <button class="btn btn-primary btn-sm" id="btnOpenScan">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                <span data-i18n="btnScanStorage">Pindai Memori HP</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="search-wrapper">
+          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" class="search-input" id="songSearchInput" placeholder="Cari judul lagu atau artis..." data-i18n-placeholder="searchPlaceholder">
+        </div>
+
+        <!-- Filter Chips -->
+        <div class="filter-row">
+          <button class="filter-chip active" data-filter="all" data-i18n="filterAll">Semua</button>
+          <button class="filter-chip" data-filter="local" data-i18n="filterLocal">Penyimpanan HP</button>
+          <button class="filter-chip" data-filter="sample" data-i18n="filterSample">Lagu Contoh</button>
+        </div>
+
+        <!-- Songs List Container -->
+        <div class="song-list" id="songsList"></div>
+      </section>
+
+      <!-- ================= VIEW 2: KARAOKE STUDIO ================= -->
+      <section class="app-view" id="viewKaraoke">
+        <div class="karaoke-studio">
+          
+          <!-- Studio Header & Visualizer Card -->
+          <div class="studio-header-card">
+            <!-- Recording Indicator -->
+            <div class="recording-indicator" id="recordingIndicator">
+              <span class="rec-pulse-dot"></span>
+              <span>RECORDING LIVE (DUAL-TRACK)</span>
+            </div>
+
+            <h2 class="current-song-title">Pilih Lagu</h2>
+            <p class="current-song-artist">Studio Karaoke Siap</p>
+
+            <!-- Audio Waveform Visualizer -->
+            <div class="visualizer-wrapper">
+              <canvas id="visualizerCanvas"></canvas>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="player-progress-section">
+              <div class="progress-bar-wrapper">
+                <input type="range" class="custom-range" id="songProgress" min="0" max="100" value="0">
+              </div>
+              <div class="time-row">
+                <span id="currentTime">00:00</span>
+                <span id="totalDuration">00:00</span>
+              </div>
+            </div>
+
+            <!-- Action Controls -->
+            <div class="karaoke-controls-row">
+              <button class="btn-icon-round" id="btnRestartKaraoke" title="Ulangi Lagu">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+              </button>
+
+              <button class="btn-karaoke-main" id="btnKaraokeAction">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
+                <span data-i18n="btnStartKaraoke">Mulai Rekam & Nyanyi</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Synchronized Lyrics Screen -->
+          <div class="lyrics-screen" id="lyricsContainer">
+            <!-- Dynamically populated LRC lines -->
+          </div>
+
+          <!-- StarMaker Vocal Effects Drawer -->
+          <div class="effects-section">
+            <div class="effects-header">
+              <div class="effects-title-row">
+                <h3 class="switch-title" data-i18n="effectsTitle">Efek Vokal StarMaker</h3>
+                <span class="effects-badge-starmaker">DSP PRO</span>
+              </div>
+            </div>
+
+            <!-- Preset Buttons -->
+            <div class="preset-grid">
+              <button class="preset-btn" data-preset="original">
+                <span class="preset-icon">🎙️</span>
+                <span data-i18n="presetOriginal">Asli</span>
+              </button>
+              <button class="preset-btn active" data-preset="studio">
+                <span class="preset-icon">🎚️</span>
+                <span data-i18n="presetStudio">Studio Pro</span>
+              </button>
+              <button class="preset-btn" data-preset="ktv">
+                <span class="preset-icon">🎤</span>
+                <span data-i18n="presetKtv">KTV</span>
+              </button>
+              <button class="preset-btn" data-preset="hall">
+                <span class="preset-icon">🏛️</span>
+                <span data-i18n="presetHall">Konser Hall</span>
+              </button>
+              <button class="preset-btn" data-preset="pop">
+                <span class="preset-icon">🌟</span>
+                <span data-i18n="presetPop">Pop Stage</span>
+              </button>
+              <button class="preset-btn" data-preset="autotune">
+                <span class="preset-icon">🤖</span>
+                <span data-i18n="presetAutotune">Auto-Tune</span>
+              </button>
+              <button class="preset-btn" data-preset="warm">
+                <span class="preset-icon">🎸</span>
+                <span data-i18n="presetWarm">Akustik</span>
+              </button>
+              <button class="preset-btn" data-preset="custom">
+                <span class="preset-icon">⚙️</span>
+                <span data-i18n="presetCustom">Kustom</span>
+              </button>
+            </div>
+
+            <!-- Earphone Vocal Monitor Switch -->
+            <div class="switch-row">
+              <div class="switch-label-group">
+                <span class="switch-title" data-i18n="monitorVoice">Dengar Suara Sendiri (Earphone)</span>
+                <span class="switch-desc" data-i18n="monitorVoiceDesc">Gunakan earphone untuk mencegah gema</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="earphoneMonitorToggle">
+                <span class="slider-toggle"></span>
+              </label>
+            </div>
+
+            <!-- DSP Audio Sliders -->
+            <div class="controls-panel">
+              <div class="slider-group">
+                <div class="slider-label-row">
+                  <span data-i18n="vocalVol">Volume Suara Mic</span>
+                </div>
+                <input type="range" class="custom-range" id="vocalVolSlider" min="0" max="2" step="0.05" value="1.0">
+              </div>
+
+              <div class="slider-group">
+                <div class="slider-label-row">
+                  <span data-i18n="musicVol">Volume Musik</span>
+                </div>
+                <input type="range" class="custom-range" id="musicVolSlider" min="0" max="1.5" step="0.05" value="0.8">
+              </div>
+
+              <div class="slider-group">
+                <div class="slider-label-row">
+                  <span data-i18n="reverbWet">Gema Ruang (Reverb)</span>
+                </div>
+                <input type="range" class="custom-range" id="reverbSlider" min="0" max="1" step="0.02" value="0.25">
+              </div>
+
+              <div class="slider-group">
+                <div class="slider-label-row">
+                  <span data-i18n="echoDelay">Pantulan (Echo / Delay)</span>
+                </div>
+                <input type="range" class="custom-range" id="echoSlider" min="0" max="0.8" step="0.02" value="0.15">
+              </div>
+
+              <div class="slider-group">
+                <div class="slider-label-row">
+                  <span data-i18n="vocalTone">Karakter Suara (Treble Boost)</span>
+                </div>
+                <input type="range" class="custom-range" id="toneSlider" min="-6" max="8" step="0.5" value="3.0">
+              </div>
+            </div>
+
+            <!-- ================= LATENCY & AUDIO SYNC ADJUSTMENT ================= -->
+            <div class="latency-section">
+              <div class="latency-header-row">
+                <div class="latency-title-group">
+                  <div class="latency-badge-row">
+                    <span class="switch-title" data-i18n="latencyAdjust">Sinkronisasi Audio (Offset Latensi)</span>
+                    <span class="effects-badge-starmaker" style="background: var(--grad-primary);">SYNC PRO</span>
+                  </div>
+                  <span class="switch-desc" data-i18n="latencyDesc">Sesuaikan jeda delay antara vokal dan musik (Bluetooth / Earphone)</span>
+                </div>
+                <div class="latency-val-pill" id="latencyDisplayVal">0 ms</div>
+              </div>
+
+              <!-- Latency Range Slider (-300ms to +300ms, step 5ms) -->
+              <div class="slider-group" style="margin-top: 10px;">
+                <input type="range" class="custom-range custom-range-sync" id="latencySlider" min="-300" max="300" step="5" value="0">
+                <div class="slider-label-row">
+                  <span>-300ms (Vokal Dulu)</span>
+                  <span style="color: var(--color-cyan); font-weight: 700;">0 ms (Tepat)</span>
+                  <span>+300ms (Musik Dulu)</span>
+                </div>
+              </div>
+
+              <!-- Quick Presets -->
+              <div class="latency-presets-grid">
+                <button class="btn-latency-chip active" data-latency="0">
+                  <span class="chip-name" data-i18n="latencyWired">Kabel (0ms)</span>
+                </button>
+                <button class="btn-latency-chip" data-latency="40">
+                  <span class="chip-name" data-i18n="latencyPhone">Speaker HP (+40ms)</span>
+                </button>
+                <button class="btn-latency-chip" data-latency="120">
+                  <span class="chip-name" data-i18n="latencyBT">Bluetooth TWS (+120ms)</span>
+                </button>
+                <button class="btn-latency-chip" data-latency="200">
+                  <span class="chip-name" data-i18n="latencyBTHigh">BT Delay Tinggi (+200ms)</span>
+                </button>
+              </div>
+
+              <!-- Auto Detect Calibration Button -->
+              <div class="latency-auto-row" style="margin-top: 14px;">
+                <button class="btn btn-auto-latency" id="btnAutoCalibrateLatency">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  <span data-i18n="btnAutoCalibrate">Deteksi Delay Otomatis (Auto Adjust)</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+
+      <!-- ================= VIEW 4: MY RECORDINGS ================= -->
+      <section class="app-view" id="viewRecordings">
+        <div class="scan-hero-card">
+          <div class="scan-hero-content">
+            <h3 class="scan-hero-title" data-i18n="recordingsTitle">Hasil Rekaman Saya</h3>
+            <p class="scan-hero-desc" data-i18n="recordingsDesc">Dengarkan dan ekspor vokal bersama musik pengiring</p>
+          </div>
+        </div>
+
+        <!-- Recordings List -->
+        <div class="recordings-container" id="recordingsList"></div>
+      </section>
+
+      <!-- ================= VIEW 5: SETTINGS & ABOUT ================= -->
+      <section class="app-view" id="viewSettings">
+        <div class="gdrive-card">
+          <h3 class="switch-title" style="margin-bottom: 14px;" data-i18n="settingsTitle">Pengaturan Aplikasi</h3>
+
+          <div class="form-group">
+            <label class="form-label" data-i18n="languageSetting">Bahasa (Language)</label>
+            <div class="lang-switcher" style="width: fit-content;">
+              <button class="lang-btn active" data-lang="id">Bahasa Indonesia</button>
+              <button class="lang-btn" data-lang="en">English</button>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 16px;">
+            <label class="form-label" data-i18n="audioQualitySetting">Kualitas Audio Rekaman</label>
+            <select class="form-input" id="audioQualitySelect">
+              <option value="high" data-i18n="highQuality">Tinggi (Stereo 48kHz, Lossless WAV / WebM)</option>
+              <option value="standard" data-i18n="standardQuality">Standar (Compressed)</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-top: 16px;">
+            <label class="form-label" data-i18n="micPermissionTitle">Izin Mikrofon</label>
+            <p class="switch-desc" style="margin-bottom: 8px;" data-i18n="micPermissionDesc">Aplikasi memerlukan izin mic untuk merekam suara karaoke</p>
+            <button class="btn btn-secondary btn-sm" id="btnTestMic">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+              <span data-i18n="btnRequestMic">Minta Izin Mic</span>
+            </button>
+          </div>
+
+          <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 14px;">
+            <img src="assets/icon.jpg" alt="SUSHEE" style="width: 52px; height: 52px; border-radius: 14px; object-fit: cover; border: 2px solid rgba(0, 242, 254, 0.4); box-shadow: 0 4px 14px rgba(0, 242, 254, 0.25);">
+            <div>
+              <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 2px;" data-i18n="aboutTitle">Tentang SUSHEE</h4>
+              <p class="switch-desc" data-i18n="aboutDesc">Aplikasi Karaoke Android Modern Minimalis dengan Web Audio DSP & Perekaman Simultan.</p>
+              <p class="switch-desc" style="margin-top: 2px;" data-i18n="version">Versi 1.0.0 (Android Edition)</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-view="viewSongs">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <span data-i18n="navSongs">Lagu</span>
+      </button>
+
+      <button class="nav-item" data-view="viewKaraoke">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        <span data-i18n="navKaraoke">Karaoke</span>
+      </button>
+
+
+      <button class="nav-item" data-view="viewRecordings">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        <span data-i18n="navRecordings">Rekaman</span>
+      </button>
+
+      <button class="nav-item" data-view="viewSettings">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span data-i18n="navSettings">Setelan</span>
+      </button>
+    </nav>
+
+    <!-- Scan Storage Modal -->
+    <div class="modal-overlay" id="scanModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title" data-i18n="btnScanStorage">Pindai Memori HP</h3>
+          <button class="modal-close" id="btnCloseScan">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <div class="scan-options-grid">
+          <button class="scan-option-btn" id="btnDirectoryScan">
+            <div class="scan-icon-bubble">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <div>
+              <h4 style="font-size: 0.95rem; font-weight: 700;">Pindai Folder Musik Otomatis</h4>
+              <p style="font-size: 0.75rem; color: var(--text-secondary);">Pilih folder musik di HP untuk memindai semua file .mp3, .m4a, dan .lrc sekaligus</p>
+            </div>
+          </button>
+
+          <button class="scan-option-btn" id="btnFileScan">
+            <div class="scan-icon-bubble" style="background: var(--grad-accent);">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            </div>
+            <div>
+              <h4 style="font-size: 0.95rem; font-weight: 700;" data-i18n="btnPickFiles">Pilih File Manual</h4>
+              <p style="font-size: 0.75rem; color: var(--text-secondary);">Pilih beberapa file audio dan file lirik (.lrc) secara spesifik</p>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recording Result Preview Modal -->
+    <div class="modal-overlay" id="recordingResultModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title" data-i18n="recordingSaved">Rekaman Berhasil Disimpan!</h3>
+          <button class="modal-close" id="btnCloseRecModal">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 16px;">
+          <h4 id="modalRecTitle" style="font-size: 1.1rem; font-weight: 700;">Judul Lagu</h4>
+          <p id="modalRecMeta" style="font-size: 0.8rem; color: var(--text-secondary);">Detail Rekaman</p>
+        </div>
+
+        <audio id="modalRecAudio" controls style="width: 100%; margin-bottom: 20px; outline: none;"></audio>
+
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-primary" id="btnDownloadRec" style="flex: 1;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span data-i18n="btnDownloadRecording">Download File</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Latency Auto Calibration Modal -->
+    <div class="modal-overlay" id="latencyCalibrateModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title" data-i18n="calibrateModalTitle">Kalibrasi Delay Otomatis</h3>
+          <button class="modal-close" id="btnCloseCalibrateModal">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <div class="calibrate-modal-body">
+          <div class="radar-pulse-container" id="calibrateRadar">
+            <div class="radar-circle circle-1"></div>
+            <div class="radar-circle circle-2"></div>
+            <div class="radar-circle circle-3"></div>
+            <div class="radar-icon">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            </div>
+          </div>
+
+          <h4 id="calibrateStatusTitle" data-i18n="calibrateReadyTitle" style="font-size: 1.05rem; font-weight: 700; margin-top: 14px; text-align: center;">Siap Mengukur Delay Audio</h4>
+          <p id="calibrateStatusDesc" data-i18n="calibrateReadyDesc" style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; margin-top: 6px; line-height: 1.4;">
+            Sistem akan mendeteksi jeda antara output suara dan mikrofon Anda secara otomatis.
+          </p>
+
+          <div class="calibrate-detected-box" id="calibrateDetectedBox" style="display: none;">
+            <span class="detected-label">Hasil Pengukuran:</span>
+            <span class="detected-value" id="detectedLatencyVal">+0 ms</span>
+            <span class="detected-sub" id="detectedLatencySub">Sinkronisasi Optimal</span>
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn btn-primary" id="btnStartCalibrate" style="flex: 1;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <span data-i18n="btnRunCalibration">Mulai Kalibrasi (Ping Test)</span>
+            </button>
+            <button class="btn btn-secondary" id="btnApplyCalibrate" style="display: none; flex: 1;">
+              <span data-i18n="btnApplyResult">Terapkan Hasil</span>
+            </button>
+          </div>
+
+          <div class="calibrate-tip">
+            <span data-i18n="calibrateTip">💡 Tips: Pastikan mikrofon aktif. Sinyal chirp akan mengukur respon audio secara presisi.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- App Scripts in Correct Dependency Order -->
+  <script src="js/i18n.js"></script>
+  <script src="js/lrc-parser.js"></script>
+  <script src="js/audio-effects.js"></script>
+  <script src="js/storage-scanner.js"></script>
+  <script src="js/recorder.js"></script>
+  <script src="js/visualizer.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>
