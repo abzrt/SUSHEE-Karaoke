@@ -252,6 +252,48 @@ class GoogleDriveService {
         lrcContent: null // Will be fetched on demand
       };
     });
+  /**
+   * Query Google Drive files via Google Apps Script Web App
+   */
+  async fetchFromAppsScript(filterQuery = '') {
+    if (!this.webAppUrl) return [];
+    const targetFolder = this.extractIdFromUrl(this.folderId);
+    const endpoint = `${this.webAppUrl}${this.webAppUrl.includes('?') ? '&' : '?'}q=${encodeURIComponent(filterQuery)}&folderId=${encodeURIComponent(targetFolder)}`;
+
+    const response = await fetch(endpoint, { method: 'GET', mode: 'cors' });
+    if (!response.ok) {
+      throw new Error(`Apps Script responded with ${response.status}`);
+    }
+
+    const data = await response.json();
+    const files = Array.isArray(data) ? data : (data.files || []);
+
+    const audios = files.filter(f => f.name && f.name.match(/\.(mp3|m4a|wav|flac|ogg)$/i));
+    const lrcs = files.filter(f => f.name && f.name.endsWith('.lrc'));
+
+    return audios.map(audio => {
+      const cleanName = audio.name.replace(/\.[^/.]+$/, '');
+      const parts = cleanName.split(' - ');
+      const title = parts.length > 1 ? parts[1].trim() : cleanName;
+      const artist = parts.length > 1 ? parts[0].trim() : (audio.artist || 'Google Drive (SB)');
+
+      const baseName = cleanName.toLowerCase();
+      const matchedLrc = lrcs.find(l => l.name.toLowerCase().includes(baseName) || baseName.includes(l.name.replace(/\.lrc$/i, '').toLowerCase()));
+
+      return {
+        id: 'gdrive_script_' + audio.id,
+        title: audio.title || title,
+        artist: audio.artist || artist,
+        genre: audio.genre || 'Cloud Track',
+        format: audio.name.endsWith('.m4a') ? '.M4A' : '.MP3',
+        source: 'gdrive',
+        fileId: audio.id,
+        audioUrl: audio.url || this.getDirectStreamUrl(audio.id),
+        hasLyrics: !!matchedLrc || !!audio.lrcId || !!audio.lrcContent,
+        lrcFileId: matchedLrc ? matchedLrc.id : (audio.lrcId || null),
+        lrcContent: audio.lrcContent || null
+      };
+    });
   }
 
   /**

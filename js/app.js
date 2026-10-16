@@ -845,10 +845,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnToggleDriveConfig = document.getElementById('btnToggleDriveConfig');
   const driveConfigDrawer = document.getElementById('driveConfigDrawer');
   const driveFolderInput = document.getElementById('driveFolderInput');
+  const driveWebAppUrlInput = document.getElementById('driveWebAppUrlInput');
   const driveApiKeyInput = document.getElementById('driveApiKeyInput');
   const btnSaveDriveConfig = document.getElementById('btnSaveDriveConfig');
   const btnOpenDriveFolderExternal = document.getElementById('btnOpenDriveFolderExternal');
   const btnRefreshDriveSongs = document.getElementById('btnRefreshDriveSongs');
+  const btnOpenDriveGuide = document.getElementById('btnOpenDriveGuide');
+  const gdriveGuideModal = document.getElementById('gdriveGuideModal');
+  const btnCloseDriveGuideModal = document.getElementById('btnCloseDriveGuideModal');
+  const btnCopyAppsScript = document.getElementById('btnCopyAppsScript');
   const btnOpenAddDriveSong = document.getElementById('btnOpenAddDriveSong');
   const addDriveSongModal = document.getElementById('addDriveSongModal');
   const btnCloseAddDriveModal = document.getElementById('btnCloseAddDriveModal');
@@ -857,6 +862,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (driveFolderInput) {
     driveFolderInput.value = gdriveService.folderUrl || 'https://drive.google.com/drive/folders/1PWplk3vIXo-k3lW7mTq7dcV7KpQyQtC3?hl=ID';
+  }
+  if (driveWebAppUrlInput) {
+    driveWebAppUrlInput.value = gdriveService.webAppUrl || '';
   }
   if (driveApiKeyInput) {
     driveApiKeyInput.value = gdriveService.apiKey || '';
@@ -949,14 +957,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnSaveDriveConfig.addEventListener('click', () => {
       const urlOrId = driveFolderInput ? driveFolderInput.value.trim() : '';
       const apiKey = driveApiKeyInput ? driveApiKeyInput.value.trim() : '';
-      if (!urlOrId) {
-        showToast('Masukkan link atau ID folder Google Drive', 'warning');
+      const webAppUrl = driveWebAppUrlInput ? driveWebAppUrlInput.value.trim() : '';
+      if (!urlOrId && !webAppUrl) {
+        showToast('Masukkan link folder atau Web App URL Google Drive', 'warning');
         return;
       }
-      gdriveService.saveConfig(urlOrId, apiKey);
+      gdriveService.saveConfig(urlOrId, apiKey, webAppUrl);
       if (driveConfigDrawer) driveConfigDrawer.style.display = 'none';
       showToast('Konfigurasi Google Drive berhasil disimpan!', 'success');
       renderGdriveSongList();
+    });
+  }
+
+  if (btnOpenDriveGuide) {
+    btnOpenDriveGuide.addEventListener('click', () => {
+      if (gdriveGuideModal) gdriveGuideModal.classList.add('open');
+    });
+  }
+
+  if (btnCloseDriveGuideModal) {
+    btnCloseDriveGuideModal.addEventListener('click', () => {
+      if (gdriveGuideModal) gdriveGuideModal.classList.remove('open');
+    });
+  }
+
+  if (btnCopyAppsScript) {
+    btnCopyAppsScript.addEventListener('click', () => {
+      const code = document.getElementById('appsScriptCodeBlock')?.value;
+      if (code && navigator.clipboard) {
+        navigator.clipboard.writeText(code).then(() => {
+          showToast('Kode script berhasil disalin ke clipboard!', 'success');
+        }).catch(() => {
+          showToast('Gagal menyalin otomatis, silakan pilih teks dan salin manual.', 'warning');
+        });
+      }
     });
   }
 
