@@ -132,6 +132,67 @@
         <div class="song-list" id="songsList"></div>
       </section>
 
+      <!-- ================= VIEW: GOOGLE DRIVE CLOUD ================= -->
+      <section class="app-view" id="viewDrive">
+        <!-- Cloud Hero Banner -->
+        <div class="scan-hero-card" style="background: linear-gradient(135deg, rgba(66, 133, 244, 0.22), rgba(52, 168, 83, 0.15), rgba(251, 188, 5, 0.12)); border: 1px solid rgba(66, 133, 244, 0.35);">
+          <div class="scan-hero-content">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <span class="badge badge-gdrive" style="font-size: 0.72rem; padding: 3px 10px; border-radius: 20px;">
+                ☁️ CLOUD DATABASE
+              </span>
+              <button class="btn-icon-round" id="btnToggleDriveConfig" title="Pengaturan Folder Google Drive" style="width: 32px; height: 32px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              </button>
+            </div>
+            <h3 class="scan-hero-title" data-i18n="gdriveTitle">Google Drive Karaoke</h3>
+            <p class="scan-hero-desc" data-i18n="gdriveDesc">Cari dan putar lagu & lirik langsung dari cloud Google Drive</p>
+
+            <div class="gdrive-status-chip" style="margin-top: 8px; display: inline-flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); padding: 5px 12px; border-radius: 20px; font-size: 0.76rem;">
+              <span class="status-dot-pulse" style="width: 8px; height: 8px; border-radius: 50%; background: #00f2fe; box-shadow: 0 0 8px #00f2fe;"></span>
+              <span id="gdriveActiveFolderLabel">Folder: <strong>SB (SongBook)</strong></span>
+            </div>
+
+            <!-- Expandable Config Drawer -->
+            <div id="driveConfigDrawer" style="display: none; margin-top: 14px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.15);">
+              <div class="form-group" style="margin-bottom: 10px;">
+                <label class="form-label" style="font-size: 0.75rem;">Link / ID Folder Google Drive:</label>
+                <input type="text" class="form-input" id="driveFolderInput" placeholder="https://drive.google.com/drive/folders/..." value="https://drive.google.com/drive/folders/1PWplk3vIXo-k3lW7mTq7dcV7KpQyQtC3?hl=ID" style="font-size: 0.8rem; padding: 8px 10px;">
+              </div>
+              <div class="form-group" style="margin-bottom: 10px;">
+                <label class="form-label" style="font-size: 0.75rem;">Google Drive API Key (Opsional untuk Full Sync):</label>
+                <input type="text" class="form-input" id="driveApiKeyInput" placeholder="AIzaSy..." style="font-size: 0.8rem; padding: 8px 10px;">
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-primary btn-sm" id="btnSaveDriveConfig" style="flex: 1;">Simpan Konfigurasi</button>
+                <button class="btn btn-secondary btn-sm" id="btnOpenDriveFolderExternal" title="Buka di Browser">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="hero-btn-row" style="margin-top: 14px; display: flex; gap: 8px;">
+              <button class="btn btn-primary btn-sm" id="btnOpenAddDriveSong" style="flex: 1;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span data-i18n="btnAddDriveSong">+ Tambah Link Lagu GDrive</span>
+              </button>
+              <button class="btn btn-secondary btn-sm" id="btnRefreshDriveSongs" title="Segarkan">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Drive Search Bar -->
+        <div class="search-wrapper" style="margin-top: 14px;">
+          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" class="search-input" id="gdriveSearchInput" placeholder="Cari lagu di Google Drive..." data-i18n-placeholder="searchDrivePlaceholder">
+        </div>
+
+        <!-- Google Drive Song List -->
+        <div class="song-list" id="gdriveSongList" style="margin-top: 12px;"></div>
+      </section>
+
       <!-- ================= VIEW 2: KARAOKE STUDIO ================= -->
       <section class="app-view" id="viewKaraoke">
         <div class="karaoke-studio">
@@ -393,6 +454,11 @@
         <span data-i18n="navSongs">Lagu</span>
       </button>
 
+      <button class="nav-item" data-view="viewDrive">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+        <span data-i18n="navDrive">G-Drive</span>
+      </button>
+
       <button class="nav-item" data-view="viewKaraoke">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
         <span data-i18n="navKaraoke">Karaoke</span>
@@ -516,6 +582,47 @@
           </div>
         </div>
       </div>
+    <!-- Add Google Drive Song Modal -->
+    <div class="modal-overlay" id="addDriveSongModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title" data-i18n="addDriveModalTitle">Tambah Lagu dari Google Drive</h3>
+          <button class="modal-close" id="btnCloseAddDriveModal">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <div style="padding: 10px 0;">
+          <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.4;">
+            Pastikan file di Google Drive Anda diatur ke <em>"Siapa saja yang memiliki link dapat melihat"</em>.
+          </p>
+
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label">Judul Lagu:</label>
+            <input type="text" class="form-input" id="modalDriveTitle" placeholder="Contoh: Sang Dewi">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label">Nama Penyanyi / Artis:</label>
+            <input type="text" class="form-input" id="modalDriveArtist" placeholder="Contoh: Lyodra & Andi Rianto">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label">Link Share File Audio (.mp3 / .m4a):</label>
+            <input type="text" class="form-input" id="modalDriveAudioUrl" placeholder="https://drive.google.com/file/d/1.../view">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label class="form-label">Teks Lirik Bersinkronisasi (.lrc - Opsional):</label>
+            <textarea class="form-input" id="modalDriveLrcText" rows="4" placeholder="[00:12.00]Lirik lagu bersinkronisasi..." style="resize: vertical; font-family: monospace; font-size: 0.8rem;"></textarea>
+          </div>
+
+          <button class="btn btn-primary" id="btnConfirmAddDriveSong" style="width: 100%;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Simpan ke Database Karaoke</span>
+          </button>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -527,6 +634,7 @@
   <script src="js/storage-scanner.js"></script>
   <script src="js/recorder.js"></script>
   <script src="js/visualizer.js"></script>
+  <script src="js/gdrive-service.js"></script>
   <script src="js/app.js"></script>
 
 </body>
