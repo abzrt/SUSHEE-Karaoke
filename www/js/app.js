@@ -3,7 +3,7 @@
  * Main Application Controller
  */
 
-document.addEventListener('DOMContentLoaded', async () => {
+async function initApp() {
   // --- SPLASH SCREEN OPENING ANIMATION ---
   const splashScreen = document.getElementById('splashScreen');
   if (splashScreen) {
@@ -1103,4 +1103,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (storageScanner.songs.length > 0) {
     selectSong(storageScanner.songs[0], false);
   }
-});
+}
+
+// Ensure initApp runs whether DOM is loading or already ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}

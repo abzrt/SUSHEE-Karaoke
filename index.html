@@ -18,6 +18,7 @@
 
   <!-- App Stylesheet -->
   <link rel="stylesheet" href="css/style.css">
+</head>
 <body>
 
   <!-- ================= COOL OPENING INTRO / SPLASH SCREEN ================= -->
@@ -60,6 +61,30 @@
     <!-- Quick Tap Dismiss -->
     <div class="splash-tap-hint">Ketuk untuk melanjutkan</div>
   </div>
+
+  <!-- Guaranteed Fail-safe Splash Dismiss -->
+  <script>
+    (function() {
+      function dismissSplashNow() {
+        var splash = document.getElementById('splashScreen');
+        if (splash && !splash.classList.contains('fade-out')) {
+          splash.classList.add('fade-out');
+          setTimeout(function() {
+            if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
+          }, 600);
+        }
+      }
+      // Guaranteed dismiss after 2 seconds
+      setTimeout(dismissSplashNow, 2000);
+      // Tap anywhere on splash dismisses instantly
+      document.addEventListener('click', function(e) {
+        if (document.getElementById('splashScreen')) dismissSplashNow();
+      });
+      document.addEventListener('touchstart', function(e) {
+        if (document.getElementById('splashScreen')) dismissSplashNow();
+      }, { passive: true });
+    })();
+  </script>
 
   <!-- Audio Element for Backing Music -->
   <audio id="musicAudio" preload="auto"></audio>

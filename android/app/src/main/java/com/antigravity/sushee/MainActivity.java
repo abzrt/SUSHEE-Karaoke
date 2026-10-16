@@ -29,11 +29,11 @@ public class MainActivity extends BridgeActivity {
             window.setNavigationBarColor(Color.parseColor("#0a0c14"));
         }
 
-        // Request all required audio, mic, and storage permissions at startup
-        requestAppPermissions();
-
         // Configure WebView media settings
         configureWebViewSettings();
+
+        // Safely request permissions after window is rendered to prevent UI lockup
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::requestAppPermissions, 600);
     }
 
     private void requestAppPermissions() {

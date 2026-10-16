@@ -252,6 +252,8 @@ class GoogleDriveService {
         lrcContent: null // Will be fetched on demand
       };
     });
+  }
+
   /**
    * Query Google Drive files via Google Apps Script Web App
    */
