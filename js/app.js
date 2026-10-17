@@ -34,6 +34,9 @@ async function initApp() {
 
   // Initialize Core Systems
   const audioEngine = new AudioEffectsEngine();
+  if (audioElement) {
+    audioElement.volume = audioEngine.musicVolume;
+  }
   const storageScanner = new StorageScanner();
   const recorder = new KaraokeRecorder(audioEngine);
   const gdriveService = new GoogleDriveService();
@@ -503,6 +506,7 @@ async function initApp() {
   }
 
   if (musicVolSlider) {
+    musicVolSlider.value = audioEngine.musicVolume;
     musicVolSlider.addEventListener('input', () => {
       audioEngine.setMusicVolume(musicVolSlider.value);
     });

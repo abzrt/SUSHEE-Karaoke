@@ -35,6 +35,12 @@ class AudioEffectsEngine {
     this.lfoGain = null;
     this.isAutotuneActive = false;
 
+    // Master Output & Master Recording Limiter Protection (Anti-Clipping / Anti-Pecah)
+    this.masterSpeakerGain = null;
+    this.masterSpeakerLimiter = null;
+    this.masterRecordGain = null;
+    this.masterRecordLimiter = null;
+
     // Monitor (earphone output) & Mixer Destination (for recorder)
     this.monitorGain = null;
     this.vocalMixGain = null;
@@ -45,7 +51,9 @@ class AudioEffectsEngine {
     this.currentPreset = 'studio';
     this.isMonitoring = false;
     this.vocalVolume = 1.0;
-    this.musicVolume = 0.8;
+    // Default balanced backing track level (0.45 = 45%), avoids overwhelming vocal and prevents digital distortion
+    const savedMusicVol = localStorage.getItem('sushee_music_volume');
+    this.musicVolume = savedMusicVol !== null ? Math.max(0, Math.min(1.0, parseFloat(savedMusicVol))) : 0.45;
     this.latencyOffsetMs = 0; // Latency compensation
 
     // Audio Analysis for Visualizer
@@ -64,26 +72,74 @@ class AudioEffectsEngine {
     }
 
     this.musicElement = musicAudioElement;
+    if (this.musicElement) {
+      this.musicElement.volume = this.musicVolume;
+    }
 
     // Create Master Recording Destination
-    this.destinationNode = this.audioCtx.createMediaStreamDestination();
+    if (!this.destinationNode) {
+      this.destinationNode = this.audioCtx.createMediaStreamDestination();
+    }
+
+    // Setup Master Anti-Clipping Limiters (Brickwall Peak Protection)
+    if (!this.masterSpeakerLimiter) {
+      this.setupMasterLimiters();
+    }
 
     // Create Analysers for UI Visualizer
-    this.micAnalyser = this.audioCtx.createAnalyser();
-    this.micAnalyser.fftSize = 128;
-    this.musicAnalyser = this.audioCtx.createAnalyser();
-    this.musicAnalyser.fftSize = 128;
+    if (!this.micAnalyser) {
+      this.micAnalyser = this.audioCtx.createAnalyser();
+      this.micAnalyser.fftSize = 128;
+    }
+    if (!this.musicAnalyser) {
+      this.musicAnalyser = this.audioCtx.createAnalyser();
+      this.musicAnalyser.fftSize = 128;
+    }
 
     // Setup Music Audio Chain
     this.setupMusicChain();
 
     // Setup Vocal Effect Chain
-    this.setupVocalChain();
+    if (!this.micPreAmp) {
+      this.setupVocalChain();
+    }
 
     // Apply default preset (Studio Pro)
-    this.applyPreset('studio');
+    if (!this.currentPreset) {
+      this.applyPreset('studio');
+    }
 
     return true;
+  }
+
+  setupMasterLimiters() {
+    // 1. Master Output (Speakers / Earphones) with Brickwall Anti-Clipping Limiter
+    this.masterSpeakerGain = this.audioCtx.createGain();
+    this.masterSpeakerGain.gain.value = 1.0;
+
+    this.masterSpeakerLimiter = this.audioCtx.createDynamicsCompressor();
+    this.masterSpeakerLimiter.threshold.value = -1.5; // -1.5 dBFS ceiling to prevent DAC distortion
+    this.masterSpeakerLimiter.knee.value = 3.0;      // Soft knee for transparent saturation
+    this.masterSpeakerLimiter.ratio.value = 20.0;    // Brickwall peak limiting
+    this.masterSpeakerLimiter.attack.value = 0.001;  // 1ms ultrafast attack catches all transients
+    this.masterSpeakerLimiter.release.value = 0.05;  // 50ms fast transparent recovery
+
+    this.masterSpeakerGain.connect(this.masterSpeakerLimiter);
+    this.masterSpeakerLimiter.connect(this.audioCtx.destination);
+
+    // 2. Master Recording Destination with Brickwall Anti-Clipping Limiter
+    this.masterRecordGain = this.audioCtx.createGain();
+    this.masterRecordGain.gain.value = 1.0;
+
+    this.masterRecordLimiter = this.audioCtx.createDynamicsCompressor();
+    this.masterRecordLimiter.threshold.value = -1.5;
+    this.masterRecordLimiter.knee.value = 3.0;
+    this.masterRecordLimiter.ratio.value = 20.0;
+    this.masterRecordLimiter.attack.value = 0.001;
+    this.masterRecordLimiter.release.value = 0.05;
+
+    this.masterRecordGain.connect(this.masterRecordLimiter);
+    this.masterRecordLimiter.connect(this.destinationNode);
   }
 
   setupMusicChain() {
@@ -95,20 +151,32 @@ class AudioEffectsEngine {
       }
     }
 
-    if (this.musicSourceNode) {
+    if (this.musicSourceNode && !this.musicMixGain) {
       this.musicMixGain = this.audioCtx.createGain();
       this.musicMixGain.gain.value = this.musicVolume;
 
-      // Connect: Music -> Gain -> Analyser -> Speakers & Mix Destination
+      // Connect: Music -> Gain -> Analyser
       this.musicSourceNode.connect(this.musicMixGain);
       this.musicMixGain.connect(this.musicAnalyser);
-      this.musicMixGain.connect(this.audioCtx.destination);
+
+      // Route to Master Speaker Output (Protected by limiter)
+      if (this.masterSpeakerGain) {
+        this.musicMixGain.connect(this.masterSpeakerGain);
+      } else {
+        this.musicMixGain.connect(this.audioCtx.destination);
+      }
       
       // Delay Node for Latency Alignment
       this.musicDelayNode = this.audioCtx.createDelay(1.0);
       this.musicDelayNode.delayTime.value = 0;
       this.musicMixGain.connect(this.musicDelayNode);
-      this.musicDelayNode.connect(this.destinationNode);
+
+      // Route to Master Record Destination (Protected by limiter)
+      if (this.masterRecordGain) {
+        this.musicDelayNode.connect(this.masterRecordGain);
+      } else {
+        this.musicDelayNode.connect(this.destinationNode);
+      }
     }
   }
 
@@ -211,7 +279,11 @@ class AudioEffectsEngine {
     this.vocalSummer.connect(this.micAnalyser);
 
     this.vocalSummer.connect(this.monitorGain);
-    this.monitorGain.connect(this.audioCtx.destination);
+    if (this.masterSpeakerGain) {
+      this.monitorGain.connect(this.masterSpeakerGain);
+    } else {
+      this.monitorGain.connect(this.audioCtx.destination);
+    }
 
     // Latency Alignment Delay Node for Vocals
     this.vocalDelayNode = this.audioCtx.createDelay(1.0);
@@ -219,7 +291,12 @@ class AudioEffectsEngine {
 
     this.vocalSummer.connect(this.vocalMixGain);
     this.vocalMixGain.connect(this.vocalDelayNode);
-    this.vocalDelayNode.connect(this.destinationNode);
+
+    if (this.masterRecordGain) {
+      this.vocalDelayNode.connect(this.masterRecordGain);
+    } else {
+      this.vocalDelayNode.connect(this.destinationNode);
+    }
 
     // Apply any saved latency offset
     const savedLatency = parseFloat(localStorage.getItem('sushee_latency_offset')) || 0;
@@ -479,17 +556,26 @@ class AudioEffectsEngine {
   }
 
   setVocalVolume(val) {
-    this.vocalVolume = parseFloat(val);
-    if (this.micPreAmp) {
+    this.vocalVolume = Math.max(0, Math.min(2.0, parseFloat(val) || 0));
+    if (this.micPreAmp && this.audioCtx) {
+      this.micPreAmp.gain.setTargetAtTime(this.vocalVolume, this.audioCtx.currentTime, 0.015);
+    } else if (this.micPreAmp) {
       this.micPreAmp.gain.value = this.vocalVolume;
     }
   }
 
   setMusicVolume(val) {
-    this.musicVolume = parseFloat(val);
-    if (this.musicMixGain) {
+    this.musicVolume = Math.max(0, Math.min(1.0, parseFloat(val) || 0));
+    try {
+      localStorage.setItem('sushee_music_volume', this.musicVolume);
+    } catch (e) {}
+
+    if (this.musicMixGain && this.audioCtx) {
+      this.musicMixGain.gain.setTargetAtTime(this.musicVolume, this.audioCtx.currentTime, 0.015);
+    } else if (this.musicMixGain) {
       this.musicMixGain.gain.value = this.musicVolume;
     }
+
     if (this.musicElement) {
       this.musicElement.volume = this.musicVolume;
     }
@@ -497,9 +583,12 @@ class AudioEffectsEngine {
 
   setMonitoring(enabled) {
     this.isMonitoring = enabled;
-    if (this.monitorGain) {
-      // 0.8 when on, 0.0 when off
-      this.monitorGain.gain.value = enabled ? 0.8 : 0.0;
+    if (this.monitorGain && this.audioCtx) {
+      // 0.7 when on, 0.0 when off (with gentle ramp to avoid pops)
+      const targetVal = enabled ? 0.7 : 0.0;
+      this.monitorGain.gain.setTargetAtTime(targetVal, this.audioCtx.currentTime, 0.02);
+    } else if (this.monitorGain) {
+      this.monitorGain.gain.value = enabled ? 0.7 : 0.0;
     }
   }
 
