@@ -51,22 +51,20 @@ class StorageScanner {
       const store = tx.objectStore('songs');
       const req = store.getAll();
       req.onsuccess = () => {
-        const saved = req.result || [];
-        // Combine with default sample songs if empty
-        if (saved.length === 0) {
-          this.loadSampleSongs();
-        } else {
-          this.songs = saved.map(s => {
-            if (s.audioBlob && !s.audioUrl) {
-              s.audioUrl = URL.createObjectURL(s.audioBlob);
-            }
-            return s;
-          });
-        }
+        // Filter out any legacy sample songs
+        const saved = (req.result || []).filter(s => s.source !== 'sample' && !s.id.startsWith('sample_'));
+        this.songs = saved.map(s => {
+          if (s.audioBlob && !s.audioUrl) {
+            s.audioUrl = URL.createObjectURL(s.audioBlob);
+          }
+          return s;
+        });
+        // Remove legacy sample songs from IndexedDB
+        ['sample_bintang_kejora', 'sample_pop_beat'].forEach(id => this.deleteSongFromDB(id));
         resolve(this.songs);
       };
       req.onerror = () => {
-        this.loadSampleSongs();
+        this.songs = [];
         resolve(this.songs);
       };
     });
@@ -311,134 +309,8 @@ class StorageScanner {
     return true;
   }
 
-  /**
-   * Pre-packaged royalty-free sample songs with synchronized lyrics
-   */
   loadSampleSongs() {
-    // Generate clean synthesized acoustic audio tone tracks for demo
-    const sample1 = {
-      id: 'sample_bintang_kejora',
-      title: 'Bintang Kejora (Karaoke)',
-      artist: 'Studio Vokal Indonesia',
-      format: '.MP3',
-      source: 'sample',
-      hasLyrics: true,
-      audioUrl: this.createSyntheticBackingTrack('c_major'),
-      lrcContent: LrcParser.getSampleLrc('Bintang Kejora', 'Studio Vokal Indonesia'),
-      dateAdded: new Date().toISOString()
-    };
-
-    const sample2 = {
-      id: 'sample_pop_beat',
-      title: 'Panggung Impian (Acoustic Pop)',
-      artist: 'StarMaker Ensemble',
-      format: '.M4A',
-      source: 'sample',
-      hasLyrics: true,
-      audioUrl: this.createSyntheticBackingTrack('g_pop'),
-      lrcContent: `[ti:Panggung Impian]
-[ar:StarMaker Ensemble]
-[00:00.00]♪ Intro Melodi Pop Acoustic ♪
-[00:04.00]Langkah demi langkah menuju cahaya
-[00:08.50]Membawa mimpi di dalam jiwa
-[00:13.00]Takkan ragu untuk bernyanyi
-[00:17.50]Biarkan dunia mendengar suara ini
-[00:23.00]♪ Chorus Pop ♪
-[00:27.00]Inilah panggung impian kita
-[00:31.50]Harmoni indah merangkai rasa
-[00:36.00]Nyanyikan lagu penuh ceria
-[00:41.00]Bersama SUSHEE selamanya!
-[00:48.00]♪ Outro Pop Melody ♪`,
-      dateAdded: new Date().toISOString()
-    };
-
-    this.songs = [sample1, sample2];
-  }
-
-  /**
-   * Synthesize a soothing backing track WAV blob on the fly so karaoke works offline instantly!
-   */
-  createSyntheticBackingTrack(style = 'c_major') {
-    const sampleRate = 44100;
-    const duration = 85; // 85 seconds backing music
-    const numSamples = sampleRate * duration;
-    const buffer = new Float32Array(numSamples);
-
-    // Chord progressions (C - G - Am - F)
-    const chords = [
-      [261.63, 329.63, 392.00], // C major
-      [196.00, 246.94, 293.66], // G major
-      [220.00, 261.63, 330.00], // A minor
-      [174.61, 220.00, 261.63]  // F major
-    ];
-
-    const chordDuration = 4; // seconds per chord
-    for (let i = 0; i < numSamples; i++) {
-      const t = i / sampleRate;
-      const chordIndex = Math.floor(t / chordDuration) % chords.length;
-      const currentChord = chords[chordIndex];
-      
-      // Arpeggiated guitar/piano synth note
-      const arpSpeed = 0.5; // seconds per note
-      const noteIndex = Math.floor((t % chordDuration) / arpSpeed) % currentChord.length;
-      const freq = currentChord[noteIndex];
-      
-      // Note envelope (decay)
-      const noteTime = (t % chordDuration) % arpSpeed;
-      const envelope = Math.exp(-noteTime * 3);
-
-      // Bass note
-      const bassFreq = currentChord[0] / 2;
-      const bass = Math.sin(2 * Math.PI * bassFreq * t) * 0.25;
-
-      // Melody tone + harmonic
-      const tone = (Math.sin(2 * Math.PI * freq * t) * 0.4 +
-                    Math.sin(2 * Math.PI * freq * 2 * t) * 0.15) * envelope;
-
-      // Gentle rhythm pulse
-      const kickTime = t % 1.0;
-      const kick = kickTime < 0.1 ? Math.sin(2 * Math.PI * 65 * (1 - kickTime * 10) * kickTime) * 0.3 : 0;
-
-      buffer[i] = Math.max(-1, Math.min(1, (tone + bass + kick) * 0.5));
-    }
-
-    return this.encodeWAV(buffer, sampleRate);
-  }
-
-  encodeWAV(samples, sampleRate) {
-    const buffer = new ArrayBuffer(44 + samples.length * 2);
-    const view = new DataView(buffer);
-
-    // RIFF identifier
-    this.writeString(view, 0, 'RIFF');
-    view.setUint32(4, 36 + samples.length * 2, true);
-    this.writeString(view, 8, 'WAVE');
-    this.writeString(view, 12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true); // PCM format
-    view.setUint16(22, 1, true); // Mono
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * 2, true);
-    view.setUint16(32, 2, true); // block align
-    view.setUint16(34, 16, true); // 16 bits per sample
-    this.writeString(view, 36, 'data');
-    view.setUint32(40, samples.length * 2, true);
-
-    // Write samples
-    let offset = 44;
-    for (let i = 0; i < samples.length; i++, offset += 2) {
-      const s = Math.max(-1, Math.min(1, samples[i]));
-      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-    }
-
-    const blob = new Blob([view], { type: 'audio/wav' });
-    return URL.createObjectURL(blob);
-  }
-
-  writeString(view, offset, string) {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
-    }
+    this.songs = [];
   }
 }
 

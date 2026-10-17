@@ -87,8 +87,8 @@
     })();
   </script>
 
-  <!-- Audio Element for Backing Music -->
-  <audio id="musicAudio" preload="auto"></audio>
+  <!-- Audio Element for Backing Music with CORS enabled for Web Audio API -->
+  <audio id="musicAudio" preload="auto" crossorigin="anonymous"></audio>
 
   <!-- Hidden Inputs for Storage Scanning & File Picking -->
   <input type="file" id="fileInputFolder" webkitdirectory directory multiple style="display: none;">
@@ -151,7 +151,6 @@
         <div class="filter-row">
           <button class="filter-chip active" data-filter="all" data-i18n="filterAll">Semua</button>
           <button class="filter-chip" data-filter="local" data-i18n="filterLocal">Penyimpanan HP</button>
-          <button class="filter-chip" data-filter="sample" data-i18n="filterSample">Lagu Contoh</button>
         </div>
 
         <!-- Songs List Container -->
@@ -183,8 +182,8 @@
             <div id="serverConfigDrawer" style="display: none; margin-top: 14px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.15);">
               <div class="form-group" style="margin-bottom: 10px;">
                 <label class="form-label" style="font-size: 0.75rem; color: #00f2fe;">🌐 URL Endpoint api.php di Hosting Anda:</label>
-                <input type="text" class="form-input" id="serverUrlInput" placeholder="https://domain-anda.my.php.id/karaoke/api.php" style="font-size: 0.8rem; padding: 8px 10px;">
-                <p style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px;">Contoh: <code>https://nama-anda.my.php.id/karaoke/api.php</code></p>
+                <input type="text" class="form-input" id="serverUrlInput" value="https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SONGS/api.php" placeholder="https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SONGS/api.php" style="font-size: 0.8rem; padding: 8px 10px;">
+                <p style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px;">Contoh: <code>https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SONGS/api.php</code></p>
               </div>
               <div style="display: flex; gap: 8px; margin-bottom: 8px;">
                 <button class="btn btn-primary btn-sm" id="btnSaveServerConfig" style="flex: 1;">
@@ -258,6 +257,11 @@
             <div class="karaoke-controls-row">
               <button class="btn-icon-round" id="btnRestartKaraoke" title="Ulangi Lagu">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+              </button>
+
+              <button class="btn-karaoke-secondary" id="btnToggleMusicPlayback" title="Putar atau jeda musik backing">
+                <svg id="musicPlayIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                <span id="musicPlayLabel">Putar Musik</span>
               </button>
 
               <button class="btn-karaoke-main" id="btnKaraokeAction">
@@ -342,7 +346,7 @@
                 <div class="slider-label-row">
                   <span data-i18n="musicVol">Volume Musik</span>
                 </div>
-                <input type="range" class="custom-range" id="musicVolSlider" min="0" max="1" step="0.02" value="0.45">
+                <input type="range" class="custom-range" id="musicVolSlider" min="0" max="1" step="0.02" value="0.85">
               </div>
 
               <div class="slider-group">
@@ -644,39 +648,123 @@
             <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 8px;">
               File <code>api.php</code> sudah tersedia di folder proyek Anda: <code>php-server/api.php</code>. Anda juga bisa menyalin langsung kode script di bawah ini:
             </p>
-            <textarea readonly id="phpScriptCodeBlock" style="width: 100%; height: 110px; background: rgba(0,0,0,0.6); color: #00f2fe; font-family: monospace; font-size: 0.72rem; padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); resize: none;">&lt;?php
+            <textarea readonly id="phpScriptCodeBlock" style="width: 100%; height: 160px; background: rgba(0,0,0,0.6); color: #00f2fe; font-family: monospace; font-size: 0.72rem; padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); resize: none;">&lt;?php
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS, HEAD");
+header("Access-Control-Allow-Headers: Range, Content-Type, Authorization");
+header("Access-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges");
 header("Content-Type: application/json; charset=UTF-8");
-$baseUrl = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://") . $_SERVER['HTTP_HOST'] . rtrim(dirname($_SERVER['PHP_SELF']), '/\\') . '/songs/';
-$songsDir = __DIR__ . '/songs/';
-if (!is_dir($songsDir)) { @mkdir($songsDir, 0755, true); }
-$q = isset($_GET['q']) ? strtolower(trim($_GET['q'])) : '';
-$catalog = [];
-foreach (scandir($songsDir) as $file) {
-    if ($file === '.' || $file === '..') continue;
-    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-    if (in_array($ext, ['mp3','m4a','wav','flac','ogg'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
+
+$isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') 
+    || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+    || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443);
+$protocol = $isHttps ? "https://" : "http://";
+$host = $_SERVER['HTTP_HOST'];
+$rawScriptDir = str_replace('\\', '/', dirname($_SERVER['PHP_SELF']));
+$segments = array_filter(explode('/', $rawScriptDir), function($s) { return $s !== '' && $s !== '.'; });
+$encodedDir = '/' . implode('/', array_map('rawurlencode', array_map('urldecode', $segments)));
+
+$scanDirs = [];
+if (is_dir(__DIR__ . '/songs')) {
+    $scanDirs[] = ['path' => __DIR__ . '/songs/', 'baseUrl' => $protocol . $host . $encodedDir . '/songs/'];
+}
+$scanDirs[] = ['path' => __DIR__ . '/', 'baseUrl' => $protocol . $host . $encodedDir . '/'];
+
+function getTokens($str) {
+    $str = strtolower(preg_replace('/(_vocals-back|_vocals|_instrumental|_karaoke|-karaoke|\(karaoke\)|\(instrumental\)|\(\d+\))/i', '', $str));
+    preg_match_all('/[a-z0-9]+/i', $str, $matches);
+    $filtered = array_filter(!empty($matches[0]) ? $matches[0] : [], function($t) { return strlen($t) >= 2 || is_numeric($t); });
+    sort($filtered);
+    return array_values(array_unique($filtered));
+}
+function parseLrcMetadata($content) {
+    $title = null; $artist = null;
+    if ($content) {
+        if (preg_match('/\[ti:\s*([^\]\r\n]+)\]/i', $content, $m)) $title = trim($m[1]);
+        if (preg_match('/\[ar:\s*([^\]\r\n]+)\]/i', $content, $m)) $artist = trim($m[1]);
+    }
+    return ['title' => $title, 'artist' => $artist];
+}
+
+$allLrcFiles = []; $lrcIndex = [];
+foreach ($scanDirs as $target) {
+    if (!is_dir($target['path'])) continue;
+    foreach (@scandir($target['path']) ?: [] as $file) {
+        if ($file === '.' || $file === '..' || is_dir($target['path'] . $file)) continue;
+        if (strtolower(pathinfo($file, PATHINFO_EXTENSION)) === 'lrc') {
+            $base = pathinfo($file, PATHINFO_FILENAME);
+            $fullPath = $target['path'] . $file;
+            $content = (@filesize($fullPath) < 153600) ? @file_get_contents($fullPath) : null;
+            $meta = parseLrcMetadata($content);
+            $tokens = getTokens($base);
+            $item = ['filename' => $file, 'basename' => $base, 'url' => $target['baseUrl'] . rawurlencode($file), 'content' => $content, 'metaTitle' => $meta['title'], 'metaArtist' => $meta['artist'], 'tokens' => $tokens, 'tokenKey' => implode('-', $tokens)];
+            $allLrcFiles[] = $item;
+            $lrcIndex[strtolower($base)] = $item;
+        }
+    }
+}
+
+$query = isset($_GET['q']) ? strtolower(trim($_GET['q'])) : '';
+$audioExts = ['mp3', 'm4a', 'wav', 'ogg', 'flac'];
+$catalog = []; $processed = [];
+
+foreach ($scanDirs as $target) {
+    if (!is_dir($target['path'])) continue;
+    foreach (@scandir($target['path']) ?: [] as $file) {
+        if ($file === '.' || $file === '..' || is_dir($target['path'] . $file)) continue;
+        $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+        if (!in_array($ext, $audioExts) || isset($processed[$file])) continue;
+        $processed[$file] = true;
         $base = pathinfo($file, PATHINFO_FILENAME);
-        if ($q && strpos(strtolower($base), $q) === false) continue;
-        $parts = explode(' - ', $base, 2);
-        $artist = count($parts) === 2 ? trim($parts[0]) : 'Karaoke';
-        $title = count($parts) === 2 ? trim($parts[1]) : $base;
-        $lrcPath = $songsDir . $base . '.lrc';
-        $hasLrc = file_exists($lrcPath);
+        if (!empty($query) && strpos(strtolower($file . ' ' . $base), $query) === false) continue;
+        
+        $matched = isset($lrcIndex[strtolower($base)]) ? $lrcIndex[strtolower($base)] : null;
+        if (!$matched) {
+            $cleanSuffix = strtolower(preg_replace('/(_vocals-back|_vocals|_instrumental|_karaoke|-karaoke|\(karaoke\)|\(instrumental\))$/i', '', $base));
+            if (isset($lrcIndex[$cleanSuffix])) $matched = $lrcIndex[$cleanSuffix];
+        }
+        if (!$matched) {
+            $aTokens = getTokens($base);
+            $aKey = implode('-', $aTokens);
+            if (!empty($aTokens)) {
+                foreach ($allLrcFiles as $l) { if ($l['tokenKey'] === $aKey) { $matched = $l; break; } }
+                if (!$matched) {
+                    $bScore = 0;
+                    foreach ($allLrcFiles as $l) {
+                        $sim = count(array_intersect($aTokens, $l['tokens'])) / max(1, count(array_unique(array_merge($aTokens, $l['tokens']))));
+                        if ($sim >= 0.6 && $sim > $bScore) { $bScore = $sim; $matched = $l; }
+                    }
+                }
+            }
+        }
+        $title = $matched && $matched['metaTitle'] ? $matched['metaTitle'] : null;
+        $artist = $matched && $matched['metaArtist'] ? $matched['metaArtist'] : null;
+        if (!$title && $matched && strpos($matched['basename'], ' - ') !== false) {
+            $p = explode(' - ', $matched['basename'], 2); $title = $p[0]; $artist = $p[1];
+        } elseif (!$title) {
+            $cl = preg_replace('/(_vocals-back|_vocals|_instrumental|_karaoke|-karaoke|\(karaoke\)|\(instrumental\))$/i', '', $base);
+            if (strpos($cl, ' - ') !== false) { $p = explode(' - ', $cl, 2); $artist = $p[0]; $title = $p[1]; }
+            else { $title = $cl; $artist = 'Karaoke Track'; }
+        }
+        $hasLrc = ($matched !== null);
         $catalog[] = [
             'id' => 'host_' . substr(md5($file), 0, 10),
-            'title' => ucwords(str_replace(['_','-'], ' ', $title)),
-            'artist' => ucwords(trim($artist)),
+            'title' => ucwords(trim(str_replace(['_', '-'], ' ', $title))),
+            'artist' => ucwords(trim(str_replace(['_', '-'], ' ', $artist))),
+            'filename' => $file,
             'format' => '.' . strtoupper($ext),
-            'audioUrl' => $baseUrl . rawurlencode($file),
+            'source' => 'custom_host',
+            'audioUrl' => $target['baseUrl'] . rawurlencode($file),
             'hasLyrics' => $hasLrc,
-            'lrcUrl' => $hasLrc ? $baseUrl . rawurlencode($base . '.lrc') : null,
-            'lrcContent' => ($hasLrc && filesize($lrcPath) < 102400) ? @file_get_contents($lrcPath) : null
+            'lrcUrl' => $hasLrc ? $matched['url'] : null,
+            'lrcContent' => $hasLrc ? $matched['content'] : null,
+            'fileSize' => @filesize($target['path'] . $file) ?: 0
         ];
     }
 }
-echo json_encode(['status' => 'success', 'total' => count($catalog), 'songs' => $catalog], JSON_UNESCAPED_SLASHES);</textarea>
+usort($catalog, function($a, $b) { return strcasecmp($a['title'], $b['title']); });
+echo json_encode(['status' => 'success', 'server' => 'SUSHEE PHP Hosting Server', 'total' => count($catalog), 'songs' => $catalog], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);</textarea>
             <button class="btn btn-primary btn-sm" id="btnCopyPhpScript" style="margin-top: 6px; width: 100%;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               <span>Salin Script api.php</span>

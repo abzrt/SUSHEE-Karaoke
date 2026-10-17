@@ -20,54 +20,12 @@ class HostingServerService {
     });
 
     // Active PHP Hosting Server Endpoint
-    this.serverUrl = localStorage.getItem('sushee_hosting_url') || '';
+    this.serverUrl = localStorage.getItem('sushee_hosting_url') || 'https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SONGS/api.php';
     this.cachedSongs = [];
     this.isConnected = false;
 
-    // Curated Demo Backup Songs (Shown when server is not configured yet)
-    this.sampleCatalog = [
-      {
-        id: 'sample_001',
-        title: 'Kemesraan',
-        artist: 'Iwan Fals & Friends',
-        format: '.MP3',
-        source: 'sample_cloud',
-        audioUrl: 'https://archive.org/download/kemesraan-karaoke-audio/kemesraan.mp3',
-        hasLyrics: true,
-        lrcContent: `[ti:Kemesraan]
-[ar:Iwan Fals]
-[00:00.00]♪ Intro Kemesraan ♪
-[00:06.00]Suatu hari di kala kita duduk di tepi pantai
-[00:15.50]Dan memandang ombak di lautan yang kian menepi
-[00:26.00]Burung camar terbang bermain di derunya angin
-[00:36.50]Suara alam ini hangatkan jiwa kita
-[00:46.00]♪ Reff ♪
-[00:48.00]Kemesraan ini janganlah cepat berlalu
-[00:57.00]Kemesraan ini inginku kenang selalu
-[01:07.50]Hatiku damai jiwaku tentram di sampingmu
-[01:17.00]Hatiku damai jiwaku tentram bersamamu`
-      },
-      {
-        id: 'sample_002',
-        title: 'Separuh Nafas',
-        artist: 'Dewa 19',
-        format: '.MP3',
-        source: 'sample_cloud',
-        audioUrl: 'https://archive.org/download/separuh-nafas-karaoke/separuh_nafas.mp3',
-        hasLyrics: true,
-        lrcContent: `[ti:Separuh Nafas]
-[ar:Dewa 19]
-[00:00.00]♪ Intro Rock Beat ♪
-[00:08.00]Separuh nafasku terbang bersama dirimu
-[00:16.50]Saat kau tinggalkanku salahkanku
-[00:24.00]Salahkah aku bila ku bukanlah
-[00:31.50]Seperti aku yang dahulu
-[00:38.00]♪ Reff Dewa 19 ♪
-[00:41.00]Ada makna tergali dari setiap kata
-[00:48.50]Yang kau ucapkan padaku
-[00:56.00]Kembalilah kasih kembalilah padaku`
-      }
-    ];
+    // No demo songs (removed upon user request)
+    this.sampleCatalog = [];
   }
 
   /**
@@ -178,9 +136,9 @@ class HostingServerService {
       }
     }
 
-    // 2. Fallback sample catalog if server not configured or unreachable
+    // 2. Return empty or cached songs if server unreachable (No demo songs)
     this.isConnected = false;
-    return this.sampleCatalog.filter(s => 
+    return this.cachedSongs.filter(s => 
       !q || s.title.toLowerCase().includes(q) || s.artist.toLowerCase().includes(q)
     );
   }

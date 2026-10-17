@@ -724,6 +724,39 @@ body {
   transform: scale(0.97);
 }
 
+.btn-karaoke-secondary {
+  height: 52px;
+  padding: 0 18px;
+  border-radius: var(--border-radius-full);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(0, 242, 254, 0.35);
+  color: var(--color-cyan);
+  font-size: 0.88rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-karaoke-secondary:hover {
+  background: rgba(0, 242, 254, 0.15);
+  border-color: var(--color-cyan);
+}
+
+.btn-karaoke-secondary:active {
+  transform: scale(0.97);
+}
+
+.btn-karaoke-secondary.is-playing {
+  background: rgba(0, 242, 254, 0.2);
+  border-color: #00f2fe;
+  box-shadow: 0 0 15px rgba(0, 242, 254, 0.3);
+}
+
 /* --- STARMAKER VOCAL EFFECT DRAWER --- */
 .effects-section {
   background: var(--bg-card);

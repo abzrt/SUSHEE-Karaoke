@@ -51,14 +51,24 @@ class AudioEffectsEngine {
     this.currentPreset = 'studio';
     this.isMonitoring = false;
     this.vocalVolume = 1.0;
-    // Default balanced backing track level (0.45 = 45%), avoids overwhelming vocal and prevents digital distortion
+    // Default balanced backing track level (0.85 = 85%) for clear, loud playback
     const savedMusicVol = localStorage.getItem('sushee_music_volume');
-    this.musicVolume = savedMusicVol !== null ? Math.max(0, Math.min(1.0, parseFloat(savedMusicVol))) : 0.45;
+    this.musicVolume = savedMusicVol !== null ? Math.max(0.1, Math.min(1.0, parseFloat(savedMusicVol))) : 0.85;
     this.latencyOffsetMs = 0; // Latency compensation
 
     // Audio Analysis for Visualizer
     this.micAnalyser = null;
     this.musicAnalyser = null;
+  }
+
+  async resumeContext() {
+    if (this.audioCtx && this.audioCtx.state === 'suspended') {
+      try {
+        await this.audioCtx.resume();
+      } catch (e) {
+        console.warn("Could not resume AudioContext:", e);
+      }
+    }
   }
 
   async init(musicAudioElement) {
@@ -67,13 +77,11 @@ class AudioEffectsEngine {
       this.audioCtx = new AudioContextClass({ latencyHint: 'interactive' });
     }
 
-    if (this.audioCtx.state === 'suspended') {
-      await this.audioCtx.resume();
-    }
+    await this.resumeContext();
 
     this.musicElement = musicAudioElement;
     if (this.musicElement) {
-      this.musicElement.volume = this.musicVolume;
+      this.musicElement.volume = 1.0;
     }
 
     // Create Master Recording Destination
@@ -159,12 +167,8 @@ class AudioEffectsEngine {
       this.musicSourceNode.connect(this.musicMixGain);
       this.musicMixGain.connect(this.musicAnalyser);
 
-      // Route to Master Speaker Output (Protected by limiter)
-      if (this.masterSpeakerGain) {
-        this.musicMixGain.connect(this.masterSpeakerGain);
-      } else {
-        this.musicMixGain.connect(this.audioCtx.destination);
-      }
+      // Route directly to Master Audio Destination for full clarity & zero distortion
+      this.musicMixGain.connect(this.audioCtx.destination);
       
       // Delay Node for Latency Alignment
       this.musicDelayNode = this.audioCtx.createDelay(1.0);
@@ -577,7 +581,8 @@ class AudioEffectsEngine {
     }
 
     if (this.musicElement) {
-      this.musicElement.volume = this.musicVolume;
+      // If Web Audio node is active, keep HTML5 volume at 1.0 to prevent double attenuation
+      this.musicElement.volume = this.musicSourceNode ? 1.0 : this.musicVolume;
     }
   }
 

@@ -173,7 +173,6 @@ async function initApp() {
       if (!matchesSearch) return false;
 
       if (currentFilter === 'local') return song.source === 'local';
-      if (currentFilter === 'sample') return song.source === 'sample';
       return true;
     });
 
@@ -243,8 +242,14 @@ async function initApp() {
     document.querySelectorAll('.current-song-title').forEach(el => el.textContent = song.title);
     document.querySelectorAll('.current-song-artist').forEach(el => el.textContent = song.artist);
 
-    // Audio element source
+    // Audio element source: ensure CORS is set before src for remote hosting URLs
+    if (song.audioUrl && (song.audioUrl.startsWith('http://') || song.audioUrl.startsWith('https://'))) {
+      audioElement.crossOrigin = 'anonymous';
+    } else {
+      audioElement.removeAttribute('crossorigin');
+    }
     audioElement.src = song.audioUrl;
+    audioElement.muted = false;
     audioElement.load();
 
     // Parse lyrics
@@ -389,6 +394,8 @@ async function initApp() {
       // START KARAOKE
       try {
         await audioEngine.init(audioElement);
+        await audioEngine.resumeContext();
+        audioElement.muted = false;
 
         let micStarted = false;
         try {
@@ -420,6 +427,7 @@ async function initApp() {
         if (visualizer) visualizer.start();
 
         updateKaraokeUIState(true);
+        updateMusicPlayButtonUI(true);
         showToast(micStarted ? 'Karaoke & Perekaman Dimulai!' : 'Musik Backing Dimulai!', 'success');
       } catch (err) {
         showToast(err.message || 'Gagal memulai karaoke.', 'error');
@@ -476,13 +484,79 @@ async function initApp() {
   }
 
   if (btnRestartKaraoke) {
-    btnRestartKaraoke.addEventListener('click', () => {
+    btnRestartKaraoke.addEventListener('click', async () => {
       audioElement.currentTime = 0;
       if (isKaraokePlaying) {
+        await audioEngine.resumeContext();
         audioElement.play();
       }
     });
   }
+
+  // --- INDEPENDENT BACKING TRACK PLAY/PAUSE CONTROLLER ---
+  const btnToggleMusicPlayback = document.getElementById('btnToggleMusicPlayback');
+  const musicPlayIcon = document.getElementById('musicPlayIcon');
+  const musicPlayLabel = document.getElementById('musicPlayLabel');
+
+  function updateMusicPlayButtonUI(isPlaying) {
+    if (!btnToggleMusicPlayback) return;
+    if (isPlaying) {
+      btnToggleMusicPlayback.classList.add('is-playing');
+      if (musicPlayLabel) musicPlayLabel.textContent = 'Jeda Musik';
+      if (musicPlayIcon) {
+        musicPlayIcon.innerHTML = `<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>`;
+      }
+    } else {
+      btnToggleMusicPlayback.classList.remove('is-playing');
+      if (musicPlayLabel) musicPlayLabel.textContent = 'Putar Musik';
+      if (musicPlayIcon) {
+        musicPlayIcon.innerHTML = `<polygon points="5 3 19 12 5 21 5 3"/>`;
+      }
+    }
+  }
+
+  async function toggleMusicPlayback() {
+    if (!currentSong) {
+      showToast(window.i18n.t('noSongSelected'), 'warning');
+      switchTab('viewCloud');
+      return;
+    }
+
+    if (audioElement.paused) {
+      try {
+        await audioEngine.init(audioElement);
+        await audioEngine.resumeContext();
+        audioElement.muted = false;
+        await audioElement.play();
+        isKaraokePlaying = true;
+        if (visualizer) visualizer.start();
+        updateMusicPlayButtonUI(true);
+        showToast('Memutar musik...', 'info');
+      } catch (err) {
+        console.error("Music playback failed:", err);
+        showToast('Gagal memutar musik: ' + (err.message || err), 'error');
+      }
+    } else {
+      audioElement.pause();
+      isKaraokePlaying = false;
+      if (visualizer) visualizer.stop();
+      updateMusicPlayButtonUI(false);
+      updateKaraokeUIState(false);
+    }
+  }
+
+  if (btnToggleMusicPlayback) {
+    btnToggleMusicPlayback.addEventListener('click', toggleMusicPlayback);
+  }
+
+  audioElement.addEventListener('play', () => updateMusicPlayButtonUI(true));
+  audioElement.addEventListener('pause', () => updateMusicPlayButtonUI(false));
+  audioElement.addEventListener('ended', () => {
+    isKaraokePlaying = false;
+    if (visualizer) visualizer.stop();
+    updateMusicPlayButtonUI(false);
+    updateKaraokeUIState(false);
+  });
 
   // --- STARMAKER VOCAL EFFECT PRESET SELECTOR ---
   const presetButtons = document.querySelectorAll('.preset-btn');
@@ -1012,11 +1086,15 @@ async function initApp() {
       `).join('');
 
       cloudListContainer.querySelectorAll('.song-card').forEach(card => {
-        card.addEventListener('click', () => {
+        card.addEventListener('click', (e) => {
           const id = card.getAttribute('data-cloud-id');
           const song = songs.find(s => s.id === id);
           if (song) {
             selectSong(song, true);
+            // If user clicked the play icon directly, start music playback immediately!
+            if (e.target.closest('.btn-icon-sing')) {
+              toggleMusicPlayback();
+            }
           }
         });
       });
@@ -1103,13 +1181,15 @@ async function initApp() {
 
   // --- INITIALIZE UI ---
   renderSongList();
-  renderCloudSongList();
   renderRecordingsList();
-
-  // If sample songs exist, select the first one by default
-  if (storageScanner.songs.length > 0) {
-    selectSong(storageScanner.songs[0], false);
-  }
+  renderCloudSongList().then(() => {
+    // Select first real cloud song by default if available
+    if (!currentSong && hostingService.cachedSongs && hostingService.cachedSongs.length > 0) {
+      selectSong(hostingService.cachedSongs[0], false);
+    } else if (!currentSong && storageScanner.songs.length > 0) {
+      selectSong(storageScanner.songs[0], false);
+    }
+  });
 }
 
 // Ensure initApp runs whether DOM is loading or already ready
