@@ -39,8 +39,8 @@ async function initApp() {
   }
   const storageScanner = new StorageScanner();
   const recorder = new KaraokeRecorder(audioEngine);
-  const gdriveService = new GoogleDriveService();
-  window.gdriveService = gdriveService;
+  const hostingService = new HostingServerService();
+  window.hostingService = hostingService;
   let visualizer = null;
   const lrcParser = new LrcParser();
 
@@ -137,7 +137,7 @@ async function initApp() {
       window.i18n.setLanguage(lang);
       renderSongList();
       renderRecordingsList();
-      if (typeof renderGdriveSongList === 'function') renderGdriveSongList();
+      if (typeof renderCloudSongList === 'function') renderCloudSongList();
       showToast(lang === 'id' ? 'Bahasa diubah ke Indonesia' : 'Language switched to English', 'success');
     });
   });
@@ -251,14 +251,19 @@ async function initApp() {
     if (song.hasLyrics && song.lrcContent) {
       lrcParser.parse(song.lrcContent);
       renderLyricsView();
-    } else if (song.hasLyrics && song.lrcFileId) {
-      showToast('Mengunduh lirik Google Drive...', 'info');
-      gdriveService.fetchLrcContent(song.lrcFileId).then(text => {
-        song.lrcContent = text;
-        lrcParser.parse(text);
-        renderLyricsView();
+    } else if (song.hasLyrics && song.lrcUrl) {
+      showToast('Mengunduh lirik dari server...', 'info');
+      hostingService.fetchLrcContent(song.lrcUrl).then(text => {
+        if (text) {
+          song.lrcContent = text;
+          lrcParser.parse(text);
+          renderLyricsView();
+        } else {
+          lrcParser.lines = [];
+          renderEmptyLyricsView();
+        }
       }).catch(err => {
-        console.warn('Gagal memuat LRC Drive:', err);
+        console.warn('Gagal memuat LRC server:', err);
         lrcParser.lines = [];
         renderEmptyLyricsView();
       });
@@ -268,7 +273,7 @@ async function initApp() {
     }
 
     renderSongList();
-    if (typeof renderGdriveSongList === 'function') renderGdriveSongList();
+    if (typeof renderCloudSongList === 'function') renderCloudSongList();
 
     if (autoNavigate) {
       switchTab('viewKaraoke');
@@ -906,70 +911,84 @@ async function initApp() {
     });
   }
 
-  // --- GOOGLE DRIVE INTEGRATION ---
-  const gdriveListContainer = document.getElementById('gdriveSongList');
-  const gdriveSearchInput = document.getElementById('gdriveSearchInput');
-  const btnToggleDriveConfig = document.getElementById('btnToggleDriveConfig');
-  const driveConfigDrawer = document.getElementById('driveConfigDrawer');
-  const driveFolderInput = document.getElementById('driveFolderInput');
-  const driveWebAppUrlInput = document.getElementById('driveWebAppUrlInput');
-  const driveApiKeyInput = document.getElementById('driveApiKeyInput');
-  const btnSaveDriveConfig = document.getElementById('btnSaveDriveConfig');
-  const btnOpenDriveFolderExternal = document.getElementById('btnOpenDriveFolderExternal');
-  const btnRefreshDriveSongs = document.getElementById('btnRefreshDriveSongs');
-  const btnOpenDriveGuide = document.getElementById('btnOpenDriveGuide');
-  const gdriveGuideModal = document.getElementById('gdriveGuideModal');
-  const btnCloseDriveGuideModal = document.getElementById('btnCloseDriveGuideModal');
-  const btnCopyAppsScript = document.getElementById('btnCopyAppsScript');
-  const btnOpenAddDriveSong = document.getElementById('btnOpenAddDriveSong');
-  const addDriveSongModal = document.getElementById('addDriveSongModal');
-  const btnCloseAddDriveModal = document.getElementById('btnCloseAddDriveModal');
-  const btnConfirmAddDriveSong = document.getElementById('btnConfirmAddDriveSong');
-  const gdriveActiveFolderLabel = document.getElementById('gdriveActiveFolderLabel');
+  // --- PHP WEB HOSTING CLOUD INTEGRATION (my.php.id) ---
+  const cloudListContainer = document.getElementById('cloudSongList');
+  const cloudSearchInput = document.getElementById('cloudSearchInput');
+  const btnToggleServerConfig = document.getElementById('btnToggleServerConfig');
+  const btnToggleServerConfigAlt = document.getElementById('btnToggleServerConfigAlt');
+  const serverConfigDrawer = document.getElementById('serverConfigDrawer');
+  const serverUrlInput = document.getElementById('serverUrlInput');
+  const btnSaveServerConfig = document.getElementById('btnSaveServerConfig');
+  const btnOpenServerExternal = document.getElementById('btnOpenServerExternal');
+  const btnRefreshCloudSongs = document.getElementById('btnRefreshCloudSongs');
+  const btnOpenHostingGuide = document.getElementById('btnOpenHostingGuide');
+  const hostingGuideModal = document.getElementById('hostingGuideModal');
+  const btnCloseHostingGuideModal = document.getElementById('btnCloseHostingGuideModal');
+  const btnCopyPhpScript = document.getElementById('btnCopyPhpScript');
+  const serverActiveLabel = document.getElementById('serverActiveLabel');
+  const serverStatusPulse = document.getElementById('serverStatusPulse');
 
-  if (driveFolderInput) {
-    driveFolderInput.value = gdriveService.folderUrl || 'https://drive.google.com/drive/folders/1PWplk3vIXo-k3lW7mTq7dcV7KpQyQtC3?hl=ID';
-  }
-  if (driveWebAppUrlInput) {
-    driveWebAppUrlInput.value = gdriveService.webAppUrl || '';
-  }
-  if (driveApiKeyInput) {
-    driveApiKeyInput.value = gdriveService.apiKey || '';
+  if (serverUrlInput) {
+    serverUrlInput.value = hostingService.serverUrl || '';
   }
 
-  async function renderGdriveSongList() {
-    if (!gdriveListContainer) return;
-    const query = (gdriveSearchInput ? gdriveSearchInput.value : '').trim();
+  function updateServerStatusUI(isConnected, songCount = 0) {
+    if (!serverActiveLabel) return;
+    if (hostingService.serverUrl) {
+      try {
+        const u = new URL(hostingService.serverUrl);
+        serverActiveLabel.innerHTML = `Server: <strong>${u.hostname}</strong> (${songCount} Lagu)`;
+      } catch (e) {
+        serverActiveLabel.innerHTML = `Server: <strong>${hostingService.serverUrl}</strong>`;
+      }
+      if (serverStatusPulse) {
+        serverStatusPulse.style.background = isConnected ? '#00f2fe' : '#f59e0b';
+        serverStatusPulse.style.boxShadow = isConnected ? '0 0 8px #00f2fe' : '0 0 8px #f59e0b';
+      }
+    } else {
+      serverActiveLabel.innerHTML = `Server: <strong>Belum Dikonfigurasi (Demo Cloud)</strong>`;
+      if (serverStatusPulse) {
+        serverStatusPulse.style.background = '#888';
+        serverStatusPulse.style.boxShadow = 'none';
+      }
+    }
+  }
+
+  async function renderCloudSongList() {
+    if (!cloudListContainer) return;
+    const query = (cloudSearchInput ? cloudSearchInput.value : '').trim();
 
     try {
-      const driveSongs = await gdriveService.searchSongs(query);
+      const songs = await hostingService.searchSongs(query);
+      updateServerStatusUI(hostingService.isConnected, songs.length);
 
-      if (driveSongs.length === 0) {
-        gdriveListContainer.innerHTML = `
+      if (songs.length === 0) {
+        cloudListContainer.innerHTML = `
           <div class="empty-state">
-            <div class="empty-icon">☁️</div>
-            <h4>Tidak Ada Lagu Ditemukan</h4>
-            <p>Belum ada lagu yang cocok dalam folder Google Drive ini.</p>
+            <div class="empty-icon">🌐</div>
+            <h4>Belum Ada Lagu di Server</h4>
+            <p>Upload file .mp3 dan .lrc ke folder <code>songs/</code> di hosting Anda.</p>
             <div class="empty-actions">
-              <button class="btn btn-primary" id="btnEmptyAddDrive">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                <span>Tambah Link Lagu Google Drive</span>
+              <button class="btn btn-primary" id="btnEmptyConfigServer">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <span>Atur URL Hosting Anda</span>
               </button>
             </div>
           </div>
         `;
-        const btnEmptyAdd = document.getElementById('btnEmptyAddDrive');
-        if (btnEmptyAdd) {
-          btnEmptyAdd.addEventListener('click', () => {
-            if (addDriveSongModal) addDriveSongModal.classList.add('open');
+        const btnEmpty = document.getElementById('btnEmptyConfigServer');
+        if (btnEmpty && serverConfigDrawer) {
+          btnEmpty.addEventListener('click', () => {
+            serverConfigDrawer.style.display = 'block';
+            if (serverUrlInput) serverUrlInput.focus();
           });
         }
         return;
       }
 
-      gdriveListContainer.innerHTML = driveSongs.map(song => `
-        <div class="song-card ${currentSong && currentSong.id === song.id ? 'now-playing' : ''}" data-gdrive-id="${song.id}">
-          <div class="song-card-avatar" style="background: rgba(66, 133, 244, 0.15); color: #8ab4f8;">
+      cloudListContainer.innerHTML = songs.map(song => `
+        <div class="song-card ${currentSong && currentSong.id === song.id ? 'now-playing' : ''}" data-cloud-id="${song.id}">
+          <div class="song-card-avatar" style="background: rgba(0, 242, 254, 0.15); color: #00f2fe;">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
           </div>
           <div class="song-card-info">
@@ -977,7 +996,7 @@ async function initApp() {
             <p class="song-card-artist">${song.artist}</p>
             <div class="song-badges">
               <span class="badge badge-format">${song.format || '.MP3'}</span>
-              <span class="badge badge-gdrive">Google Drive</span>
+              <span class="badge" style="background: rgba(0, 242, 254, 0.15); color: var(--color-cyan); border: 1px solid rgba(0, 242, 254, 0.3);">PHP Hosting</span>
               ${song.hasLyrics ? 
                 `<span class="badge badge-lyrics"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> ${window.i18n.t('badgeHasLyrics')}</span>` : 
                 `<span class="badge badge-no-lyrics">${window.i18n.t('badgeNoLyrics')}</span>`
@@ -985,138 +1004,106 @@ async function initApp() {
             </div>
           </div>
           <div class="song-card-actions">
-            <button class="btn-icon-sing" title="${window.i18n.t('btnSingNow')}" data-gdrive-id="${song.id}">
+            <button class="btn-icon-sing" title="${window.i18n.t('btnSingNow')}" data-cloud-id="${song.id}">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             </button>
           </div>
         </div>
       `).join('');
 
-      gdriveListContainer.querySelectorAll('.song-card').forEach(card => {
+      cloudListContainer.querySelectorAll('.song-card').forEach(card => {
         card.addEventListener('click', () => {
-          const id = card.getAttribute('data-gdrive-id');
-          const song = driveSongs.find(s => s.id === id);
+          const id = card.getAttribute('data-cloud-id');
+          const song = songs.find(s => s.id === id);
           if (song) {
             selectSong(song, true);
           }
         });
       });
     } catch (e) {
-      console.error("Error rendering GDrive list:", e);
+      console.error("Error rendering Cloud Hosting list:", e);
     }
   }
 
-  if (gdriveSearchInput) {
-    gdriveSearchInput.addEventListener('input', () => {
-      renderGdriveSongList();
+  if (cloudSearchInput) {
+    cloudSearchInput.addEventListener('input', () => {
+      renderCloudSongList();
     });
   }
 
-  if (btnToggleDriveConfig) {
-    btnToggleDriveConfig.addEventListener('click', () => {
-      if (!driveConfigDrawer) return;
-      const isVisible = driveConfigDrawer.style.display !== 'none';
-      driveConfigDrawer.style.display = isVisible ? 'none' : 'block';
-    });
-  }
+  const toggleDrawer = () => {
+    if (!serverConfigDrawer) return;
+    const isVisible = serverConfigDrawer.style.display !== 'none';
+    serverConfigDrawer.style.display = isVisible ? 'none' : 'block';
+  };
+  if (btnToggleServerConfig) btnToggleServerConfig.addEventListener('click', toggleDrawer);
+  if (btnToggleServerConfigAlt) btnToggleServerConfigAlt.addEventListener('click', toggleDrawer);
 
-  if (btnSaveDriveConfig) {
-    btnSaveDriveConfig.addEventListener('click', () => {
-      const urlOrId = driveFolderInput ? driveFolderInput.value.trim() : '';
-      const apiKey = driveApiKeyInput ? driveApiKeyInput.value.trim() : '';
-      const webAppUrl = driveWebAppUrlInput ? driveWebAppUrlInput.value.trim() : '';
-      if (!urlOrId && !webAppUrl) {
-        showToast('Masukkan link folder atau Web App URL Google Drive', 'warning');
+  if (btnSaveServerConfig) {
+    btnSaveServerConfig.addEventListener('click', async () => {
+      const url = serverUrlInput ? serverUrlInput.value.trim() : '';
+      if (!url) {
+        showToast('Masukkan URL endpoint api.php di hosting Anda', 'warning');
         return;
       }
-      gdriveService.saveConfig(urlOrId, apiKey, webAppUrl);
-      if (driveConfigDrawer) driveConfigDrawer.style.display = 'none';
-      showToast('Konfigurasi Google Drive berhasil disimpan!', 'success');
-      renderGdriveSongList();
+
+      showToast('Menghubungkan ke server hosting...', 'info');
+      try {
+        const res = await hostingService.testConnection(url);
+        if (serverConfigDrawer) serverConfigDrawer.style.display = 'none';
+        showToast(`Berhasil terhubung! Ditemukan ${res.total} lagu di hosting.`, 'success');
+        renderCloudSongList();
+      } catch (err) {
+        showToast('Gagal terhubung: ' + err.message, 'error');
+      }
     });
   }
 
-  if (btnOpenDriveGuide) {
-    btnOpenDriveGuide.addEventListener('click', () => {
-      if (gdriveGuideModal) gdriveGuideModal.classList.add('open');
+  if (btnOpenServerExternal) {
+    btnOpenServerExternal.addEventListener('click', () => {
+      if (hostingService.serverUrl) {
+        window.open(hostingService.serverUrl, '_blank');
+      } else {
+        showToast('Isi URL server terlebih dahulu', 'warning');
+      }
     });
   }
 
-  if (btnCloseDriveGuideModal) {
-    btnCloseDriveGuideModal.addEventListener('click', () => {
-      if (gdriveGuideModal) gdriveGuideModal.classList.remove('open');
+  if (btnRefreshCloudSongs) {
+    btnRefreshCloudSongs.addEventListener('click', () => {
+      showToast('Menyegarkan daftar lagu dari hosting...', 'info');
+      renderCloudSongList();
     });
   }
 
-  if (btnCopyAppsScript) {
-    btnCopyAppsScript.addEventListener('click', () => {
-      const code = document.getElementById('appsScriptCodeBlock')?.value;
+  if (btnOpenHostingGuide) {
+    btnOpenHostingGuide.addEventListener('click', () => {
+      if (hostingGuideModal) hostingGuideModal.classList.add('open');
+    });
+  }
+
+  if (btnCloseHostingGuideModal) {
+    btnCloseHostingGuideModal.addEventListener('click', () => {
+      if (hostingGuideModal) hostingGuideModal.classList.remove('open');
+    });
+  }
+
+  if (btnCopyPhpScript) {
+    btnCopyPhpScript.addEventListener('click', () => {
+      const code = document.getElementById('phpScriptCodeBlock')?.value;
       if (code && navigator.clipboard) {
         navigator.clipboard.writeText(code).then(() => {
-          showToast('Kode script berhasil disalin ke clipboard!', 'success');
+          showToast('Script api.php berhasil disalin ke clipboard!', 'success');
         }).catch(() => {
-          showToast('Gagal menyalin otomatis, silakan pilih teks dan salin manual.', 'warning');
+          showToast('Gagal menyalin otomatis, silakan salin teks secara manual.', 'warning');
         });
       }
     });
   }
 
-  if (btnOpenDriveFolderExternal) {
-    btnOpenDriveFolderExternal.addEventListener('click', () => {
-      const targetUrl = gdriveService.folderUrl || 'https://drive.google.com/drive/folders/1PWplk3vIXo-k3lW7mTq7dcV7KpQyQtC3?hl=ID';
-      window.open(targetUrl, '_blank');
-    });
-  }
-
-  if (btnRefreshDriveSongs) {
-    btnRefreshDriveSongs.addEventListener('click', () => {
-      showToast('Menyegarkan katalog Google Drive...', 'info');
-      renderGdriveSongList();
-    });
-  }
-
-  if (btnOpenAddDriveSong) {
-    btnOpenAddDriveSong.addEventListener('click', () => {
-      if (addDriveSongModal) addDriveSongModal.classList.add('open');
-    });
-  }
-
-  if (btnCloseAddDriveModal) {
-    btnCloseAddDriveModal.addEventListener('click', () => {
-      if (addDriveSongModal) addDriveSongModal.classList.remove('open');
-    });
-  }
-
-  if (btnConfirmAddDriveSong) {
-    btnConfirmAddDriveSong.addEventListener('click', () => {
-      const title = document.getElementById('modalDriveTitle')?.value.trim();
-      const artist = document.getElementById('modalDriveArtist')?.value.trim();
-      const audioUrl = document.getElementById('modalDriveAudioUrl')?.value.trim();
-      const lrcText = document.getElementById('modalDriveLrcText')?.value.trim();
-
-      if (!audioUrl) {
-        showToast('Harap masukkan link file audio Google Drive!', 'warning');
-        return;
-      }
-
-      const newSong = gdriveService.addCustomSong(title, artist, audioUrl, lrcText);
-      if (addDriveSongModal) addDriveSongModal.classList.remove('open');
-      
-      // Clear inputs
-      if (document.getElementById('modalDriveTitle')) document.getElementById('modalDriveTitle').value = '';
-      if (document.getElementById('modalDriveArtist')) document.getElementById('modalDriveArtist').value = '';
-      if (document.getElementById('modalDriveAudioUrl')) document.getElementById('modalDriveAudioUrl').value = '';
-      if (document.getElementById('modalDriveLrcText')) document.getElementById('modalDriveLrcText').value = '';
-
-      renderGdriveSongList();
-      showToast(`Lagu "${newSong.title}" berhasil ditambahkan ke database!`, 'success');
-      selectSong(newSong, true);
-    });
-  }
-
   // --- INITIALIZE UI ---
   renderSongList();
-  renderGdriveSongList();
+  renderCloudSongList();
   renderRecordingsList();
 
   // If sample songs exist, select the first one by default

@@ -1,0 +1,12 @@
+# Enable CORS for audio and lrc files
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS, HEAD"
+    Header set Access-Control-Allow-Headers "Range, Content-Type, Authorization"
+    Header set Access-Control-Expose-Headers "Content-Range, Content-Length, Accept-Ranges"
+</IfModule>
+
+# Enable Range Requests for smooth audio seeking / scrubbing
+<IfModule mod_setenvif.c>
+    SetEnvIf Range "(..*)" HAVE_RANGE=1
+</IfModule>

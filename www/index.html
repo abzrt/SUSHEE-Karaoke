@@ -158,73 +158,69 @@
         <div class="song-list" id="songsList"></div>
       </section>
 
-      <!-- ================= VIEW: GOOGLE DRIVE CLOUD ================= -->
-      <section class="app-view" id="viewDrive">
+      <!-- ================= VIEW: PHP WEB HOSTING CLOUD ================= -->
+      <section class="app-view" id="viewCloud">
         <!-- Cloud Hero Banner -->
-        <div class="scan-hero-card" style="background: linear-gradient(135deg, rgba(66, 133, 244, 0.22), rgba(52, 168, 83, 0.15), rgba(251, 188, 5, 0.12)); border: 1px solid rgba(66, 133, 244, 0.35);">
+        <div class="scan-hero-card" style="background: linear-gradient(135deg, rgba(0, 242, 254, 0.16), rgba(79, 172, 254, 0.22), rgba(118, 75, 162, 0.16)); border: 1px solid rgba(0, 242, 254, 0.38);">
           <div class="scan-hero-content">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-              <span class="badge badge-gdrive" style="font-size: 0.72rem; padding: 3px 10px; border-radius: 20px;">
-                ☁️ CLOUD DATABASE
+              <span class="badge" style="font-size: 0.72rem; padding: 3px 10px; border-radius: 20px; background: rgba(0, 242, 254, 0.18); color: var(--color-cyan); border: 1px solid rgba(0, 242, 254, 0.35);">
+                🌐 PHP WEB HOSTING (MY.PHP.ID)
               </span>
-              <button class="btn-icon-round" id="btnToggleDriveConfig" title="Pengaturan Folder Google Drive" style="width: 32px; height: 32px;">
+              <button class="btn-icon-round" id="btnToggleServerConfig" title="Atur Endpoint Server" style="width: 32px; height: 32px;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
               </button>
             </div>
-            <h3 class="scan-hero-title" data-i18n="gdriveTitle">Google Drive Karaoke</h3>
-            <p class="scan-hero-desc" data-i18n="gdriveDesc">Cari dan putar lagu & lirik langsung dari cloud Google Drive</p>
+            <h3 class="scan-hero-title" data-i18n="cloudTitle">Server Hosting Lagu</h3>
+            <p class="scan-hero-desc" data-i18n="cloudDesc">Streaming lagu & lirik langsung dari web hosting PHP Anda (my.php.id)</p>
 
-            <div class="gdrive-status-chip" style="margin-top: 8px; display: inline-flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); padding: 5px 12px; border-radius: 20px; font-size: 0.76rem;">
-              <span class="status-dot-pulse" style="width: 8px; height: 8px; border-radius: 50%; background: #00f2fe; box-shadow: 0 0 8px #00f2fe;"></span>
-              <span id="gdriveActiveFolderLabel">Folder: <strong>SB (SongBook)</strong></span>
+            <div class="gdrive-status-chip" style="margin-top: 8px; display: inline-flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.12); padding: 5px 12px; border-radius: 20px; font-size: 0.76rem;">
+              <span id="serverStatusPulse" class="status-dot-pulse" style="width: 8px; height: 8px; border-radius: 50%; background: #00f2fe; box-shadow: 0 0 8px #00f2fe;"></span>
+              <span id="serverActiveLabel">Server: <strong>Belum Dikonfigurasi</strong></span>
             </div>
 
             <!-- Expandable Config Drawer -->
-            <div id="driveConfigDrawer" style="display: none; margin-top: 14px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.15);">
+            <div id="serverConfigDrawer" style="display: none; margin-top: 14px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.15);">
               <div class="form-group" style="margin-bottom: 10px;">
-                <label class="form-label" style="font-size: 0.75rem;">Link / ID Folder Google Drive:</label>
-                <input type="text" class="form-input" id="driveFolderInput" placeholder="https://drive.google.com/drive/folders/..." value="https://drive.google.com/drive/folders/1PWplk3vIXo-k3lW7mTq7dcV7KpQyQtC3?hl=ID" style="font-size: 0.8rem; padding: 8px 10px;">
-              </div>
-              <div class="form-group" style="margin-bottom: 10px;">
-                <label class="form-label" style="font-size: 0.75rem; color: #60a5fa;">⚡ Google Apps Script Web App URL (Rekomendasi - Gratis & Bebas CORS):</label>
-                <input type="text" class="form-input" id="driveWebAppUrlInput" placeholder="https://script.google.com/macros/s/.../exec" style="font-size: 0.8rem; padding: 8px 10px;">
-              </div>
-              <div class="form-group" style="margin-bottom: 10px;">
-                <label class="form-label" style="font-size: 0.75rem;">Atau Google Cloud API Key (Drive API v3):</label>
-                <input type="text" class="form-input" id="driveApiKeyInput" placeholder="AIzaSy..." style="font-size: 0.8rem; padding: 8px 10px;">
+                <label class="form-label" style="font-size: 0.75rem; color: #00f2fe;">🌐 URL Endpoint api.php di Hosting Anda:</label>
+                <input type="text" class="form-input" id="serverUrlInput" placeholder="https://domain-anda.my.php.id/karaoke/api.php" style="font-size: 0.8rem; padding: 8px 10px;">
+                <p style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px;">Contoh: <code>https://nama-anda.my.php.id/karaoke/api.php</code></p>
               </div>
               <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                <button class="btn btn-primary btn-sm" id="btnSaveDriveConfig" style="flex: 1;">Simpan Konfigurasi</button>
-                <button class="btn btn-secondary btn-sm" id="btnOpenDriveFolderExternal" title="Buka di Browser">
+                <button class="btn btn-primary btn-sm" id="btnSaveServerConfig" style="flex: 1;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>Simpan & Hubungkan</span>
+                </button>
+                <button class="btn btn-secondary btn-sm" id="btnOpenServerExternal" title="Buka URL Server di Browser">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                 </button>
               </div>
-              <button class="btn btn-secondary btn-sm" id="btnOpenDriveGuide" style="width: 100%; font-size: 0.75rem; padding: 6px 10px; background: rgba(66, 133, 244, 0.12); color: #8ab4f8; border-color: rgba(66, 133, 244, 0.3);">
+              <button class="btn btn-secondary btn-sm" id="btnOpenHostingGuide" style="width: 100%; font-size: 0.75rem; padding: 6px 10px; background: rgba(0, 242, 254, 0.1); color: #00f2fe; border-color: rgba(0, 242, 254, 0.3);">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                <span>Cara Mengaktifkan Search Online (Panduan 1 Menit)</span>
+                <span>Panduan Upload File ke Hosting (my.php.id)</span>
               </button>
             </div>
 
             <div class="hero-btn-row" style="margin-top: 14px; display: flex; gap: 8px;">
-              <button class="btn btn-primary btn-sm" id="btnOpenAddDriveSong" style="flex: 1;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                <span data-i18n="btnAddDriveSong">+ Tambah Link Lagu GDrive</span>
+              <button class="btn btn-primary btn-sm" id="btnToggleServerConfigAlt" style="flex: 1;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <span data-i18n="btnConfigure">Atur Server</span>
               </button>
-              <button class="btn btn-secondary btn-sm" id="btnRefreshDriveSongs" title="Segarkan">
+              <button class="btn btn-secondary btn-sm" id="btnRefreshCloudSongs" title="Segarkan">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               </button>
             </div>
           </div>
         </div>
 
-        <!-- Drive Search Bar -->
+        <!-- Search Bar -->
         <div class="search-wrapper" style="margin-top: 14px;">
           <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" class="search-input" id="gdriveSearchInput" placeholder="Cari lagu di Google Drive..." data-i18n-placeholder="searchDrivePlaceholder">
+          <input type="text" class="search-input" id="cloudSearchInput" placeholder="Cari lagu di server hosting..." data-i18n-placeholder="searchCloudPlaceholder">
         </div>
 
-        <!-- Google Drive Song List -->
-        <div class="song-list" id="gdriveSongList" style="margin-top: 12px;"></div>
+        <!-- Song List -->
+        <div class="song-list" id="cloudSongList" style="margin-top: 12px;"></div>
       </section>
 
       <!-- ================= VIEW 2: KARAOKE STUDIO ================= -->
@@ -488,9 +484,9 @@
         <span data-i18n="navSongs">Lagu</span>
       </button>
 
-      <button type="button" class="nav-item" data-view="viewDrive" onclick="window.switchTab && window.switchTab('viewDrive')">
+      <button type="button" class="nav-item" data-view="viewCloud" onclick="window.switchTab && window.switchTab('viewCloud')">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
-        <span data-i18n="navDrive">G-Drive</span>
+        <span data-i18n="navCloud">Cloud Server</span>
       </button>
 
       <button type="button" class="nav-item" data-view="viewKaraoke" onclick="window.switchTab && window.switchTab('viewKaraoke')">
@@ -617,113 +613,80 @@
       </div>
     </div>
 
-    <!-- Add Google Drive Song Modal -->
-    <div class="modal-overlay" id="addDriveSongModal">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3 class="modal-title" data-i18n="addDriveModalTitle">Tambah Lagu dari Google Drive</h3>
-          <button class="modal-close" id="btnCloseAddDriveModal">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
-
-        <div style="padding: 10px 0;">
-          <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.4;">
-            Pastikan file di Google Drive Anda diatur ke <em>"Siapa saja yang memiliki link dapat melihat"</em>.
-          </p>
-
-          <div class="form-group" style="margin-bottom: 12px;">
-            <label class="form-label">Judul Lagu:</label>
-            <input type="text" class="form-input" id="modalDriveTitle" placeholder="Contoh: Sang Dewi">
-          </div>
-
-          <div class="form-group" style="margin-bottom: 12px;">
-            <label class="form-label">Nama Penyanyi / Artis:</label>
-            <input type="text" class="form-input" id="modalDriveArtist" placeholder="Contoh: Lyodra & Andi Rianto">
-          </div>
-
-          <div class="form-group" style="margin-bottom: 12px;">
-            <label class="form-label">Link Share File Audio (.mp3 / .m4a):</label>
-            <input type="text" class="form-input" id="modalDriveAudioUrl" placeholder="https://drive.google.com/file/d/1.../view">
-          </div>
-
-          <div class="form-group" style="margin-bottom: 16px;">
-            <label class="form-label">Teks Lirik Bersinkronisasi (.lrc - Opsional):</label>
-            <textarea class="form-input" id="modalDriveLrcText" rows="4" placeholder="[00:12.00]Lirik lagu bersinkronisasi..." style="resize: vertical; font-family: monospace; font-size: 0.8rem;"></textarea>
-          </div>
-
-          <button class="btn btn-primary" id="btnConfirmAddDriveSong" style="width: 100%;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-            <span>Simpan ke Database Karaoke</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Google Drive Quick Setup Guide Modal -->
-    <div class="modal-overlay" id="gdriveGuideModal">
+    <!-- PHP Hosting Server Quick Setup Guide Modal -->
+    <div class="modal-overlay" id="hostingGuideModal">
       <div class="modal-card" style="max-height: 85vh; overflow-y: auto;">
         <div class="modal-header">
-          <h3 class="modal-title">Panduan Google Drive Online Search</h3>
-          <button class="modal-close" id="btnCloseDriveGuideModal">
+          <h3 class="modal-title">Panduan Web Hosting PHP (my.php.id)</h3>
+          <button class="modal-close" id="btnCloseHostingGuideModal">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
 
         <div style="padding: 10px 0; font-size: 0.85rem; line-height: 1.5; color: var(--text-main);">
           <p style="color: var(--text-secondary); margin-bottom: 12px;">
-            Google Drive memblokir akses langsung dari aplikasi luar karena proteksi keamanan (CORS). Agar aplikasi SUSHEE dapat mencari semua lagu di folder Anda, gunakan salah satu cara di bawah:
+            Gunakan web hosting PHP pribadi Anda (seperti di <strong style="color: #00f2fe;">https://my.php.id/</strong> atau cPanel hosting lainnya) untuk streaming lagu dan lirik tanpa limit:
           </p>
 
-          <div style="background: rgba(66, 133, 244, 0.1); border: 1px solid rgba(66, 133, 244, 0.3); border-radius: var(--border-radius-sm); padding: 12px; margin-bottom: 14px;">
-            <h4 style="color: #60a5fa; font-weight: 700; font-size: 0.95rem; margin-bottom: 6px;">⭐ Cara 1: Google Apps Script (Rekomendasi - 1 Menit, 100% Gratis)</h4>
-            <ol style="margin-left: 18px; margin-bottom: 10px; color: var(--text-secondary); font-size: 0.8rem; line-height: 1.6;">
-              <li>Buka <a href="https://script.google.com" target="_blank" style="color: #00f2fe; text-decoration: underline;">script.google.com</a> lalu klik <strong>New project</strong> (Proyek baru).</li>
-              <li>Hapus semua teks di sana, lalu copy-paste kode script di bawah ini.</li>
-              <li>Klik <strong>Deploy (Terapkan)</strong> &gt; <strong>New deployment (Penerapan baru)</strong>.</li>
-              <li>Pilih tipe <strong>Web app (Aplikasi Web)</strong>:
-                <br>• <em>Execute as</em>: <strong>Me (Saya)</strong>
-                <br>• <em>Who has access</em>: <strong>Anyone (Siapa saja)</strong>
-              </li>
-              <li>Klik <strong>Deploy</strong>, lalu salin URL yang berakhiran <code>/exec</code> dan tempel ke kolom <em>Web App URL</em> di pengaturan SUSHEE.</li>
-            </ol>
+          <div style="background: rgba(0, 242, 254, 0.08); border: 1px solid rgba(0, 242, 254, 0.25); border-radius: var(--border-radius-sm); padding: 12px; margin-bottom: 14px;">
+            <h4 style="color: #00f2fe; font-weight: 700; font-size: 0.95rem; margin-bottom: 6px;">⚡ Langkah 1: Buat Folder di cPanel / File Manager</h4>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 6px;">
+              Buka File Manager di cPanel hosting Anda, masuk ke folder <code>public_html/</code>, lalu buat struktur folder berikut:
+            </p>
+            <pre style="background: rgba(0,0,0,0.5); padding: 8px; border-radius: 6px; font-size: 0.75rem; color: #a5f3fc;">public_html/
+└── karaoke/
+    ├── api.php      <-- script di bawah
+    └── songs/        <-- file .mp3 & .lrc</pre>
+          </div>
 
-            <div style="position: relative; margin-top: 8px;">
-              <textarea readonly id="appsScriptCodeBlock" style="width: 100%; height: 140px; background: rgba(0,0,0,0.6); color: #00f2fe; font-family: monospace; font-size: 0.72rem; padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); resize: none;">function doGet(e) {
-  var folderId = (e && e.parameter && e.parameter.folderId) ? e.parameter.folderId : "1PWplk3vIXo-k3lW7mTq7dcV7KpQyQtC3";
-  var q = (e && e.parameter && e.parameter.q) ? e.parameter.q.toLowerCase() : "";
-  try {
-    var folder = DriveApp.getFolderById(folderId);
-    var files = folder.getFiles();
-    var list = [];
-    while (files.hasNext()) {
-      var f = files.next();
-      var name = f.getName();
-      if (q && !name.toLowerCase().includes(q)) continue;
-      list.push({
-        id: f.getId(),
-        name: name,
-        size: f.getSize(),
-        mimeType: f.getMimeType(),
-        url: "https://drive.google.com/uc?export=download&id=" + f.getId()
-      });
+          <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-subtle); border-radius: var(--border-radius-sm); padding: 12px; margin-bottom: 14px;">
+            <h4 style="font-weight: 700; font-size: 0.95rem; margin-bottom: 6px;">⚡ Langkah 2: Upload File api.php</h4>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 8px;">
+              File <code>api.php</code> sudah tersedia di folder proyek Anda: <code>php-server/api.php</code>. Anda juga bisa menyalin langsung kode script di bawah ini:
+            </p>
+            <textarea readonly id="phpScriptCodeBlock" style="width: 100%; height: 110px; background: rgba(0,0,0,0.6); color: #00f2fe; font-family: monospace; font-size: 0.72rem; padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); resize: none;">&lt;?php
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Content-Type: application/json; charset=UTF-8");
+$baseUrl = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://") . $_SERVER['HTTP_HOST'] . rtrim(dirname($_SERVER['PHP_SELF']), '/\\') . '/songs/';
+$songsDir = __DIR__ . '/songs/';
+if (!is_dir($songsDir)) { @mkdir($songsDir, 0755, true); }
+$q = isset($_GET['q']) ? strtolower(trim($_GET['q'])) : '';
+$catalog = [];
+foreach (scandir($songsDir) as $file) {
+    if ($file === '.' || $file === '..') continue;
+    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+    if (in_array($ext, ['mp3','m4a','wav','flac','ogg'])) {
+        $base = pathinfo($file, PATHINFO_FILENAME);
+        if ($q && strpos(strtolower($base), $q) === false) continue;
+        $parts = explode(' - ', $base, 2);
+        $artist = count($parts) === 2 ? trim($parts[0]) : 'Karaoke';
+        $title = count($parts) === 2 ? trim($parts[1]) : $base;
+        $lrcPath = $songsDir . $base . '.lrc';
+        $hasLrc = file_exists($lrcPath);
+        $catalog[] = [
+            'id' => 'host_' . substr(md5($file), 0, 10),
+            'title' => ucwords(str_replace(['_','-'], ' ', $title)),
+            'artist' => ucwords(trim($artist)),
+            'format' => '.' . strtoupper($ext),
+            'audioUrl' => $baseUrl . rawurlencode($file),
+            'hasLyrics' => $hasLrc,
+            'lrcUrl' => $hasLrc ? $baseUrl . rawurlencode($base . '.lrc') : null,
+            'lrcContent' => ($hasLrc && filesize($lrcPath) < 102400) ? @file_get_contents($lrcPath) : null
+        ];
     }
-    return ContentService.createTextOutput(JSON.stringify(list)).setMimeType(ContentService.MimeType.JSON);
-  } catch(err) {
-    return ContentService.createTextOutput(JSON.stringify({error: err.toString()})).setMimeType(ContentService.MimeType.JSON);
-  }
-}</textarea>
-              <button class="btn btn-primary btn-sm" id="btnCopyAppsScript" style="margin-top: 6px; width: 100%;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                <span>Salin Script Google Apps Script</span>
-              </button>
-            </div>
+}
+echo json_encode(['status' => 'success', 'total' => count($catalog), 'songs' => $catalog], JSON_UNESCAPED_SLASHES);</textarea>
+            <button class="btn btn-primary btn-sm" id="btnCopyPhpScript" style="margin-top: 6px; width: 100%;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>Salin Script api.php</span>
+            </button>
           </div>
 
           <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-subtle); border-radius: var(--border-radius-sm); padding: 12px;">
-            <h4 style="font-weight: 700; font-size: 0.95rem; margin-bottom: 6px;">⚡ Cara 2: Tombol "+ Tambah Link Lagu GDrive" (Tanpa Koding)</h4>
+            <h4 style="font-weight: 700; font-size: 0.95rem; margin-bottom: 6px;">⚡ Langkah 3: Masukkan URL di Tab Cloud Server</h4>
             <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5;">
-              Cukup buka file lagu Anda di Google Drive, klik <em>Bagikan (Share)</em> &gt; <em>Salin link</em> (pastikan akses: <em>Siapa saja yang memiliki link</em>), lalu klik tombol <strong>"+ Tambah Link Lagu GDrive"</strong> di aplikasi SUSHEE. Lagu akan langsung tersimpan di database HP Anda.
+              Masukkan URL ke kolom <em>URL Endpoint api.php</em> (misal: <code>https://domainanda.my.php.id/karaoke/api.php</code>) lalu klik <strong>Simpan & Hubungkan</strong>. Seluruh lagu Anda akan langsung terdeteksi!
             </p>
           </div>
         </div>
@@ -739,7 +702,7 @@
   <script src="js/storage-scanner.js"></script>
   <script src="js/recorder.js"></script>
   <script src="js/visualizer.js"></script>
-  <script src="js/gdrive-service.js"></script>
+  <script src="js/hosting-service.js"></script>
   <script src="js/app.js"></script>
 
 </body>
