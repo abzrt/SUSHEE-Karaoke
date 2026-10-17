@@ -53,8 +53,18 @@ class AudioEffectsEngine {
     this.vocalVolume = 1.0;
     // Default balanced backing track level (0.85 = 85%) for clear, loud playback
     const savedMusicVol = localStorage.getItem('sushee_music_volume');
-    this.musicVolume = savedMusicVol !== null ? Math.max(0.1, Math.min(1.0, parseFloat(savedMusicVol))) : 0.85;
-    this.latencyOffsetMs = 0; // Latency compensation
+    this.musicVolume = (savedMusicVol !== null && !isNaN(parseFloat(savedMusicVol))) ? parseFloat(savedMusicVol) : 0.85;
+    // Latency compensation (Smart Auto-Alignment: 110ms default for Android mobile, 45ms desktop)
+    let defaultLatency = 110;
+    if (typeof window !== 'undefined' && window.AndroidStorage && typeof window.AndroidStorage.getOptimalHardwareLatencyMs === 'function') {
+      try {
+        defaultLatency = window.AndroidStorage.getOptimalHardwareLatencyMs();
+      } catch (e) {}
+    } else if (typeof navigator !== 'undefined' && !/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)) {
+      defaultLatency = 45;
+    }
+    const savedLatency = localStorage.getItem('sushee_latency_offset');
+    this.latencyOffsetMs = (savedLatency !== null && savedLatency !== '0') ? parseFloat(savedLatency) : defaultLatency;
 
     // Audio Analysis for Visualizer
     this.micAnalyser = null;
@@ -172,7 +182,6 @@ class AudioEffectsEngine {
       
       // Delay Node for Latency Alignment
       this.musicDelayNode = this.audioCtx.createDelay(1.0);
-      this.musicDelayNode.delayTime.value = 0;
       this.musicMixGain.connect(this.musicDelayNode);
 
       // Route to Master Record Destination (Protected by limiter)
@@ -181,6 +190,9 @@ class AudioEffectsEngine {
       } else {
         this.musicDelayNode.connect(this.destinationNode);
       }
+
+      // Apply initial latency offset to music delay node
+      this.setLatencyOffset(this.latencyOffsetMs);
     }
   }
 
@@ -302,9 +314,8 @@ class AudioEffectsEngine {
       this.vocalDelayNode.connect(this.destinationNode);
     }
 
-    // Apply any saved latency offset
-    const savedLatency = parseFloat(localStorage.getItem('sushee_latency_offset')) || 0;
-    this.setLatencyOffset(savedLatency);
+    // Apply current latency offset
+    this.setLatencyOffset(this.latencyOffsetMs);
   }
 
   /**
@@ -604,20 +615,38 @@ class AudioEffectsEngine {
    */
   setLatencyOffset(offsetMs) {
     this.latencyOffsetMs = parseFloat(offsetMs) || 0;
-    localStorage.setItem('sushee_latency_offset', this.latencyOffsetMs);
+    try {
+      localStorage.setItem('sushee_latency_offset', this.latencyOffsetMs);
+    } catch (e) {}
 
-    if (!this.audioCtx || !this.musicDelayNode || !this.vocalDelayNode) return;
+    if (!this.audioCtx) return;
 
-    if (this.latencyOffsetMs > 0) {
-      this.musicDelayNode.delayTime.value = this.latencyOffsetMs / 1000;
-      this.vocalDelayNode.delayTime.value = 0;
-    } else if (this.latencyOffsetMs < 0) {
-      this.musicDelayNode.delayTime.value = 0;
-      this.vocalDelayNode.delayTime.value = Math.abs(this.latencyOffsetMs) / 1000;
-    } else {
-      this.musicDelayNode.delayTime.value = 0;
-      this.vocalDelayNode.delayTime.value = 0;
+    const now = this.audioCtx.currentTime;
+    const sec = Math.abs(this.latencyOffsetMs) / 1000;
+
+    if (this.musicDelayNode) {
+      const musicSec = this.latencyOffsetMs > 0 ? sec : 0;
+      try {
+        this.musicDelayNode.delayTime.cancelScheduledValues(now);
+        this.musicDelayNode.delayTime.setValueAtTime(musicSec, now);
+        this.musicDelayNode.delayTime.value = musicSec;
+      } catch (e) {
+        this.musicDelayNode.delayTime.value = musicSec;
+      }
     }
+
+    if (this.vocalDelayNode) {
+      const vocalSec = this.latencyOffsetMs < 0 ? sec : 0;
+      try {
+        this.vocalDelayNode.delayTime.cancelScheduledValues(now);
+        this.vocalDelayNode.delayTime.setValueAtTime(vocalSec, now);
+        this.vocalDelayNode.delayTime.value = vocalSec;
+      } catch (e) {
+        this.vocalDelayNode.delayTime.value = vocalSec;
+      }
+    }
+
+    console.log(`[AudioEffectsEngine] Real-time Latency Offset applied: ${this.latencyOffsetMs}ms (Music delay: ${this.musicDelayNode ? this.musicDelayNode.delayTime.value : 'N/A'}s, Vocal delay: ${this.vocalDelayNode ? this.vocalDelayNode.delayTime.value : 'N/A'}s)`);
   }
 
   /**

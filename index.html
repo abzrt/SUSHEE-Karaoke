@@ -21,71 +21,27 @@
 </head>
 <body>
 
-  <!-- ================= COOL OPENING INTRO / SPLASH SCREEN ================= -->
-  <div id="splashScreen" class="splash-screen">
-    <div class="splash-ambient-glow"></div>
-    <div class="splash-content">
-      <!-- Animated Avatar with Rotating Neon Conic Border & Ripples -->
-      <div class="splash-avatar-container">
-        <div class="splash-pulse-ring ring-1"></div>
-        <div class="splash-pulse-ring ring-2"></div>
-        <div class="splash-pulse-ring ring-3"></div>
-        <div class="splash-neon-orbit"></div>
-        <div class="splash-avatar-border">
-          <img src="assets/icon.jpg" alt="SUSHEE" class="splash-logo-img">
-        </div>
-      </div>
-
-      <!-- Kinetic Typography Reveal -->
-      <div class="splash-brand">
-        <h1 class="splash-title">
-          <span style="--i:0">S</span><span style="--i:1">U</span><span style="--i:2">S</span><span style="--i:3">H</span><span style="--i:4">E</span><span style="--i:5">E</span>
-        </h1>
-        <div class="splash-tagline-wrapper">
-          <span class="splash-tagline-line left"></span>
-          <p class="splash-subtitle">SONGBOOK KARAOKE</p>
-          <span class="splash-tagline-line right"></span>
-        </div>
-      </div>
-
-      <!-- Neon Mini Equalizer -->
-      <div class="splash-equalizer">
-        <span class="eq-bar bar-1"></span>
-        <span class="eq-bar bar-2"></span>
-        <span class="eq-bar bar-3"></span>
-        <span class="eq-bar bar-4"></span>
-        <span class="eq-bar bar-5"></span>
-      </div>
-    </div>
-    
-    <!-- Quick Tap Dismiss -->
-    <div class="splash-tap-hint">Ketuk untuk melanjutkan</div>
-  </div>
-
-  <!-- Guaranteed Fail-safe Splash Dismiss -->
+  <!-- Robust Global App Action Bridge & Fail-Safe Navigation Controller -->
   <script>
     (function() {
-      function dismissSplashNow() {
-        var splash = document.getElementById('splashScreen');
-        if (splash && !splash.classList.contains('fade-out')) {
-          splash.classList.add('fade-out');
-          splash.style.pointerEvents = 'none';
-          setTimeout(function() {
-            if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
-          }, 600);
+      // Global fail-safe language switcher
+      window.setAppLanguage = function(lang) {
+        if (!lang) return;
+        if (window.i18n && typeof window.i18n.setLanguage === 'function') {
+          window.i18n.setLanguage(lang);
+        } else {
+          localStorage.setItem('karaoke_lang', lang);
+          document.querySelectorAll('.lang-btn').forEach(function(btn) {
+            if (btn.getAttribute('data-lang') === lang) btn.classList.add('active');
+            else btn.classList.remove('active');
+          });
         }
-      }
-      // Guaranteed dismiss after 2 seconds
-      setTimeout(dismissSplashNow, 2000);
-      // Tap anywhere on splash dismisses instantly
-      document.addEventListener('click', function(e) {
-        if (document.getElementById('splashScreen')) dismissSplashNow();
-      });
-      document.addEventListener('touchstart', function(e) {
-        if (document.getElementById('splashScreen')) dismissSplashNow();
-      }, { passive: true });
+        if (typeof window.showAppToast === 'function') {
+          window.showAppToast(lang === 'en' ? 'Language switched to English' : 'Bahasa dialihkan ke Bahasa Indonesia', 'success');
+        }
+      };
 
-      // Immediate fail-safe tab switcher
+      // Global fail-safe tab switcher
       window.switchTab = function(viewId) {
         if (!viewId) return;
         var views = document.querySelectorAll('.app-view');
@@ -99,8 +55,17 @@
         var activeBtn = document.querySelector('.nav-item[data-view="' + viewId + '"]');
         if (activeBtn) activeBtn.classList.add('active');
 
+        try {
+          window.scrollTo({ top: 0, behavior: 'instant' });
+        } catch (e) {
+          window.scrollTo(0, 0);
+        }
+
         if (viewId === 'viewKaraoke' && window.appVisualizer) {
           window.appVisualizer.resizeCanvas();
+        }
+        if (typeof window.onTabSwitched === 'function') {
+          window.onTabSwitched(viewId);
         }
       };
     })();
@@ -135,8 +100,8 @@
       <!-- Language Toggle Switcher (ID / EN) -->
       <div class="header-actions">
         <div class="lang-switcher">
-          <button class="lang-btn active" data-lang="id">ID</button>
-          <button class="lang-btn" data-lang="en">EN</button>
+          <button type="button" class="lang-btn active" data-lang="id" onclick="window.setAppLanguage && window.setAppLanguage('id')">ID</button>
+          <button type="button" class="lang-btn" data-lang="en" onclick="window.setAppLanguage && window.setAppLanguage('en')">EN</button>
         </div>
       </div>
     </header>
@@ -152,7 +117,7 @@
             <h3 class="scan-hero-title" data-i18n="libraryTitle">Koleksi Lagu</h3>
             <p class="scan-hero-desc" data-i18n="libraryDesc">Pindai memori HP untuk menemukan lagu (.mp3, .m4a) dan lirik (.lrc)</p>
             <div class="hero-btn-row">
-              <button class="btn btn-primary btn-sm" id="btnOpenScan">
+              <button type="button" class="btn btn-primary btn-sm" id="btnOpenScan" onclick="window.openScanModal && window.openScanModal()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                 <span data-i18n="btnScanStorage">Pindai Memori HP</span>
               </button>
@@ -168,8 +133,9 @@
 
         <!-- Filter Chips -->
         <div class="filter-row">
-          <button class="filter-chip active" data-filter="all" data-i18n="filterAll">Semua</button>
-          <button class="filter-chip" data-filter="local" data-i18n="filterLocal">Penyimpanan HP</button>
+          <button type="button" class="filter-chip active" data-filter="all" onclick="window.setSongFilter && window.setSongFilter('all')" data-i18n="filterAll">Semua</button>
+          <button type="button" class="filter-chip" data-filter="cloud" onclick="window.setSongFilter && window.setSongFilter('cloud')" data-i18n="navCloud">Server Hosting</button>
+          <button type="button" class="filter-chip" data-filter="local" onclick="window.setSongFilter && window.setSongFilter('local')" data-i18n="filterLocal">Penyimpanan HP</button>
         </div>
 
         <!-- Songs List Container -->
@@ -182,8 +148,8 @@
         <div class="scan-hero-card" style="background: linear-gradient(135deg, rgba(0, 242, 254, 0.16), rgba(79, 172, 254, 0.22), rgba(118, 75, 162, 0.16)); border: 1px solid rgba(0, 242, 254, 0.38);">
           <div class="scan-hero-content">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-              <span class="badge" style="font-size: 0.72rem; padding: 3px 10px; border-radius: 20px; background: rgba(0, 242, 254, 0.18); color: var(--color-cyan); border: 1px solid rgba(0, 242, 254, 0.35);">
-                🌐 PHP WEB HOSTING (MY.PHP.ID)
+              <span class="badge" style="font-size: 0.72rem; padding: 3px 10px; border-radius: 20px; background: rgba(0, 242, 254, 0.18); color: var(--color-cyan); border: 1px solid rgba(0, 242, 254, 0.35);" data-i18n="cloudBadge">
+                PHP WEB HOSTING (MY.PHP.ID)
               </span>
               <button class="btn-icon-round" id="btnToggleServerConfig" title="Atur Endpoint Server" style="width: 32px; height: 32px;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -194,37 +160,37 @@
 
             <div class="gdrive-status-chip" style="margin-top: 8px; display: inline-flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.12); padding: 5px 12px; border-radius: 20px; font-size: 0.76rem;">
               <span id="serverStatusPulse" class="status-dot-pulse" style="width: 8px; height: 8px; border-radius: 50%; background: #00f2fe; box-shadow: 0 0 8px #00f2fe;"></span>
-              <span id="serverActiveLabel">Server: <strong>Belum Dikonfigurasi</strong></span>
+              <span id="serverActiveLabel">Server: <strong id="cloudStatusText" data-i18n="cloudNotConfigured">Belum Dikonfigurasi</strong></span>
             </div>
 
             <!-- Expandable Config Drawer -->
             <div id="serverConfigDrawer" style="display: none; margin-top: 14px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.15);">
               <div class="form-group" style="margin-bottom: 10px;">
-                <label class="form-label" style="font-size: 0.75rem; color: #00f2fe;">🌐 URL Endpoint api.php di Hosting Anda:</label>
+                <label class="form-label" style="font-size: 0.75rem; color: #00f2fe;" data-i18n="cloudUrlLabel">🌐 URL Endpoint api.php di Hosting Anda:</label>
                 <input type="text" class="form-input" id="serverUrlInput" value="https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SONGS/api.php" placeholder="https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SONGS/api.php" style="font-size: 0.8rem; padding: 8px 10px;">
                 <p style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px;">Contoh: <code>https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SONGS/api.php</code></p>
               </div>
               <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                <button class="btn btn-primary btn-sm" id="btnSaveServerConfig" style="flex: 1;">
+                <button type="button" class="btn btn-primary btn-sm" id="btnSaveServerConfig" onclick="window.saveServerConfig && window.saveServerConfig()" style="flex: 1;">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                  <span>Simpan & Hubungkan</span>
+                  <span data-i18n="btnSaveConnect">Simpan & Hubungkan</span>
                 </button>
-                <button class="btn btn-secondary btn-sm" id="btnOpenServerExternal" title="Buka URL Server di Browser">
+                <button type="button" class="btn btn-secondary btn-sm" id="btnOpenServerExternal" onclick="window.openServerExternal && window.openServerExternal()" title="Buka URL Server di Browser">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                 </button>
               </div>
-              <button class="btn btn-secondary btn-sm" id="btnOpenHostingGuide" style="width: 100%; font-size: 0.75rem; padding: 6px 10px; background: rgba(0, 242, 254, 0.1); color: #00f2fe; border-color: rgba(0, 242, 254, 0.3);">
+              <button type="button" class="btn btn-secondary btn-sm" id="btnOpenHostingGuide" onclick="window.openHostingGuideModal && window.openHostingGuideModal()" style="width: 100%; font-size: 0.75rem; padding: 6px 10px; background: rgba(0, 242, 254, 0.1); color: #00f2fe; border-color: rgba(0, 242, 254, 0.3);">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                <span>Panduan Upload File ke Hosting (my.php.id)</span>
+                <span data-i18n="btnOpenGuide">Panduan Upload File ke Hosting (my.php.id)</span>
               </button>
             </div>
 
             <div class="hero-btn-row" style="margin-top: 14px; display: flex; gap: 8px;">
-              <button class="btn btn-primary btn-sm" id="btnToggleServerConfigAlt" style="flex: 1;">
+              <button type="button" class="btn btn-primary btn-sm" id="btnToggleServerConfigAlt" onclick="window.toggleServerConfigDrawer && window.toggleServerConfigDrawer()" style="flex: 1;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 <span data-i18n="btnConfigure">Atur Server</span>
               </button>
-              <button class="btn btn-secondary btn-sm" id="btnRefreshCloudSongs" title="Segarkan">
+              <button type="button" class="btn btn-secondary btn-sm" id="btnRefreshCloudSongs" onclick="window.refreshCloudSongs && window.refreshCloudSongs()" title="Segarkan">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               </button>
             </div>
@@ -253,8 +219,8 @@
               <span>RECORDING LIVE (DUAL-TRACK)</span>
             </div>
 
-            <h2 class="current-song-title">Pilih Lagu</h2>
-            <p class="current-song-artist">Studio Karaoke Siap</p>
+            <h2 class="current-song-title" data-i18n="selectSongHint">Pilih Lagu</h2>
+            <p class="current-song-artist" data-i18n="studioReady">Studio Karaoke Siap</p>
 
             <!-- Audio Waveform Visualizer -->
             <div class="visualizer-wrapper">
@@ -274,16 +240,16 @@
 
             <!-- Action Controls -->
             <div class="karaoke-controls-row">
-              <button class="btn-icon-round" id="btnRestartKaraoke" title="Ulangi Lagu">
+              <button type="button" class="btn-icon-round" id="btnRestartKaraoke" title="Ulangi Lagu" onclick="window.restartKaraoke && window.restartKaraoke()">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
               </button>
 
-              <button class="btn-karaoke-secondary" id="btnToggleMusicPlayback" title="Putar atau jeda musik backing">
+              <button type="button" class="btn-karaoke-secondary" id="btnToggleMusicPlayback" title="Putar atau jeda musik backing" onclick="window.toggleMusicPlayback && window.toggleMusicPlayback()">
                 <svg id="musicPlayIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                <span id="musicPlayLabel">Putar Musik</span>
+                <span id="musicPlayLabel" data-i18n="btnPlayMusic">Putar Musik</span>
               </button>
 
-              <button class="btn-karaoke-main" id="btnKaraokeAction">
+              <button type="button" class="btn-karaoke-main" id="btnKaraokeAction" onclick="window.toggleKaraokeRecording && window.toggleKaraokeRecording()">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
                 <span data-i18n="btnStartKaraoke">Mulai Rekam & Nyanyi</span>
               </button>
@@ -306,135 +272,160 @@
 
             <!-- Preset Buttons -->
             <div class="preset-grid">
-              <button class="preset-btn" data-preset="original">
+              <button type="button" class="preset-btn" data-preset="original" onclick="window.selectVocalPreset && window.selectVocalPreset('original')">
                 <span class="preset-icon">🎙️</span>
                 <span data-i18n="presetOriginal">Asli</span>
               </button>
-              <button class="preset-btn active" data-preset="studio">
+              <button type="button" class="preset-btn active" data-preset="studio" onclick="window.selectVocalPreset && window.selectVocalPreset('studio')">
                 <span class="preset-icon">🎚️</span>
                 <span data-i18n="presetStudio">Studio Pro</span>
               </button>
-              <button class="preset-btn" data-preset="ktv">
+              <button type="button" class="preset-btn" data-preset="ktv" onclick="window.selectVocalPreset && window.selectVocalPreset('ktv')">
                 <span class="preset-icon">🎤</span>
                 <span data-i18n="presetKtv">KTV</span>
               </button>
-              <button class="preset-btn" data-preset="hall">
+              <button type="button" class="preset-btn" data-preset="hall" onclick="window.selectVocalPreset && window.selectVocalPreset('hall')">
                 <span class="preset-icon">🏛️</span>
                 <span data-i18n="presetHall">Konser Hall</span>
               </button>
-              <button class="preset-btn" data-preset="pop">
+              <button type="button" class="preset-btn" data-preset="pop" onclick="window.selectVocalPreset && window.selectVocalPreset('pop')">
                 <span class="preset-icon">🌟</span>
                 <span data-i18n="presetPop">Pop Stage</span>
               </button>
-              <button class="preset-btn" data-preset="autotune">
+              <button type="button" class="preset-btn" data-preset="autotune" onclick="window.selectVocalPreset && window.selectVocalPreset('autotune')">
                 <span class="preset-icon">🤖</span>
                 <span data-i18n="presetAutotune">Auto-Tune</span>
               </button>
-              <button class="preset-btn" data-preset="warm">
+              <button type="button" class="preset-btn" data-preset="warm" onclick="window.selectVocalPreset && window.selectVocalPreset('warm')">
                 <span class="preset-icon">🎸</span>
                 <span data-i18n="presetWarm">Akustik</span>
               </button>
-              <button class="preset-btn" data-preset="custom">
+              <button type="button" class="preset-btn" data-preset="custom" onclick="window.selectVocalPreset && window.selectVocalPreset('custom')">
                 <span class="preset-icon">⚙️</span>
                 <span data-i18n="presetCustom">Kustom</span>
               </button>
             </div>
 
-            <!-- Earphone Vocal Monitor Switch -->
-            <div class="switch-row">
-              <div class="switch-label-group">
-                <span class="switch-title" data-i18n="monitorVoice">Dengar Suara Sendiri (Earphone)</span>
-                <span class="switch-desc" data-i18n="monitorVoiceDesc">Gunakan earphone untuk mencegah gema</span>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="earphoneMonitorToggle">
-                <span class="slider-toggle"></span>
-              </label>
-            </div>
-
-            <!-- DSP Audio Sliders -->
-            <div class="controls-panel">
-              <div class="slider-group">
-                <div class="slider-label-row">
-                  <span data-i18n="vocalVol">Volume Suara Mic</span>
-                </div>
-                <input type="range" class="custom-range" id="vocalVolSlider" min="0" max="2" step="0.05" value="1.0">
-              </div>
-
-              <div class="slider-group">
-                <div class="slider-label-row">
-                  <span data-i18n="musicVol">Volume Musik</span>
-                </div>
-                <input type="range" class="custom-range" id="musicVolSlider" min="0" max="1" step="0.02" value="0.85">
-              </div>
-
-              <div class="slider-group">
-                <div class="slider-label-row">
-                  <span data-i18n="reverbWet">Gema Ruang (Reverb)</span>
-                </div>
-                <input type="range" class="custom-range" id="reverbSlider" min="0" max="1" step="0.02" value="0.25">
-              </div>
-
-              <div class="slider-group">
-                <div class="slider-label-row">
-                  <span data-i18n="echoDelay">Pantulan (Echo / Delay)</span>
-                </div>
-                <input type="range" class="custom-range" id="echoSlider" min="0" max="0.8" step="0.02" value="0.15">
-              </div>
-
-              <div class="slider-group">
-                <div class="slider-label-row">
-                  <span data-i18n="vocalTone">Karakter Suara (Treble Boost)</span>
-                </div>
-                <input type="range" class="custom-range" id="toneSlider" min="-6" max="8" step="0.5" value="3.0">
-              </div>
-            </div>
-
-            <!-- ================= LATENCY & AUDIO SYNC ADJUSTMENT ================= -->
-            <div class="latency-section">
-              <div class="latency-header-row">
-                <div class="latency-title-group">
-                  <div class="latency-badge-row">
-                    <span class="switch-title" data-i18n="latencyAdjust">Sinkronisasi Audio (Offset Latensi)</span>
-                    <span class="effects-badge-starmaker" style="background: var(--grad-primary);">SYNC PRO</span>
+            <!-- Dedicated Toggle Button to Hide/Show All Audio Settings (Anti-Scroll Slip) -->
+            <div class="audio-settings-toggle-wrapper">
+              <button type="button" class="btn-toggle-audio-drawer" id="btnToggleAudioSettings" aria-expanded="true" onclick="window.toggleAudioSettingsDrawer && window.toggleAudioSettingsDrawer()">
+                <div class="toggle-drawer-left">
+                  <span class="toggle-drawer-icon">🎛️</span>
+                  <div class="toggle-drawer-info">
+                    <span class="toggle-drawer-title" id="toggleAudioSettingsTitle" data-i18n="toggleAudioSettings">Pengaturan Slider & Audio Lengkap</span>
+                    <span class="toggle-drawer-subtitle" id="toggleAudioSettingsSub" data-i18n="toggleAudioSettingsSub">Sembunyikan agar kontrol tidak tergeser saat scrolling</span>
                   </div>
-                  <span class="switch-desc" data-i18n="latencyDesc">Sesuaikan jeda delay antara vokal dan musik (Bluetooth / Earphone)</span>
                 </div>
-                <div class="latency-val-pill" id="latencyDisplayVal">0 ms</div>
+                <div class="toggle-drawer-status-pill" id="toggleAudioSettingsStatus">
+                  <span id="toggleAudioSettingsAction" data-i18n="btnHideSettings">Sembunyikan</span>
+                  <svg id="toggleAudioSettingsArrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+                </div>
+              </button>
+            </div>
+
+            <!-- Collapsible Settings Container -->
+            <div class="audio-settings-collapse-container" id="audioSettingsCollapseContainer">
+              <!-- Earphone Vocal Monitor Switch -->
+              <div class="switch-row">
+                <div class="switch-label-group">
+                  <span class="switch-title" data-i18n="monitorVoice">Dengar Suara Sendiri (Earphone)</span>
+                  <span class="switch-desc" data-i18n="monitorVoiceDesc">Gunakan earphone untuk mencegah gema</span>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="earphoneMonitorToggle">
+                  <span class="slider-toggle"></span>
+                </label>
               </div>
 
-              <!-- Latency Range Slider (-300ms to +300ms, step 5ms) -->
-              <div class="slider-group" style="margin-top: 10px;">
-                <input type="range" class="custom-range custom-range-sync" id="latencySlider" min="-300" max="300" step="5" value="0">
-                <div class="slider-label-row">
-                  <span>-300ms (Vokal Dulu)</span>
-                  <span style="color: var(--color-cyan); font-weight: 700;">0 ms (Tepat)</span>
-                  <span>+300ms (Musik Dulu)</span>
+              <!-- DSP Audio Sliders -->
+              <div class="controls-panel">
+                <div class="slider-group">
+                  <div class="slider-label-row">
+                    <span class="slider-title" data-i18n="vocalVol">Volume Suara Mic</span>
+                    <span class="slider-val-badge" id="vocalVolVal">100%</span>
+                  </div>
+                  <input type="range" class="custom-range" id="vocalVolSlider" min="0" max="2" step="0.05" value="1.0">
+                </div>
+
+                <div class="slider-group">
+                  <div class="slider-label-row">
+                    <span class="slider-title" data-i18n="musicVol">Volume Musik</span>
+                    <span class="slider-val-badge" id="musicVolVal">85%</span>
+                  </div>
+                  <input type="range" class="custom-range" id="musicVolSlider" min="0" max="1" step="0.02" value="0.85">
+                </div>
+
+                <div class="slider-group">
+                  <div class="slider-label-row">
+                    <span class="slider-title" data-i18n="reverbWet">Gema Ruang (Reverb)</span>
+                    <span class="slider-val-badge" id="reverbVal">25%</span>
+                  </div>
+                  <input type="range" class="custom-range" id="reverbSlider" min="0" max="1" step="0.02" value="0.25">
+                </div>
+
+                <div class="slider-group">
+                  <div class="slider-label-row">
+                    <span class="slider-title" data-i18n="echoDelay">Pantulan (Echo / Delay)</span>
+                    <span class="slider-val-badge" id="echoVal">15%</span>
+                  </div>
+                  <input type="range" class="custom-range" id="echoSlider" min="0" max="0.8" step="0.02" value="0.15">
+                </div>
+
+                <div class="slider-group">
+                  <div class="slider-label-row">
+                    <span class="slider-title" data-i18n="vocalTone">Karakter Suara (Treble Boost)</span>
+                    <span class="slider-val-badge" id="toneVal">+3.0 dB</span>
+                  </div>
+                  <input type="range" class="custom-range" id="toneSlider" min="-6" max="8" step="0.5" value="3.0">
                 </div>
               </div>
 
-              <!-- Quick Presets -->
-              <div class="latency-presets-grid">
-                <button class="btn-latency-chip active" data-latency="0">
-                  <span class="chip-name" data-i18n="latencyWired">Kabel (0ms)</span>
-                </button>
-                <button class="btn-latency-chip" data-latency="40">
-                  <span class="chip-name" data-i18n="latencyPhone">Speaker HP (+40ms)</span>
-                </button>
-                <button class="btn-latency-chip" data-latency="120">
-                  <span class="chip-name" data-i18n="latencyBT">Bluetooth TWS (+120ms)</span>
-                </button>
-                <button class="btn-latency-chip" data-latency="200">
-                  <span class="chip-name" data-i18n="latencyBTHigh">BT Delay Tinggi (+200ms)</span>
-                </button>
-              </div>
+              <!-- ================= LATENCY & AUDIO SYNC ADJUSTMENT ================= -->
+              <div class="latency-section">
+                <div class="latency-header-row">
+                  <div class="latency-title-group">
+                    <div class="latency-badge-row">
+                      <span class="switch-title" data-i18n="latencyAdjust">Sinkronisasi Audio (Offset Latensi)</span>
+                      <span class="effects-badge-starmaker" style="background: var(--grad-primary);">SYNC PRO</span>
+                    </div>
+                    <span class="switch-desc" data-i18n="latencyDesc">Sesuaikan jeda delay antara vokal dan musik (Bluetooth / Earphone)</span>
+                  </div>
+                  <div class="latency-val-pill" id="latencyDisplayVal">+110 ms</div>
+                </div>
 
-              <!-- Auto Detect Calibration Button -->
-              <div class="latency-auto-row" style="margin-top: 14px;">
-                <button class="btn btn-auto-latency" id="btnAutoCalibrateLatency">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                  <span data-i18n="btnAutoCalibrate">Deteksi Delay Otomatis (Auto Adjust)</span>
-                </button>
+                <!-- Latency Range Slider (-300ms to +300ms, step 5ms) -->
+                <div class="slider-group" style="margin-top: 10px;">
+                  <input type="range" class="custom-range custom-range-sync" id="latencySlider" min="-300" max="300" step="5" value="110">
+                  <div class="slider-label-row">
+                    <span data-i18n="vocalEarlyHint">-300ms (Vokal Dulu)</span>
+                    <span style="color: var(--color-cyan); font-weight: 700;" data-i18n="vocalSyncHint">+110 ms (Realtime)</span>
+                    <span data-i18n="musicEarlyHint">+300ms (Musik Dulu)</span>
+                  </div>
+                </div>
+
+                <!-- Quick Presets -->
+                <div class="latency-presets-grid">
+                  <button type="button" class="btn-latency-chip" data-latency="0" onclick="window.selectLatencyPreset && window.selectLatencyPreset(0)">
+                    <span class="chip-name" data-i18n="latencyWired">Direct (0ms)</span>
+                  </button>
+                  <button type="button" class="btn-latency-chip" data-latency="60" onclick="window.selectLatencyPreset && window.selectLatencyPreset(60)">
+                    <span class="chip-name" data-i18n="latencyHeadset">Kabel (+60ms)</span>
+                  </button>
+                  <button type="button" class="btn-latency-chip active" data-latency="110" onclick="window.selectLatencyPreset && window.selectLatencyPreset(110)">
+                    <span class="chip-name" data-i18n="latencyPhone">Speaker HP (+110ms • Realtime)</span>
+                  </button>
+                  <button type="button" class="btn-latency-chip" data-latency="180" onclick="window.selectLatencyPreset && window.selectLatencyPreset(180)">
+                    <span class="chip-name" data-i18n="latencyBT">Bluetooth TWS (+180ms)</span>
+                  </button>
+                </div>
+
+                <!-- Auto Detect Calibration Button -->
+                <div class="latency-auto-row" style="margin-top: 14px;">
+                  <button type="button" class="btn btn-auto-latency" id="btnAutoCalibrateLatency" onclick="window.openCalibrateModal && window.openCalibrateModal()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    <span data-i18n="btnAutoCalibrate">Deteksi Delay Otomatis (Auto Adjust)</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -465,25 +456,42 @@
           <div class="form-group">
             <label class="form-label" data-i18n="languageSetting">Bahasa (Language)</label>
             <div class="lang-switcher" style="width: fit-content;">
-              <button class="lang-btn active" data-lang="id">Bahasa Indonesia</button>
-              <button class="lang-btn" data-lang="en">English</button>
+              <button type="button" class="lang-btn active" data-lang="id" onclick="window.setAppLanguage && window.setAppLanguage('id')">Bahasa Indonesia</button>
+              <button type="button" class="lang-btn" data-lang="en" onclick="window.setAppLanguage && window.setAppLanguage('en')">English</button>
             </div>
           </div>
 
-          <div class="form-group" style="margin-top: 16px;">
-            <label class="form-label" data-i18n="audioQualitySetting">Kualitas Audio Rekaman</label>
-            <select class="form-input" id="audioQualitySelect">
-              <option value="high" data-i18n="highQuality">Tinggi (Stereo 48kHz, Lossless WAV / WebM)</option>
-              <option value="standard" data-i18n="standardQuality">Standar (Compressed)</option>
-            </select>
+          <div class="form-group" style="margin-top: 18px;">
+            <label class="form-label" data-i18n="audioQualitySetting">Format & Kualitas Rekaman (MP3 320 Kbps)</label>
+            <p class="switch-desc" style="margin-bottom: 8px;" data-i18n="audioQualityDesc">Hasil rekaman vokal dan musik akan otomatis dikonversi ke format MP3 320 Kbps.</p>
+            <div class="custom-select-container">
+              <select class="form-input custom-select" id="audioQualitySelect">
+                <option value="320" selected data-i18n="qualityMp3_320">MP3 320 Kbps (Studio Master - Kualitas Tertinggi)</option>
+                <option value="256" data-i18n="qualityMp3_256">MP3 256 Kbps (High Quality)</option>
+                <option value="192" data-i18n="qualityMp3_192">MP3 192 Kbps (Standard Quality)</option>
+              </select>
+            </div>
+            <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+              <span class="badge badge-host" style="font-size: 0.72rem; padding: 4px 10px; background: rgba(0, 242, 254, 0.15); border: 1px solid rgba(0, 242, 254, 0.4); color: #00f2fe; font-weight: 700; border-radius: 6px;" data-i18n="recordFormatBadge">FORMAT: MP3 ONLY</span>
+              <span style="font-size: 0.78rem; color: #34d399; font-weight: 600;" data-i18n="recordBitrateBadge">⚡ 320 Kbps High-Bitrate Stereo</span>
+            </div>
           </div>
 
           <div class="form-group" style="margin-top: 16px;">
             <label class="form-label" data-i18n="micPermissionTitle">Izin Mikrofon</label>
             <p class="switch-desc" style="margin-bottom: 8px;" data-i18n="micPermissionDesc">Aplikasi memerlukan izin mic untuk merekam suara karaoke</p>
-            <button class="btn btn-secondary btn-sm" id="btnTestMic">
+            <button type="button" class="btn btn-secondary btn-sm" id="btnTestMic" onclick="window.testMicrophone && window.testMicrophone()">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
               <span data-i18n="btnRequestMic">Minta Izin Mic</span>
+            </button>
+          </div>
+
+          <div class="form-group" style="margin-top: 16px;">
+            <label class="form-label" data-i18n="storagePermissionTitle">Izin Penyimpanan Smartphone</label>
+            <p class="switch-desc" style="margin-bottom: 8px;" data-i18n="storagePermissionDesc">Diperlukan untuk menyimpan rekaman lagu ke folder Musik HP dan membaca file audio.</p>
+            <button type="button" class="btn btn-secondary btn-sm" id="btnRequestStorage" onclick="window.requestStoragePermission && window.requestStoragePermission()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              <span data-i18n="btnRequestStorage">Minta Izin Penyimpanan</span>
             </button>
           </div>
 
@@ -544,8 +552,8 @@
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
             </div>
             <div>
-              <h4 style="font-size: 0.95rem; font-weight: 700;">Pindai Folder Musik Otomatis</h4>
-              <p style="font-size: 0.75rem; color: var(--text-secondary);">Pilih folder musik di HP untuk memindai semua file .mp3, .m4a, dan .lrc sekaligus</p>
+              <h4 style="font-size: 0.95rem; font-weight: 700;" data-i18n="scanAutoTitle">Pindai Folder Musik Otomatis</h4>
+              <p style="font-size: 0.75rem; color: var(--text-secondary);" data-i18n="scanAutoDesc">Pilih folder musik di HP untuk memindai semua file .mp3, .m4a, dan .lrc sekaligus</p>
             </div>
           </button>
 
@@ -554,8 +562,8 @@
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             </div>
             <div>
-              <h4 style="font-size: 0.95rem; font-weight: 700;" data-i18n="btnPickFiles">Pilih File Manual</h4>
-              <p style="font-size: 0.75rem; color: var(--text-secondary);">Pilih beberapa file audio dan file lirik (.lrc) secara spesifik</p>
+              <h4 style="font-size: 0.95rem; font-weight: 700;" data-i18n="scanManualTitle">Pilih File Manual</h4>
+              <p style="font-size: 0.75rem; color: var(--text-secondary);" data-i18n="scanManualDesc">Pilih beberapa file audio dan file lirik (.lrc) secara spesifik</p>
             </div>
           </button>
         </div>
@@ -567,22 +575,67 @@
       <div class="modal-card">
         <div class="modal-header">
           <h3 class="modal-title" data-i18n="recordingSaved">Rekaman Berhasil Disimpan!</h3>
-          <button class="modal-close" id="btnCloseRecModal">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <button class="modal-close" id="btnCloseRecModal" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(255,255,255,0.06); cursor: pointer;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
 
-        <div style="text-align: center; margin-bottom: 16px;">
-          <h4 id="modalRecTitle" style="font-size: 1.1rem; font-weight: 700;">Judul Lagu</h4>
-          <p id="modalRecMeta" style="font-size: 0.8rem; color: var(--text-secondary);">Detail Rekaman</p>
+        <div class="modal-rec-hero">
+          <div class="modal-rec-icon-bubble">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          </div>
+          <h4 id="modalRecTitle" style="font-size: 1.15rem; font-weight: 700; text-align: center; margin-bottom: 4px;">Judul Lagu</h4>
+          <p id="modalRecMeta" style="font-size: 0.8rem; color: var(--text-secondary); text-align: center;">Detail Rekaman</p>
         </div>
 
-        <audio id="modalRecAudio" controls style="width: 100%; margin-bottom: 20px; outline: none;"></audio>
+        <!-- Custom Large Player with Big Buttons -->
+        <div class="modal-player-controls">
+          <div class="modal-player-row">
+            <button class="btn-modal-play" id="btnModalPlayPause" title="Putar / Jeda">
+              <svg id="modalPlayIcon" width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+            </button>
+            <div class="modal-player-progress-area">
+              <input type="range" id="modalProgressBar" class="modal-progress-bar" min="0" max="100" value="0">
+              <div class="modal-time-display">
+                <span id="modalTimeCurrent">00:00</span>
+                <span id="modalTimeTotal">00:00</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
-        <div style="display: flex; gap: 10px;">
-          <button class="btn btn-primary" id="btnDownloadRec" style="flex: 1;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <audio id="modalRecAudio" preload="auto" style="display: none;"></audio>
+
+        <!-- Quick Real-Time Sync Adjuster in Modal -->
+        <div class="modal-sync-adjust-box">
+          <div class="modal-sync-header">
+            <div class="modal-sync-title-wrap">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span data-i18n="modalSyncTitle">Sinkronisasi Suara Real-Time</span>
+            </div>
+            <span class="modal-sync-val-badge" id="modalRecSyncVal">+110 ms</span>
+          </div>
+          <div class="modal-sync-controls-row">
+            <button class="btn-sync-nudge" id="btnModalSyncMinus" title="Kurangi Delay (-20ms)">-20ms</button>
+            <input type="range" id="modalRecSyncSlider" class="custom-range custom-range-sync modal-sync-slider" min="-300" max="300" step="5" value="110">
+            <button class="btn-sync-nudge" id="btnModalSyncPlus" title="Tambah Delay (+20ms)">+20ms</button>
+          </div>
+          <div class="modal-sync-presets">
+            <button class="btn-modal-sync-chip" data-latency="0" data-i18n="latencyWired">Direct (0ms)</button>
+            <button class="btn-modal-sync-chip" data-latency="60" data-i18n="latencyHeadset">Kabel (+60ms)</button>
+            <button class="btn-modal-sync-chip active" data-latency="110" data-i18n="latencyPhone">Speaker HP (+110ms)</button>
+            <button class="btn-modal-sync-chip" data-latency="180" data-i18n="latencyBT">Bluetooth (+180ms)</button>
+          </div>
+          <p class="modal-sync-hint" data-i18n="modalSyncHint">⚡ Mengatur delay agar vokal dan musik pas tepat waktu pada rekaman secara realtime.</p>
+        </div>
+
+        <div style="display: flex; gap: 12px;">
+          <button class="btn-modal-download" id="btnDownloadRec">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             <span data-i18n="btnDownloadRecording">Download File</span>
+          </button>
+          <button class="btn-modal-close-action" id="btnModalDone">
+            <span data-i18n="btnModalClose">Tutup</span>
           </button>
         </div>
       </div>
@@ -614,9 +667,9 @@
           </p>
 
           <div class="calibrate-detected-box" id="calibrateDetectedBox" style="display: none;">
-            <span class="detected-label">Hasil Pengukuran:</span>
+            <span class="detected-label" data-i18n="measuredResult">Hasil Pengukuran:</span>
             <span class="detected-value" id="detectedLatencyVal">+0 ms</span>
-            <span class="detected-sub" id="detectedLatencySub">Sinkronisasi Optimal</span>
+            <span class="detected-sub" id="detectedLatencySub" data-i18n="optimalSync">Sinkronisasi Optimal</span>
           </div>
 
           <div style="display: flex; gap: 10px; margin-top: 20px;">
@@ -640,7 +693,7 @@
     <div class="modal-overlay" id="hostingGuideModal">
       <div class="modal-card" style="max-height: 85vh; overflow-y: auto;">
         <div class="modal-header">
-          <h3 class="modal-title">Panduan Web Hosting PHP (my.php.id)</h3>
+          <h3 class="modal-title" data-i18n="guideTitle">Panduan Web Hosting PHP (my.php.id)</h3>
           <button class="modal-close" id="btnCloseHostingGuideModal">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
@@ -652,7 +705,7 @@
           </p>
 
           <div style="background: rgba(0, 242, 254, 0.08); border: 1px solid rgba(0, 242, 254, 0.25); border-radius: var(--border-radius-sm); padding: 12px; margin-bottom: 14px;">
-            <h4 style="color: #00f2fe; font-weight: 700; font-size: 0.95rem; margin-bottom: 6px;">⚡ Langkah 1: Buat Folder di cPanel / File Manager</h4>
+            <h4 style="color: #00f2fe; font-weight: 700; font-size: 0.95rem; margin-bottom: 6px;" data-i18n="guideStep1">⚡ Langkah 1: Buat Folder di cPanel / File Manager</h4>
             <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 6px;">
               Buka File Manager di cPanel hosting Anda, masuk ke folder <code>public_html/</code>, lalu buat struktur folder berikut:
             </p>
@@ -663,7 +716,7 @@
           </div>
 
           <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-subtle); border-radius: var(--border-radius-sm); padding: 12px; margin-bottom: 14px;">
-            <h4 style="font-weight: 700; font-size: 0.95rem; margin-bottom: 6px;">⚡ Langkah 2: Upload File api.php</h4>
+            <h4 style="font-weight: 700; font-size: 0.95rem; margin-bottom: 6px;" data-i18n="guideStep2">⚡ Langkah 2: Upload File api.php</h4>
             <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 8px;">
               File <code>api.php</code> sudah tersedia di folder proyek Anda: <code>php-server/api.php</code>. Anda juga bisa menyalin langsung kode script di bawah ini:
             </p>
@@ -786,12 +839,12 @@ usort($catalog, function($a, $b) { return strcasecmp($a['title'], $b['title']); 
 echo json_encode(['status' => 'success', 'server' => 'SUSHEE PHP Hosting Server', 'total' => count($catalog), 'songs' => $catalog], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);</textarea>
             <button class="btn btn-primary btn-sm" id="btnCopyPhpScript" style="margin-top: 6px; width: 100%;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              <span>Salin Script api.php</span>
+              <span data-i18n="btnCopyScript">Salin Script api.php</span>
             </button>
           </div>
 
           <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-subtle); border-radius: var(--border-radius-sm); padding: 12px;">
-            <h4 style="font-weight: 700; font-size: 0.95rem; margin-bottom: 6px;">⚡ Langkah 3: Masukkan URL di Tab Cloud Server</h4>
+            <h4 style="font-weight: 700; font-size: 0.95rem; margin-bottom: 6px;" data-i18n="guideStep3">⚡ Langkah 3: Masukkan URL di Tab Cloud Server</h4>
             <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5;">
               Masukkan URL ke kolom <em>URL Endpoint api.php</em> (misal: <code>https://domainanda.my.php.id/karaoke/api.php</code>) lalu klik <strong>Simpan & Hubungkan</strong>. Seluruh lagu Anda akan langsung terdeteksi!
             </p>
@@ -803,6 +856,7 @@ echo json_encode(['status' => 'success', 'server' => 'SUSHEE PHP Hosting Server'
   </div>
 
   <!-- App Scripts in Correct Dependency Order -->
+  <script src="js/lame.min.js"></script>
   <script src="js/i18n.js"></script>
   <script src="js/lrc-parser.js"></script>
   <script src="js/audio-effects.js"></script>

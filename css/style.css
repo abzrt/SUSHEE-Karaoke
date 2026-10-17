@@ -159,28 +159,79 @@ body {
 /* Language Switcher */
 .lang-switcher {
   display: flex;
-  background: rgba(255, 255, 255, 0.06);
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
   border-radius: var(--border-radius-full);
   padding: 3px;
   border: 1px solid var(--border-subtle);
+  position: relative;
+  z-index: 102;
+  touch-action: manipulation !important;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .lang-btn {
   background: transparent;
   border: none;
   color: var(--text-secondary);
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 4px 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  min-height: 38px;
+  min-width: 46px;
+  padding: 6px 14px;
   border-radius: var(--border-radius-full);
-  cursor: pointer;
-  transition: all 0.25s ease;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.lang-btn:active {
+  transform: scale(0.94);
 }
 
 .lang-btn.active {
   background: var(--grad-primary);
   color: #ffffff;
-  box-shadow: 0 2px 10px rgba(0, 242, 254, 0.3);
+  box-shadow: 0 2px 14px rgba(0, 242, 254, 0.45);
+}
+
+/* Settings View specific language buttons */
+#viewSettings .lang-switcher {
+  display: flex;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  width: 100%;
+  max-width: 360px;
+}
+
+#viewSettings .lang-btn {
+  flex: 1;
+  min-height: 48px;
+  min-width: 130px;
+  padding: 12px 18px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  border-radius: var(--border-radius-md);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+}
+
+#viewSettings .lang-btn.active {
+  background: var(--grad-primary);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 4px 20px rgba(0, 242, 254, 0.4);
 }
 
 /* --- MAIN CONTENT & VIEWS --- */
@@ -1292,7 +1343,8 @@ input:checked + .slider-toggle:before {
   align-items: center;
   justify-content: space-around;
   padding: 0 8px var(--safe-bottom) 8px;
-  z-index: 200;
+  z-index: 9999;
+  pointer-events: auto !important;
 }
 
 @media (min-width: 768px) {
@@ -1313,7 +1365,8 @@ input:checked + .slider-toggle:before {
   font-family: var(--font-sans);
   font-size: 0.7rem;
   font-weight: 600;
-  cursor: pointer;
+  cursor: pointer !important;
+  pointer-events: auto !important;
   padding: 8px 10px;
   border-radius: var(--border-radius-md);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1344,6 +1397,53 @@ input:checked + .slider-toggle:before {
   transform: scale(0.92);
 }
 
+/* Global Touch & Pointer Action Optimization */
+button,
+.btn,
+.lang-btn,
+.filter-chip,
+.preset-btn,
+.nav-item,
+.btn-latency-chip,
+.btn-sync-nudge,
+.btn-modal-sync-chip,
+.modal-close,
+.scan-option-btn,
+.btn-icon-round,
+.song-card,
+.btn-song-action,
+.btn-toggle-audio-drawer,
+.btn-modal-play,
+.btn-modal-download,
+.btn-modal-close-action,
+.btn-rec-action {
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+}
+
+button svg,
+button path,
+button span,
+.btn svg,
+.btn path,
+.btn span,
+.lang-btn *,
+.filter-chip *,
+.preset-btn *,
+.nav-item *,
+.btn-latency-chip *,
+.btn-sync-nudge *,
+.btn-modal-sync-chip *,
+.modal-close *,
+.scan-option-btn *,
+.btn-icon-round *,
+.btn-song-action *,
+.btn-rec-action * {
+  pointer-events: none !important;
+}
+
 /* --- MODALS --- */
 .modal-overlay {
   position: fixed;
@@ -1353,16 +1453,29 @@ input:checked + .slider-toggle:before {
   bottom: 0;
   background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   z-index: 300;
   display: none;
   align-items: center;
   justify-content: center;
   padding: 16px;
   animation: fadeIn 0.2s ease;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.modal-overlay:not(.open) {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
 }
 
 .modal-overlay.open {
-  display: flex;
+  display: flex !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .modal-card {
@@ -1515,27 +1628,14 @@ input:checked + .slider-toggle:before {
    ========================================================================== */
 
 .splash-screen {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: radial-gradient(circle at 50% 45%, #0d1120 0%, #06070b 80%);
-  z-index: 99999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  user-select: none;
-  cursor: pointer;
-  transition: opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 0.75s cubic-bezier(0.16, 1, 0.3, 1),
-              visibility 0.75s;
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
 }
 
 .splash-screen.fade-out {
+  display: none !important;
   opacity: 0;
-  transform: scale(1.08);
   pointer-events: none !important;
   visibility: hidden !important;
 }
@@ -1791,4 +1891,900 @@ input:checked + .slider-toggle:before {
   opacity: 0;
   animation: splashFadeIn 0.8s ease forwards;
   animation-delay: 1.5s;
+}
+
+/* ==========================================================================
+   RECORDINGS VIEW & RECORDING MODAL ENHANCED STYLING
+   Large touch targets, sleek modern dark theme, high-contrast buttons
+   ========================================================================== */
+
+.recordings-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 10px 0 36px 0;
+}
+
+.recording-card {
+  display: flex;
+  align-items: center;
+  background: rgba(18, 22, 38, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.recording-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--grad-primary);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.recording-card:hover, .recording-card:focus-within {
+  border-color: rgba(0, 242, 254, 0.35);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 26px rgba(0, 242, 254, 0.16);
+}
+
+.recording-card:hover::before {
+  opacity: 1;
+}
+
+.recording-card-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(0, 242, 254, 0.18), rgba(121, 40, 202, 0.24));
+  border: 1.5px solid rgba(0, 242, 254, 0.35);
+  color: #00f2fe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(0, 242, 254, 0.2);
+}
+
+.recording-card-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.recording-card-info {
+  flex: 1;
+  min-width: 0;
+  margin: 0 16px;
+}
+
+.recording-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 5px;
+}
+
+.recording-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.recording-meta-artist {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recording-meta-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(0, 242, 254, 0.15);
+  color: #00f2fe;
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  text-transform: uppercase;
+}
+
+.recording-meta-duration {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.recording-date {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  display: block;
+}
+
+.recording-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Base style shared across all 3 action buttons: Play, Simpan, Hapus */
+.btn-rec-action {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.btn-rec-action svg {
+  width: 15px;
+  height: 15px;
+  pointer-events: none;
+  transition: transform 0.2s ease;
+}
+
+.btn-rec-action:hover {
+  transform: translateY(-2px);
+}
+
+.btn-rec-action:active {
+  transform: scale(0.92);
+}
+
+/* 1. Play Button - Neon Cyan Accent */
+.btn-play-rec {
+  background: rgba(0, 242, 254, 0.12);
+  border: 1.2px solid rgba(0, 242, 254, 0.35);
+  color: #00f2fe;
+}
+
+.btn-play-rec svg {
+  fill: #00f2fe;
+  transform: translateX(1px);
+}
+
+.btn-play-rec:hover {
+  background: rgba(0, 242, 254, 0.24);
+  border-color: #00f2fe;
+  box-shadow: 0 0 14px rgba(0, 242, 254, 0.45);
+}
+
+/* 2. Simpan / Download Button - Emerald Green Accent */
+.btn-dl-rec {
+  background: rgba(52, 211, 153, 0.12);
+  border: 1.2px solid rgba(52, 211, 153, 0.35);
+  color: #34d399;
+}
+
+.btn-dl-rec svg {
+  stroke: #34d399;
+}
+
+.btn-dl-rec:hover {
+  background: rgba(52, 211, 153, 0.24);
+  border-color: #34d399;
+  box-shadow: 0 0 14px rgba(52, 211, 153, 0.45);
+}
+
+/* 3. Hapus / Delete Button - Coral Rose Accent */
+.btn-del-rec {
+  background: rgba(244, 63, 94, 0.12);
+  border: 1.2px solid rgba(244, 63, 94, 0.35);
+  color: #f43f5e;
+}
+
+.btn-del-rec svg {
+  stroke: #f43f5e;
+}
+
+.btn-del-rec:hover {
+  background: rgba(244, 63, 94, 0.24);
+  border-color: #f43f5e;
+  box-shadow: 0 0 14px rgba(244, 63, 94, 0.45);
+}
+
+/* --- Recording Modal Custom Player --- */
+.modal-rec-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 10px 0 18px 0;
+}
+
+.modal-rec-icon-bubble {
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(121, 40, 202, 0.3));
+  border: 2px solid rgba(0, 242, 254, 0.4);
+  color: #00f2fe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  box-shadow: 0 0 28px rgba(0, 242, 254, 0.25);
+  animation: modalBubblePulse 3s ease-in-out infinite alternate;
+}
+
+@keyframes modalBubblePulse {
+  0% { transform: scale(0.98); box-shadow: 0 0 20px rgba(0, 242, 254, 0.2); }
+  100% { transform: scale(1.04); box-shadow: 0 0 32px rgba(0, 242, 254, 0.4); }
+}
+
+.modal-player-controls {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  padding: 16px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-player-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.btn-modal-play {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #00f2fe, #4facfe);
+  border: none;
+  color: #050b16;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(0, 242, 254, 0.4);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-modal-play:hover {
+  transform: scale(1.08);
+}
+
+.btn-modal-play:active {
+  transform: scale(0.92);
+}
+
+.modal-player-progress-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modal-time-display {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.modal-progress-bar {
+  width: 100%;
+  height: 8px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+  accent-color: var(--color-cyan);
+}
+
+.modal-progress-bar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #00f2fe;
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.8);
+  cursor: pointer;
+}
+
+.btn-modal-download {
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border: none;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(16, 185, 129, 0.35);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  flex: 1;
+}
+
+.btn-modal-download:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(16, 185, 129, 0.5);
+}
+
+.btn-modal-download:active {
+  transform: scale(0.96);
+}
+
+.btn-modal-close-action {
+  height: 52px;
+  padding: 0 20px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  font-size: 0.95rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-modal-close-action:active {
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(0.96);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 480px) {
+  .recording-card {
+    padding: 12px 14px;
+  }
+  .recording-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+  }
+  .recording-card-icon svg {
+    width: 24px;
+    height: 24px;
+  }
+  .recording-card-info {
+    margin: 0 10px;
+  }
+  .recording-title {
+    font-size: 0.95rem;
+  }
+  .recording-meta-artist {
+    max-width: 95px;
+    font-size: 0.8rem;
+  }
+  .recording-card-actions {
+    gap: 6px;
+  }
+  .btn-rec-action,
+  .btn-play-rec,
+  .btn-dl-rec,
+  .btn-del-rec {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    border-radius: 9px;
+  }
+  .btn-rec-action svg,
+  .btn-play-rec svg,
+  .btn-dl-rec svg,
+  .btn-del-rec svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* ==========================================================================
+   SETTINGS & FORM CONTROLS (HIGH CONTRAST & ACCESSIBLE)
+   Fixes invisible text and options on Android & dark themes
+   ========================================================================== */
+
+.form-group {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.form-label {
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  margin-bottom: 8px !important;
+  letter-spacing: 0.3px !important;
+  display: block !important;
+}
+
+.custom-select-container {
+  position: relative;
+  width: 100%;
+}
+
+.form-input,
+.custom-select,
+select.form-input {
+  width: 100% !important;
+  background-color: #151a2e !important;
+  color: #ffffff !important;
+  border: 1.5px solid rgba(0, 242, 254, 0.45) !important;
+  border-radius: 14px !important;
+  padding: 14px 18px !important;
+  font-size: 0.95rem !important;
+  font-weight: 600 !important;
+  font-family: var(--font-sans) !important;
+  outline: none !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 24 24' fill='none' stroke='%2300f2fe' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 14px center !important;
+  background-size: 20px !important;
+  padding-right: 46px !important;
+}
+
+.form-input:focus,
+.custom-select:focus,
+select.form-input:focus {
+  border-color: #00f2fe !important;
+  box-shadow: 0 0 20px rgba(0, 242, 254, 0.5) !important;
+  background-color: #1a2038 !important;
+}
+
+/* Individual options inside select dropdown (forces dark bg + white text) */
+.form-input option,
+.custom-select option,
+select.form-input option {
+  background-color: #101424 !important;
+  color: #ffffff !important;
+  padding: 14px 18px !important;
+  font-size: 0.95rem !important;
+  font-weight: 600 !important;
+}
+
+.form-input option:checked,
+.custom-select option:checked,
+select.form-input option:checked {
+  background-color: #00f2fe !important;
+  color: #050811 !important;
+  font-weight: 700 !important;
+}
+
+/* Quick Real-Time Sync Adjuster inside Recording Modal */
+.modal-sync-adjust-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(0, 242, 254, 0.25);
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin: 14px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-sync-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-sync-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.modal-sync-title-wrap svg {
+  color: var(--color-cyan);
+}
+
+.modal-sync-val-badge {
+  background: rgba(0, 242, 254, 0.15);
+  border: 1px solid rgba(0, 242, 254, 0.4);
+  color: var(--color-cyan);
+  font-family: monospace;
+  font-size: 0.85rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+
+.modal-sync-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-sync-nudge {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.btn-sync-nudge:active {
+  transform: scale(0.92);
+  background: var(--color-cyan);
+  color: #000;
+}
+
+.modal-sync-slider {
+  flex: 1;
+}
+
+.modal-sync-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.btn-modal-sync-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 5px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: all 0.15s ease;
+}
+
+.btn-modal-sync-chip.active {
+  background: rgba(0, 242, 254, 0.2);
+  border-color: var(--color-cyan);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.modal-sync-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.3;
+}
+
+/* ==========================================================================
+   Typography Alignment & Edge-to-Edge Layout Fixes ("Rata Kiri & Kanan")
+   ========================================================================== */
+
+/* 1. Justified multi-line text descriptions for clean, balanced left and right borders */
+.view-desc,
+.scan-hero-desc,
+.cloud-desc,
+.switch-desc,
+.setting-desc,
+.scan-option-desc,
+.modal-sync-hint,
+.calibrate-tip,
+#calibrateStatusDesc,
+#hostingGuideModal p,
+.modal-card p:not(#modalRecTitle):not(#modalRecMeta) {
+  text-align: justify !important;
+  text-justify: inter-word !important;
+  hyphens: auto !important;
+  -webkit-hyphens: auto !important;
+  word-break: normal !important;
+  line-height: 1.5 !important;
+}
+
+/* 2. Symmetrical edge-to-edge container alignment with full box sizing */
+.song-card,
+.recording-card,
+.scan-hero-card,
+.gdrive-card,
+.setting-item,
+.latency-section,
+.modal-sync-adjust-box,
+.modal-player-controls,
+.form-group,
+.now-singing-card {
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* 3. Flush left and right alignments on slider labels and time displays */
+.slider-label-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.slider-label-row span:only-child {
+  text-align: left !important;
+  flex: 1 !important;
+}
+
+.slider-label-row span:first-child,
+.slider-label-row .slider-title {
+  text-align: left !important;
+  flex: 1 !important;
+  justify-content: flex-start !important;
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+}
+
+.slider-label-row span:nth-child(2):not(:last-child) {
+  text-align: center !important;
+  flex: 1 !important;
+}
+
+.slider-label-row span:last-child:not(:first-child) {
+  text-align: right !important;
+}
+
+.controls-panel .slider-label-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  text-align: left !important;
+}
+
+.controls-panel .slider-label-row span:first-child,
+.controls-panel .slider-label-row .slider-title {
+  text-align: left !important;
+  flex: 1 !important;
+}
+
+.slider-val-badge {
+  text-align: right !important;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-cyan, #00f2fe);
+  background: rgba(0, 242, 254, 0.1);
+  border: 1px solid rgba(0, 242, 254, 0.25);
+  padding: 2px 8px;
+  border-radius: 12px;
+  letter-spacing: 0.5px;
+  font-family: var(--font-mono, monospace);
+  flex-shrink: 0;
+}
+
+/* ================= AUDIO SETTINGS TOGGLE DRAWER (ANTI-SCROLL SLIP) ================= */
+.audio-settings-toggle-wrapper {
+  margin: 14px 0 6px 0;
+  width: 100%;
+}
+
+.btn-toggle-audio-drawer {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(17, 24, 39, 0.75) 100%);
+  border: 1px solid rgba(0, 242, 254, 0.25);
+  border-radius: var(--border-radius-lg, 16px);
+  color: var(--text-main, #ffffff);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-toggle-audio-drawer:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(17, 24, 39, 0.9) 100%);
+  border-color: rgba(0, 242, 254, 0.45);
+  box-shadow: 0 6px 20px rgba(0, 242, 254, 0.15);
+}
+
+.btn-toggle-audio-drawer:active {
+  transform: scale(0.985);
+}
+
+.toggle-drawer-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.toggle-drawer-icon {
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(0, 242, 254, 0.1);
+  border: 1px solid rgba(0, 242, 254, 0.2);
+  flex-shrink: 0;
+}
+
+.toggle-drawer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.toggle-drawer-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.2px;
+}
+
+.toggle-drawer-subtitle {
+  font-size: 0.68rem;
+  color: var(--text-muted, #94a3b8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toggle-drawer-status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: rgba(0, 242, 254, 0.12);
+  border: 1px solid rgba(0, 242, 254, 0.35);
+  border-radius: var(--border-radius-full, 9999px);
+  color: var(--color-cyan, #00f2fe);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.btn-toggle-audio-drawer.collapsed-state {
+  border-color: rgba(255, 75, 145, 0.35);
+  background: linear-gradient(135deg, rgba(255, 75, 145, 0.08) 0%, rgba(17, 24, 39, 0.85) 100%);
+}
+
+.btn-toggle-audio-drawer.collapsed-state .toggle-drawer-icon {
+  background: rgba(255, 75, 145, 0.15);
+  border-color: rgba(255, 75, 145, 0.3);
+}
+
+.btn-toggle-audio-drawer.collapsed-state .toggle-drawer-status-pill {
+  background: rgba(255, 75, 145, 0.15);
+  border-color: rgba(255, 75, 145, 0.4);
+  color: #ff4b91;
+}
+
+.audio-settings-collapse-container {
+  display: block;
+  overflow: visible;
+  transition: opacity 0.25s ease;
+}
+
+.audio-settings-collapse-container.collapsed {
+  display: none !important;
+}
+
+/* Prevent accidental horizontal drag on range inputs while scrolling vertically */
+.custom-range {
+  touch-action: pan-y !important;
+}
+
+.time-row,
+.modal-time-display {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.time-row span:first-child,
+.modal-time-display span:first-child {
+  text-align: left !important;
+}
+
+.time-row span:last-child,
+.modal-time-display span:last-child {
+  text-align: right !important;
+}
+
+/* 4. Left-aligned content columns */
+.song-card-info,
+.recording-card-info,
+.switch-label-group,
+.latency-title-group {
+  text-align: left !important;
+}
+
+.song-card-title,
+.song-card-artist,
+.recording-title,
+.recording-meta,
+.scan-option-title,
+.switch-title,
+.form-label,
+.view-title,
+.scan-hero-title {
+  text-align: left !important;
+}
+
+/* 5. Centered hero titles in result preview & calibration radar */
+.modal-rec-hero h4,
+.modal-rec-hero p,
+#calibrateStatusTitle,
+.detected-value,
+.detected-sub {
+  text-align: center !important;
+}
+
+/* 6. Clean header rows spanning the full container width */
+.latency-header-row,
+.switch-row,
+.modal-header,
+.modal-sync-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
