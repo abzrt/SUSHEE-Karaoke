@@ -84,6 +84,25 @@
       document.addEventListener('touchstart', function(e) {
         if (document.getElementById('splashScreen')) dismissSplashNow();
       }, { passive: true });
+
+      // Immediate fail-safe tab switcher
+      window.switchTab = function(viewId) {
+        if (!viewId) return;
+        var views = document.querySelectorAll('.app-view');
+        var navButtons = document.querySelectorAll('.nav-item');
+        views.forEach(function(v) { v.classList.remove('active'); });
+        navButtons.forEach(function(b) { b.classList.remove('active'); });
+
+        var targetView = document.getElementById(viewId);
+        if (targetView) targetView.classList.add('active');
+
+        var activeBtn = document.querySelector('.nav-item[data-view="' + viewId + '"]');
+        if (activeBtn) activeBtn.classList.add('active');
+
+        if (viewId === 'viewKaraoke' && window.appVisualizer) {
+          window.appVisualizer.resizeCanvas();
+        }
+      };
     })();
   </script>
 

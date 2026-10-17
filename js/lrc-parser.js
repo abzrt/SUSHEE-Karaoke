@@ -101,7 +101,6 @@ class LrcParser {
   static getSampleLrc() {
     return '';
   }
-  }
 }
 
 window.LrcParser = LrcParser;
