@@ -51,20 +51,25 @@ class AudioEffectsEngine {
     this.currentPreset = 'studio';
     this.isMonitoring = false;
     this.vocalVolume = 1.0;
+
+    // Music Pitch Transpose (-6 to +6 semitones) and Speed/Tempo (0.75x to 1.5x)
+    this.musicPitch = parseInt(localStorage.getItem('sushee_music_pitch') || '0', 10) || 0;
+    this.musicSpeed = parseFloat(localStorage.getItem('sushee_music_speed') || '1.0') || 1.0;
+    this.pitchShifter = null;
+
     // Default balanced backing track level (0.85 = 85%) for clear, loud playback
     const savedMusicVol = localStorage.getItem('sushee_music_volume');
     this.musicVolume = (savedMusicVol !== null && !isNaN(parseFloat(savedMusicVol))) ? parseFloat(savedMusicVol) : 0.85;
-    // Latency compensation (Smart Auto-Alignment: 110ms default for Android mobile, 45ms desktop)
-    let defaultLatency = 110;
-    if (typeof window !== 'undefined' && window.AndroidStorage && typeof window.AndroidStorage.getOptimalHardwareLatencyMs === 'function') {
-      try {
-        defaultLatency = window.AndroidStorage.getOptimalHardwareLatencyMs();
-      } catch (e) {}
-    } else if (typeof navigator !== 'undefined' && !/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)) {
-      defaultLatency = 45;
-    }
+    // Real-Time Direct Vocal Sync (0ms delay for true zero-latency simultaneous recording)
+    let defaultLatency = 0;
     const savedLatency = localStorage.getItem('sushee_latency_offset');
-    this.latencyOffsetMs = (savedLatency !== null && savedLatency !== '0') ? parseFloat(savedLatency) : defaultLatency;
+    // If previously saved with old 110ms or invalid default, reset to pure 0ms realtime
+    if (savedLatency === '110' || savedLatency === null) {
+      this.latencyOffsetMs = 0;
+      try { localStorage.setItem('sushee_latency_offset', '0'); } catch (e) {}
+    } else {
+      this.latencyOffsetMs = parseFloat(savedLatency) || 0;
+    }
 
     // Audio Analysis for Visualizer
     this.micAnalyser = null;
@@ -170,11 +175,20 @@ class AudioEffectsEngine {
     }
 
     if (this.musicSourceNode && !this.musicMixGain) {
+      // Create Real-Time Pitch Shifter for Backing Track
+      if (!this.pitchShifter) {
+        this.pitchShifter = new WebAudioPitchShifter(this.audioCtx);
+        if (this.musicPitch) {
+          this.pitchShifter.setPitch(this.musicPitch);
+        }
+      }
+
       this.musicMixGain = this.audioCtx.createGain();
       this.musicMixGain.gain.value = this.musicVolume;
 
-      // Connect: Music -> Gain -> Analyser
-      this.musicSourceNode.connect(this.musicMixGain);
+      // Connect: Music -> Pitch Shifter -> Music Mix Gain -> Analyser
+      this.musicSourceNode.connect(this.pitchShifter.input);
+      this.pitchShifter.output.connect(this.musicMixGain);
       this.musicMixGain.connect(this.musicAnalyser);
 
       // Route directly to Master Audio Destination for full clarity & zero distortion
@@ -193,6 +207,11 @@ class AudioEffectsEngine {
 
       // Apply initial latency offset to music delay node
       this.setLatencyOffset(this.latencyOffsetMs);
+
+      // Apply initial speed
+      if (this.musicElement && this.musicSpeed !== 1.0) {
+        this.setMusicSpeed(this.musicSpeed);
+      }
     }
   }
 
@@ -327,12 +346,15 @@ class AudioEffectsEngine {
         this.stopMicrophone();
       }
 
+      // Enable Acoustic Echo Cancellation & Noise Suppression to prevent speaker music bleed
+      // from leaking into the microphone and creating double music in recordings
       this.micStream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          echoCancellation: false, // Keep full vocal dynamics
-          noiseSuppression: false, // Don't clip singing harmonies
-          autoGainControl: false,  // Let StarMaker compressor handle leveling
-          latency: 0
+          echoCancellation: { ideal: true },
+          noiseSuppression: { ideal: true },
+          autoGainControl: false,
+          channelCount: 1,
+          latency: { ideal: 0 }
         }
       });
 
@@ -344,10 +366,15 @@ class AudioEffectsEngine {
       this.micSourceNode.connect(this.micPreAmp);
       return true;
     } catch (err) {
-      console.error("Microphone access failed:", err);
+      console.warn("Microphone access with advanced constraints failed, attempting fallback:", err);
       // Fallback with standard constraints
       try {
-        this.micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        this.micStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true
+          }
+        });
         this.micSourceNode = this.audioCtx.createMediaStreamSource(this.micStream);
         this.micSourceNode.connect(this.micPreAmp);
         return true;
@@ -415,18 +442,18 @@ class AudioEffectsEngine {
         break;
 
       case 'studio':
-        // Crisp, punchy, studio-treated vocal with subtle room reverb
-        this.generateImpulseResponse(1.2, 2.5);
-        this.reverbGain.gain.value = 0.18;
-        this.echoGain.gain.value = 0.05;
-        this.delayNode.delayTime.value = 0.11;
-        this.delayFeedback.gain.value = 0.12;
-        this.dryVocalGain.gain.value = 0.95;
+        // Pure Realtime Studio Vocal: Crisp, immediate, zero-delay upfront sound with subtle room polish
+        this.generateImpulseResponse(1.0, 2.5);
+        this.reverbGain.gain.value = 0.10;
+        this.echoGain.gain.value = 0.0; // 0.0 echo gain - ZERO delay on vocals!
+        this.delayNode.delayTime.value = 0.0; // 0.0 delay time
+        this.delayFeedback.gain.value = 0.0;
+        this.dryVocalGain.gain.value = 1.0; // 100% direct upfront dry vocal
         this.eqLow.gain.value = -1; // Clean lows
-        this.eqMid.gain.value = 2.5; // Presence boost
-        this.eqHigh.gain.value = 4.0; // Air / Sparkle
-        this.compressor.threshold.value = -22;
-        this.compressor.ratio.value = 4;
+        this.eqMid.gain.value = 2.0; // Presence boost
+        this.eqHigh.gain.value = 3.5; // Air / Sparkle
+        this.compressor.threshold.value = -20;
+        this.compressor.ratio.value = 3.5;
         break;
 
       case 'ktv':
@@ -595,6 +622,47 @@ class AudioEffectsEngine {
       // If Web Audio node is active, keep HTML5 volume at 1.0 to prevent double attenuation
       this.musicElement.volume = this.musicSourceNode ? 1.0 : this.musicVolume;
     }
+  }
+
+  setMusicPitch(semitones) {
+    const val = Math.max(-6, Math.min(6, parseInt(semitones, 10) || 0));
+    this.musicPitch = val;
+    if (this.pitchShifter) {
+      this.pitchShifter.setPitch(val);
+    }
+    try {
+      localStorage.setItem('sushee_music_pitch', val.toString());
+    } catch (e) {}
+    return val;
+  }
+
+  setMusicSpeed(speed) {
+    const s = Math.max(0.75, Math.min(1.35, parseFloat(speed) || 1.0));
+    // Round to nearest 0.05
+    const rounded = Math.round(s * 20) / 20;
+    this.musicSpeed = rounded;
+    if (this.musicElement) {
+      try {
+        this.musicElement.preservesPitch = true;
+        this.musicElement.mozPreservesPitch = true;
+        this.musicElement.webkitPreservesPitch = true;
+        this.musicElement.playbackRate = rounded;
+      } catch (e) {
+        console.warn("Could not set playbackRate:", e);
+      }
+    }
+    try {
+      localStorage.setItem('sushee_music_speed', rounded.toString());
+    } catch (e) {}
+    return rounded;
+  }
+
+  resetMusicPitch() {
+    return this.setMusicPitch(0);
+  }
+
+  resetMusicSpeed() {
+    return this.setMusicSpeed(1.0);
   }
 
   setMonitoring(enabled) {
@@ -768,4 +836,172 @@ class AudioEffectsEngine {
   }
 }
 
+/**
+ * Web Audio Real-Time Pitch Shifter for Backing Music Track
+ * Uses dual modulated delay lines with smooth cosine crossfade window
+ * Provides click-free realtime semitone transposition (-6 to +6) with instant dry bypass when semitones === 0
+ */
+class WebAudioPitchShifter {
+  constructor(audioCtx) {
+    this.audioCtx = audioCtx;
+    this.input = audioCtx.createGain();
+    this.output = audioCtx.createGain();
+    this.pitchSemitones = 0;
+
+    // Dry bypass gain (1.0 when 0 semitones)
+    this.dryGain = audioCtx.createGain();
+    this.dryGain.gain.value = 1.0;
+
+    // Wet shifted gain (0.0 when 0 semitones)
+    this.wetGain = audioCtx.createGain();
+    this.wetGain.gain.value = 0.0;
+
+    // 60ms grain window provides crystal clear audio without phase smearing or distortion
+    this.bufferTime = 0.06;
+
+    this.delay1 = audioCtx.createDelay(1.0);
+    this.delay2 = audioCtx.createDelay(1.0);
+    this.fadeGain1 = audioCtx.createGain();
+    this.fadeGain2 = audioCtx.createGain();
+
+    this.delay1.delayTime.value = 0;
+    this.delay2.delayTime.value = 0;
+    this.fadeGain1.gain.value = 0.5;
+    this.fadeGain2.gain.value = 0.5;
+
+    // Audio Graph Connections
+    this.input.connect(this.dryGain);
+    this.dryGain.connect(this.output);
+
+    this.input.connect(this.wetGain);
+    this.wetGain.connect(this.delay1);
+    this.wetGain.connect(this.delay2);
+
+    this.delay1.connect(this.fadeGain1);
+    this.delay2.connect(this.fadeGain2);
+
+    this.fadeGain1.connect(this.output);
+    this.fadeGain2.connect(this.output);
+
+    this.modSources = [];
+    this.initModulation();
+  }
+
+  initModulation() {
+    this.stopModulation();
+    if (!this.audioCtx || this.pitchSemitones === 0) {
+      if (this.dryGain && this.wetGain) {
+        this.dryGain.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
+        this.wetGain.gain.setValueAtTime(0.0, this.audioCtx.currentTime);
+      }
+      return;
+    }
+
+    this.dryGain.gain.setValueAtTime(0.0, this.audioCtx.currentTime);
+    this.wetGain.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
+
+    const pitchRatio = Math.pow(2, this.pitchSemitones / 12);
+    const delta = pitchRatio - 1;
+    if (Math.abs(delta) < 0.001) {
+      this.dryGain.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
+      this.wetGain.gain.setValueAtTime(0.0, this.audioCtx.currentTime);
+      return;
+    }
+
+    // Exact DSP rotating delay-line pitch shifting formula:
+    // f_out / f_in = 1 - (dDelay/dt) = pitchRatio
+    // Therefore |dDelay/dt| = |pitchRatio - 1| = |delta|
+    // With grain period T = bufferTime (60ms), maxDelay MUST equal T * |delta|
+    // so that slope = maxDelay / T = |delta| exactly, matching the requested semitones.
+    const period = this.bufferTime;
+    const maxDelay = period * Math.abs(delta);
+    const sampleRate = this.audioCtx.sampleRate || 44100;
+    const length = Math.floor(period * sampleRate);
+    if (length < 2) return;
+
+    const delayBuffer = this.audioCtx.createBuffer(1, length, sampleRate);
+    const delayData = delayBuffer.getChannelData(0);
+    const fadeBuffer = this.audioCtx.createBuffer(1, length, sampleRate);
+    const fadeData = fadeBuffer.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+      const norm = i / length;
+      if (delta > 0) {
+        // Pitch UP
+        delayData[i] = (1 - norm) * maxDelay;
+      } else {
+        // Pitch DOWN
+        delayData[i] = norm * maxDelay;
+      }
+      // Raised cosine window for click-free crossfade
+      const x = norm * 2 * Math.PI;
+      fadeData[i] = 0.5 * (1 - Math.cos(x));
+    }
+
+    // Reset base gains to 0 so the modulated buffer source controls 0.0 to 1.0 crossfade cleanly
+    const now = this.audioCtx.currentTime;
+    this.fadeGain1.gain.setValueAtTime(0.0, now);
+    this.fadeGain2.gain.setValueAtTime(0.0, now);
+    this.delay1.delayTime.setValueAtTime(0.0, now);
+    this.delay2.delayTime.setValueAtTime(0.0, now);
+
+    const delayMod1 = this.audioCtx.createBufferSource();
+    delayMod1.buffer = delayBuffer;
+    delayMod1.loop = true;
+    delayMod1.connect(this.delay1.delayTime);
+
+    const fadeMod1 = this.audioCtx.createBufferSource();
+    fadeMod1.buffer = fadeBuffer;
+    fadeMod1.loop = true;
+    fadeMod1.connect(this.fadeGain1.gain);
+
+    const halfLen = Math.floor(length / 2);
+    const delayBuffer2 = this.audioCtx.createBuffer(1, length, sampleRate);
+    const delayData2 = delayBuffer2.getChannelData(0);
+    const fadeBuffer2 = this.audioCtx.createBuffer(1, length, sampleRate);
+    const fadeData2 = fadeBuffer2.getChannelData(0);
+
+    for (let i = 0; i < length; i++) {
+      const srcIdx = (i + halfLen) % length;
+      delayData2[i] = delayData[srcIdx];
+      fadeData2[i] = fadeData[srcIdx];
+    }
+
+    const delayMod2 = this.audioCtx.createBufferSource();
+    delayMod2.buffer = delayBuffer2;
+    delayMod2.loop = true;
+    delayMod2.connect(this.delay2.delayTime);
+
+    const fadeMod2 = this.audioCtx.createBufferSource();
+    fadeMod2.buffer = fadeBuffer2;
+    fadeMod2.loop = true;
+    fadeMod2.connect(this.fadeGain2.gain);
+
+    delayMod1.start(now);
+    fadeMod1.start(now);
+    delayMod2.start(now);
+    fadeMod2.start(now);
+
+    this.modSources = [delayMod1, fadeMod1, delayMod2, fadeMod2];
+  }
+
+  stopModulation() {
+    this.modSources.forEach(src => {
+      try {
+        src.stop();
+        src.disconnect();
+      } catch (e) {}
+    });
+    this.modSources = [];
+  }
+
+  setPitch(semitones) {
+    const val = Math.max(-6, Math.min(6, parseInt(semitones, 10) || 0));
+    if (this.pitchSemitones === val) return val;
+    this.pitchSemitones = val;
+    this.initModulation();
+    return val;
+  }
+}
+
 window.AudioEffectsEngine = AudioEffectsEngine;
+window.WebAudioPitchShifter = WebAudioPitchShifter;

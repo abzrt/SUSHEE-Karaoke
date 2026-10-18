@@ -4,24 +4,59 @@
  */
 
 async function initApp() {
-  // --- SPLASH SCREEN OPENING ANIMATION ---
+  // --- CINEMATIC SPLASH SCREEN OPENING CONTROLLER ---
   const splashScreen = document.getElementById('splashScreen');
   if (splashScreen) {
     let splashDismissed = false;
+    const progressBar = document.getElementById('splashProgressBar');
+    const percentLabel = document.getElementById('splashPercent');
+    const statusText = document.getElementById('splashStatusText');
+    const skipBtn = document.getElementById('splashSkipBtn');
+    let splashTimers = [];
+
     const dismissSplash = () => {
       if (splashDismissed) return;
       splashDismissed = true;
+      splashTimers.forEach(clearTimeout);
+      splashTimers = [];
+      if (progressBar) progressBar.style.width = '100%';
+      if (percentLabel) percentLabel.textContent = '100%';
       splashScreen.classList.add('fade-out');
       splashScreen.style.pointerEvents = 'none';
-      splashScreen.style.opacity = '0';
       setTimeout(() => {
         if (splashScreen.parentNode) {
           splashScreen.parentNode.removeChild(splashScreen);
         }
-      }, 400);
+      }, 500);
     };
 
-    setTimeout(dismissSplash, 600);
+    const updateStep = (pct, textKey, delay) => {
+      const t = setTimeout(() => {
+        if (splashDismissed) return;
+        if (progressBar) progressBar.style.width = pct + '%';
+        if (percentLabel) percentLabel.textContent = pct + '%';
+        if (statusText && textKey && window.i18n) {
+          statusText.textContent = window.i18n.t(textKey) || statusText.textContent;
+        }
+      }, delay);
+      splashTimers.push(t);
+    };
+
+    // Staged realistic progress animation
+    updateStep(28, 'splashStatusLoading', 150);
+    updateStep(62, 'splashStatusEffects', 600);
+    updateStep(88, 'splashStatusSync', 1100);
+    updateStep(100, 'splashStatusReady', 1600);
+
+    const autoDismissTimer = setTimeout(dismissSplash, 2050);
+    splashTimers.push(autoDismissTimer);
+
+    if (skipBtn) {
+      skipBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dismissSplash();
+      });
+    }
     splashScreen.addEventListener('click', dismissSplash);
     splashScreen.addEventListener('touchstart', dismissSplash, { passive: true });
   }
@@ -34,6 +69,15 @@ async function initApp() {
   // Initialize Core Systems
   const audioEngine = new AudioEffectsEngine();
   window.audioEngine = audioEngine;
+
+  // Immediately unlock AudioContext on first user interaction on mobile devices
+  const unlockAudioContext = () => {
+    if (audioEngine && typeof audioEngine.resumeContext === 'function') {
+      audioEngine.resumeContext();
+    }
+  };
+  window.addEventListener('touchstart', unlockAudioContext, { passive: true, once: true });
+  window.addEventListener('click', unlockAudioContext, { once: true });
   if (audioElement) {
     try {
       const vol = (audioEngine.musicVolume !== undefined && !isNaN(audioEngine.musicVolume)) ? audioEngine.musicVolume : 0.85;
@@ -56,6 +100,60 @@ async function initApp() {
   let isKaraokePlaying = false;
   let activeLyricIndex = -1;
   let lyricScrollTimer = null;
+
+  // --- SCREEN WAKE LOCK CONTROLLER (KEEP SCREEN AWAKE ONLY DURING RECORDING) ---
+  let screenWakeLock = null;
+
+  async function requestScreenWakeLock() {
+    // 1. Android Native Window Flag Bridge
+    if (window.AndroidStorage && typeof window.AndroidStorage.setKeepScreenAwake === 'function') {
+      try {
+        window.AndroidStorage.setKeepScreenAwake(true);
+      } catch (e) {
+        console.warn('Native setKeepScreenAwake error:', e);
+      }
+    }
+
+    // 2. Modern Web Wake Lock API
+    if ('wakeLock' in navigator && typeof navigator.wakeLock.request === 'function') {
+      try {
+        if (!screenWakeLock) {
+          screenWakeLock = await navigator.wakeLock.request('screen');
+          screenWakeLock.addEventListener('release', () => {
+            screenWakeLock = null;
+          });
+        }
+      } catch (e) {
+        console.warn('Web WakeLock request error:', e);
+      }
+    }
+  }
+
+  async function releaseScreenWakeLock() {
+    // 1. Android Native Window Flag Bridge
+    if (window.AndroidStorage && typeof window.AndroidStorage.setKeepScreenAwake === 'function') {
+      try {
+        window.AndroidStorage.setKeepScreenAwake(false);
+      } catch (e) {
+        console.warn('Native setKeepScreenAwake error:', e);
+      }
+    }
+
+    // 2. Modern Web Wake Lock API
+    if (screenWakeLock) {
+      try {
+        await screenWakeLock.release();
+      } catch (e) {}
+      screenWakeLock = null;
+    }
+  }
+
+  // Restore wake lock on visibility change if recording is in progress
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && isKaraokePlaying && recorder && recorder.isRecording) {
+      await requestScreenWakeLock();
+    }
+  });
 
   // Initialize UI language
   window.i18n.updateDOM();
@@ -565,6 +663,7 @@ async function initApp() {
         if (micStarted) {
           try {
             recorder.startRecording();
+            await requestScreenWakeLock(); // Screen keep-awake ONLY while recording!
           } catch (recErr) {
             console.warn("Recorder start error:", recErr);
           }
@@ -574,6 +673,7 @@ async function initApp() {
           await audioElement.play();
         } catch (playErr) {
           console.error("Audio playback error:", playErr);
+          await releaseScreenWakeLock();
           showToast(window.i18n.t('toastPlaybackError', { err: playErr.message || playErr }), 'error');
           return;
         }
@@ -585,6 +685,10 @@ async function initApp() {
         updateMusicPlayButtonUI(true);
         showToast(micStarted ? window.i18n.t('toastKaraokeStarted') : window.i18n.t('toastMusicStarted'), 'success');
       } catch (err) {
+        await releaseScreenWakeLock();
+        if (audioEngine && typeof audioEngine.stopMicrophone === 'function') {
+          audioEngine.stopMicrophone();
+        }
         showToast(window.i18n.t('toastKaraokeStartError', { err: err.message || err }), 'error');
         console.error(err);
       }
@@ -594,13 +698,19 @@ async function initApp() {
       isKaraokePlaying = false;
       if (visualizer) visualizer.stop();
 
-      showToast(window.i18n.t('toastConvertingMp3'), 'info');
+      // Release wake lock and stop mic so screen can turn off normally and battery is conserved
+      await releaseScreenWakeLock();
+      if (audioEngine && typeof audioEngine.stopMicrophone === 'function') {
+        audioEngine.stopMicrophone();
+      }
+
+      // Stop recording instantaneously without heavy conversion lag
       const recordingResult = await recorder.stopRecording();
       updateKaraokeUIState(false);
 
       if (recordingResult && recordingResult.duration >= 3) {
-        // Save recording
-        const savedItem = recorder.saveCurrentRecording(
+        showToast(window.i18n.t('toastConvertingMp3') || 'Menyimpan & memproses rekaman...', 'info');
+        const savedItem = await recorder.saveCurrentRecording(
           currentSong.title,
           currentSong.artist,
           audioEngine.currentPreset,
@@ -620,15 +730,15 @@ async function initApp() {
 
     if (isPlaying) {
       btnKaraokeAction.innerHTML = `
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-        <span data-i18n="btnStopKaraoke">${window.i18n.t('btnStopKaraoke')}</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+        <span id="karaokeActionLabel" data-i18n="btnStopKaraoke">Stop</span>
       `;
       btnKaraokeAction.classList.add('recording-active');
       if (recordingIndicator) recordingIndicator.classList.add('active');
     } else {
       btnKaraokeAction.innerHTML = `
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
-        <span data-i18n="btnStartKaraoke">${window.i18n.t('btnStartKaraoke')}</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
+        <span id="karaokeActionLabel" data-i18n="btnStartKaraoke">Record</span>
       `;
       btnKaraokeAction.classList.remove('recording-active');
       if (recordingIndicator) recordingIndicator.classList.remove('active');
@@ -722,13 +832,65 @@ async function initApp() {
     btnToggleMusicPlayback.addEventListener('click', toggleMusicPlayback);
   }
 
-  audioElement.addEventListener('play', () => updateMusicPlayButtonUI(true));
-  audioElement.addEventListener('pause', () => updateMusicPlayButtonUI(false));
+  // --- MEDIA SESSION & BACKGROUND AUDIO CONTROLLER ---
+  function setupMediaSession(song) {
+    if (!('mediaSession' in navigator) || !song) return;
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: song.title || 'SUSHEE Karaoke',
+        artist: song.artist || 'SUSHEE Studio',
+        album: 'SUSHEE Karaoke & Audio',
+        artwork: [
+          { src: 'assets/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'assets/icon-512.png', sizes: '512x512', type: 'image/png' }
+        ]
+      });
+      navigator.mediaSession.setActionHandler('play', () => {
+        if (typeof isCloudPlaylistMode !== 'undefined' && isCloudPlaylistMode) toggleCloudPlaylistPlayback();
+        else toggleMusicPlayback();
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+        if (typeof isCloudPlaylistMode !== 'undefined' && isCloudPlaylistMode) toggleCloudPlaylistPlayback();
+        else toggleMusicPlayback();
+      });
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        if (typeof isCloudPlaylistMode !== 'undefined' && isCloudPlaylistMode) prevCloudPlaylistSong();
+        else restartKaraoke();
+      });
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        if (typeof isCloudPlaylistMode !== 'undefined' && isCloudPlaylistMode) nextCloudPlaylistSong();
+      });
+    } catch (e) {
+      console.warn('MediaSession error:', e);
+    }
+  }
+
+  audioElement.addEventListener('play', () => {
+    updateMusicPlayButtonUI(true);
+    if (window.AndroidStorage && typeof window.AndroidStorage.setBackgroundAudioActive === 'function') {
+      try { window.AndroidStorage.setBackgroundAudioActive(true); } catch (e) {}
+    }
+    if (currentSong) setupMediaSession(currentSong);
+  });
+
+  audioElement.addEventListener('pause', () => {
+    updateMusicPlayButtonUI(false);
+    if (window.AndroidStorage && typeof window.AndroidStorage.setBackgroundAudioActive === 'function') {
+      try { window.AndroidStorage.setBackgroundAudioActive(false); } catch (e) {}
+    }
+  });
+
   audioElement.addEventListener('ended', () => {
     isKaraokePlaying = false;
     if (visualizer) visualizer.stop();
     updateMusicPlayButtonUI(false);
     updateKaraokeUIState(false);
+    if (window.AndroidStorage && typeof window.AndroidStorage.setBackgroundAudioActive === 'function') {
+      try { window.AndroidStorage.setBackgroundAudioActive(false); } catch (e) {}
+    }
+    if (typeof isCloudPlaylistMode !== 'undefined' && isCloudPlaylistMode) {
+      nextCloudPlaylistSong();
+    }
   });
 
   // --- STARMAKER VOCAL EFFECT PRESET SELECTOR ---
@@ -849,72 +1011,198 @@ async function initApp() {
     });
   }
 
-  // --- TOGGLE AUDIO SETTINGS DRAWER (ANTI-SCROLL SLIP) ---
-  const btnToggleAudioSettings = document.getElementById('btnToggleAudioSettings');
-  const audioSettingsCollapseContainer = document.getElementById('audioSettingsCollapseContainer');
-  const toggleAudioSettingsTitle = document.getElementById('toggleAudioSettingsTitle');
-  const toggleAudioSettingsSub = document.getElementById('toggleAudioSettingsSub');
-  const toggleAudioSettingsAction = document.getElementById('toggleAudioSettingsAction');
-  const toggleAudioSettingsArrow = document.getElementById('toggleAudioSettingsArrow');
+  // --- COMBINED STUDIO SETTINGS DRAWER (UPWARD-EXPANDING DROPUP) ---
+  const btnToggleStudioSettings = document.getElementById('btnToggleStudioSettings');
+  const studioSettingsCollapseContainer = document.getElementById('studioSettingsCollapseContainer');
+  const toggleStudioSettingsAction = document.getElementById('toggleStudioSettingsAction');
+  const toggleStudioSettingsArrow = document.getElementById('toggleStudioSettingsArrow');
 
-  const setAudioSettingsDrawerState = (isCollapsed, savePref = true) => {
-    if (!audioSettingsCollapseContainer || !btnToggleAudioSettings) return;
+  let isStudioDrawerOpen = false;
+  const setStudioDrawerState = (isOpen, savePref = true) => {
+    isStudioDrawerOpen = isOpen;
+    const container = document.getElementById('studioSettingsCollapseContainer');
+    const btn = document.getElementById('btnToggleStudioSettings');
+    const toggleAction = document.getElementById('toggleStudioSettingsAction');
+    const toggleArrow = document.getElementById('toggleStudioSettingsArrow');
 
-    if (isCollapsed) {
-      audioSettingsCollapseContainer.classList.add('collapsed');
-      btnToggleAudioSettings.classList.add('collapsed-state');
-      btnToggleAudioSettings.setAttribute('aria-expanded', 'false');
-      if (toggleAudioSettingsTitle) {
-        toggleAudioSettingsTitle.textContent = (window.i18n && window.i18n.t) ? window.i18n.t('toggleAudioSettingsHidden') : 'Pengaturan Slider & Audio (Disembunyikan)';
+    if (!container || !btn) return;
+
+    if (isOpen) {
+      container.style.display = 'block';
+      container.classList.remove('collapsed');
+      btn.setAttribute('aria-expanded', 'true');
+      if (toggleAction) {
+        toggleAction.textContent = (window.i18n && window.i18n.t) ? window.i18n.t('btnHideSettings') : 'Sembunyikan';
       }
-      if (toggleAudioSettingsSub) {
-        toggleAudioSettingsSub.textContent = (window.i18n && window.i18n.t) ? window.i18n.t('toggleAudioSettingsHiddenSub') : 'Ketuk untuk membuka slider volume, efek & latensi';
+      if (toggleArrow) {
+        toggleArrow.innerHTML = '<polyline points="6 9 12 15 18 9"/>';
       }
-      if (toggleAudioSettingsAction) {
-        toggleAudioSettingsAction.textContent = (window.i18n && window.i18n.t) ? window.i18n.t('btnShowSettings') : 'Buka Pengaturan';
-      }
-      if (toggleAudioSettingsArrow) {
-        toggleAudioSettingsArrow.innerHTML = '<polyline points="6 9 12 15 18 9"/>';
-      }
-      if (savePref) localStorage.setItem('sushee_audio_settings_hidden', '1');
+
+      // Ensure active subtab is visible
+      const activeTabBtn = document.querySelector('.studio-subtab.active');
+      const currentTab = activeTabBtn ? activeTabBtn.getAttribute('data-subtab') : 'vocalTab';
+      switchStudioSubtab(currentTab || 'vocalTab');
+
+      // Expand upwards into viewport view smoothly
+      setTimeout(() => {
+        try {
+          container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } catch (e) {}
+      }, 80);
+      if (savePref) localStorage.setItem('sushee_studio_settings_open', '1');
     } else {
-      audioSettingsCollapseContainer.classList.remove('collapsed');
-      btnToggleAudioSettings.classList.remove('collapsed-state');
-      btnToggleAudioSettings.setAttribute('aria-expanded', 'true');
-      if (toggleAudioSettingsTitle) {
-        toggleAudioSettingsTitle.textContent = (window.i18n && window.i18n.t) ? window.i18n.t('toggleAudioSettings') : 'Pengaturan Slider & Audio Lengkap';
+      container.style.display = 'none';
+      container.classList.add('collapsed');
+      btn.setAttribute('aria-expanded', 'false');
+      if (toggleAction) {
+        toggleAction.textContent = (window.i18n && window.i18n.t) ? window.i18n.t('btnShowSettings') : 'Buka Pengaturan';
       }
-      if (toggleAudioSettingsSub) {
-        toggleAudioSettingsSub.textContent = (window.i18n && window.i18n.t) ? window.i18n.t('toggleAudioSettingsSub') : 'Sembunyikan agar kontrol tidak tergeser saat scrolling';
+      if (toggleArrow) {
+        toggleArrow.innerHTML = '<polyline points="18 15 12 9 6 15"/>';
       }
-      if (toggleAudioSettingsAction) {
-        toggleAudioSettingsAction.textContent = (window.i18n && window.i18n.t) ? window.i18n.t('btnHideSettings') : 'Sembunyikan';
-      }
-      if (toggleAudioSettingsArrow) {
-        toggleAudioSettingsArrow.innerHTML = '<polyline points="18 15 12 9 6 15"/>';
-      }
-      if (savePref) localStorage.setItem('sushee_audio_settings_hidden', '0');
+      if (savePref) localStorage.setItem('sushee_studio_settings_open', '0');
     }
   };
 
-  let lastAudioDrawerToggle = 0;
-  const toggleAudioSettingsDrawer = () => {
+  let lastStudioToggleTime = 0;
+  const toggleStudioSettingsDrawer = (e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
     const now = Date.now();
-    if (now - lastAudioDrawerToggle < 250) return;
-    lastAudioDrawerToggle = now;
-    const isCurrentlyCollapsed = audioSettingsCollapseContainer && audioSettingsCollapseContainer.classList.contains('collapsed');
-    setAudioSettingsDrawerState(!isCurrentlyCollapsed, true);
+    if (now - lastStudioToggleTime < 250) return;
+    lastStudioToggleTime = now;
+    setStudioDrawerState(!isStudioDrawerOpen, true);
   };
-  window.toggleAudioSettingsDrawer = toggleAudioSettingsDrawer;
+  window.toggleStudioSettingsDrawer = toggleStudioSettingsDrawer;
 
-  if (btnToggleAudioSettings) {
-    btnToggleAudioSettings.addEventListener('click', toggleAudioSettingsDrawer);
-
-    // Check saved state: if user previously collapsed it, restore collapsed state
-    const savedAudioCollapse = localStorage.getItem('sushee_audio_settings_hidden');
-    if (savedAudioCollapse === '1') {
-      setAudioSettingsDrawerState(true, false);
+  if (btnToggleStudioSettings) {
+    const savedState = localStorage.getItem('sushee_studio_settings_open');
+    if (savedState === '1') {
+      setStudioDrawerState(true, false);
     }
+  }
+
+  // Subtab navigation inside combined studio drawer
+  const switchStudioSubtab = (tabName) => {
+    document.querySelectorAll('.studio-subtab').forEach(btn => {
+      if (btn.getAttribute('data-subtab') === tabName) btn.classList.add('active');
+      else btn.classList.remove('active');
+    });
+    const paneVocal = document.getElementById('paneVocalTab');
+    const panePitch = document.getElementById('panePitchTab');
+    const paneSync = document.getElementById('paneSyncTab');
+
+    if (paneVocal) {
+      paneVocal.style.display = tabName === 'vocalTab' ? 'block' : 'none';
+      if (tabName === 'vocalTab') paneVocal.classList.add('active'); else paneVocal.classList.remove('active');
+    }
+    if (panePitch) {
+      panePitch.style.display = tabName === 'pitchTab' ? 'block' : 'none';
+      if (tabName === 'pitchTab') panePitch.classList.add('active'); else panePitch.classList.remove('active');
+    }
+    if (paneSync) {
+      paneSync.style.display = tabName === 'syncTab' ? 'block' : 'none';
+      if (tabName === 'syncTab') paneSync.classList.add('active'); else paneSync.classList.remove('active');
+    }
+  };
+  window.switchStudioSubtab = switchStudioSubtab;
+
+  // Backward compatibility triggers for tests and external bindings
+  const vocalEffectsCollapseContainer = document.getElementById('vocalEffectsCollapseContainer') || studioSettingsCollapseContainer;
+  const audioSettingsCollapseContainer = document.getElementById('audioSettingsCollapseContainer') || studioSettingsCollapseContainer;
+  const btnToggleVocalSettings = document.getElementById('btnToggleVocalSettings') || btnToggleStudioSettings;
+  const btnToggleAudioSettings = document.getElementById('btnToggleAudioSettings') || btnToggleStudioSettings;
+
+  window.toggleVocalSettingsDrawer = () => {
+    setStudioDrawerState(true, true);
+    switchStudioSubtab('vocalTab');
+  };
+  window.toggleAudioSettingsDrawer = () => {
+    setStudioDrawerState(true, true);
+    switchStudioSubtab('pitchTab');
+  };
+
+  // --- PITCH SHIFTER & SPEED (TEMPO) CONTROLS ---
+  const musicPitchSlider = document.getElementById('musicPitchSlider');
+  const musicPitchVal = document.getElementById('musicPitchVal');
+  const musicSpeedSlider = document.getElementById('musicSpeedSlider');
+  const musicSpeedVal = document.getElementById('musicSpeedVal');
+
+  const updatePitchBadge = (semitones) => {
+    if (!musicPitchVal) return;
+    const val = parseInt(semitones, 10) || 0;
+    if (val === 0) {
+      musicPitchVal.textContent = '0 (Normal)';
+      musicPitchVal.style.color = 'var(--color-cyan, #00f2fe)';
+    } else if (val > 0) {
+      musicPitchVal.textContent = `+${val} (♯ Naik)`;
+      musicPitchVal.style.color = '#38ef7d';
+    } else {
+      musicPitchVal.textContent = `${val} (♭ Turun)`;
+      musicPitchVal.style.color = '#ff4b91';
+    }
+  };
+
+  const updateSpeedBadge = (speed) => {
+    if (!musicSpeedVal) return;
+    const val = parseFloat(speed) || 1.0;
+    if (Math.abs(val - 1.0) < 0.01) {
+      musicSpeedVal.textContent = '1.00x (Normal)';
+      musicSpeedVal.style.color = 'var(--color-cyan, #00f2fe)';
+    } else if (val > 1.0) {
+      musicSpeedVal.textContent = `${val.toFixed(2)}x (Cepat)`;
+      musicSpeedVal.style.color = '#38ef7d';
+    } else {
+      musicSpeedVal.textContent = `${val.toFixed(2)}x (Lambat)`;
+      musicSpeedVal.style.color = '#ffb300';
+    }
+  };
+
+  window.stepMusicPitch = (delta) => {
+    if (!audioEngine) return;
+    const current = parseInt(audioEngine.musicPitchShift || 0, 10);
+    const target = Math.max(-6, Math.min(6, current + delta));
+    audioEngine.setMusicPitch(target);
+    if (musicPitchSlider) musicPitchSlider.value = target;
+    updatePitchBadge(target);
+  };
+
+  window.resetMusicPitch = () => {
+    if (!audioEngine) return;
+    audioEngine.resetMusicPitch();
+    if (musicPitchSlider) musicPitchSlider.value = 0;
+    updatePitchBadge(0);
+  };
+
+  window.stepMusicSpeed = (delta) => {
+    if (!audioEngine) return;
+    const current = parseFloat(audioEngine.musicPlaybackSpeed || 1.0);
+    const target = Math.max(0.75, Math.min(1.35, Math.round((current + delta) * 100) / 100));
+    audioEngine.setMusicSpeed(target);
+    if (musicSpeedSlider) musicSpeedSlider.value = target;
+    updateSpeedBadge(target);
+  };
+
+  window.resetMusicSpeed = () => {
+    if (!audioEngine) return;
+    audioEngine.resetMusicSpeed();
+    if (musicSpeedSlider) musicSpeedSlider.value = 1.0;
+    updateSpeedBadge(1.0);
+  };
+
+  if (musicPitchSlider) {
+    musicPitchSlider.addEventListener('input', () => {
+      const val = parseInt(musicPitchSlider.value, 10) || 0;
+      audioEngine.setMusicPitch(val);
+      updatePitchBadge(val);
+    });
+  }
+
+  if (musicSpeedSlider) {
+    musicSpeedSlider.addEventListener('input', () => {
+      const val = parseFloat(musicSpeedSlider.value) || 1.0;
+      audioEngine.setMusicSpeed(val);
+      updateSpeedBadge(val);
+    });
   }
 
   // --- LATENCY & AUDIO SYNC ADJUSTMENT ---
@@ -1188,12 +1476,17 @@ async function initApp() {
           renderSongList();
           showToast(window.i18n.t('storageScanSuccess', { count: res.addedCount }), 'success');
         } else {
-          // Fallback to webkitdirectory input
-          fileInputFolder.click();
+          // On Android / mobile devices, webkitdirectory is not supported; use fileInputMulti for direct multi-file selection
+          const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || !!window.AndroidStorage;
+          if (isMobileDevice && fileInputMulti) {
+            fileInputMulti.click();
+          } else if (fileInputFolder) {
+            fileInputFolder.click();
+          }
         }
       } catch (err) {
         console.warn("Directory picker error:", err);
-        fileInputFolder.click();
+        if (fileInputMulti) fileInputMulti.click();
       }
     });
   }
@@ -1262,6 +1555,12 @@ async function initApp() {
           <div class="empty-icon">🎙️</div>
           <h4 data-i18n="noRecordingsTitle">${window.i18n.t('noRecordingsTitle')}</h4>
           <p data-i18n="noRecordingsDesc">${window.i18n.t('noRecordingsDesc')}</p>
+          <div class="empty-actions" style="display: flex; justify-content: center; margin-top: 14px;">
+            <button type="button" class="btn btn-primary" id="btnGoToKaraoke" onclick="window.switchTab && window.switchTab('viewKaraoke')">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              <span>${window.i18n.currentLang === 'id' ? 'Mulai Bernyanyi & Rekam' : 'Start Singing & Recording'}</span>
+            </button>
+          </div>
         </div>
       `;
       return;
@@ -1269,32 +1568,50 @@ async function initApp() {
 
     recordingsListContainer.innerHTML = list.map(rec => `
       <div class="recording-card" data-rec-id="${rec.id}">
-        <div class="recording-card-icon">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-        </div>
-        <div class="recording-card-info">
-          <h4 class="recording-title">${rec.songTitle}</h4>
-          <div class="recording-meta">
-            <span class="recording-meta-artist">${rec.artist}</span>
-            <span class="recording-meta-badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.35);">MP3 320K</span>
-            <span class="recording-meta-badge">${rec.preset ? rec.preset.toUpperCase() : 'STUDIO'}</span>
-            <span class="recording-meta-duration">⏱️ ${formatTime(rec.duration)}</span>
+        <div class="recording-card-row-top">
+          <div class="recording-card-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
           </div>
-          <span class="recording-date">${new Date(rec.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+          <div class="recording-card-info">
+            <h4 class="recording-title">${rec.songTitle}</h4>
+            <div class="recording-meta">
+              <span class="recording-meta-artist">${rec.artist}</span>
+              <span class="recording-meta-badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.35);">${rec.format ? (rec.format + (rec.bitrate ? ` • ${rec.bitrate}` : '')) : (rec.isMp3Converted ? 'MP3 320K' : 'AUDIO')}</span>
+              <span class="recording-meta-badge">${rec.preset ? rec.preset.toUpperCase() : 'STUDIO'}</span>
+              <span class="recording-meta-duration">⏱️ ${formatTime(rec.duration)}</span>
+            </div>
+            <span class="recording-date">${new Date(rec.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+          </div>
+          <button type="button" class="btn-rec-action btn-play-rec" data-rec-id="${rec.id}" title="Putar Rekaman" aria-label="Putar Rekaman">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+          </button>
         </div>
         <div class="recording-card-actions">
-          <button type="button" class="btn-rec-action btn-play-rec" data-rec-id="${rec.id}" title="Putar Rekaman" aria-label="Putar Rekaman">
+          <button type="button" class="btn-rec-action btn-play-rec btn-play-rec-mobile" data-rec-id="${rec.id}" title="Putar Rekaman" aria-label="Putar Rekaman">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+            <span class="btn-rec-label">Putar</span>
           </button>
           <button type="button" class="btn-rec-action btn-dl-rec" data-rec-id="${rec.id}" title="Simpan / Download Rekaman" aria-label="Simpan Rekaman">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span class="btn-rec-label">Simpan</span>
           </button>
           <button type="button" class="btn-rec-action btn-del-rec" data-rec-id="${rec.id}" title="Hapus Rekaman" aria-label="Hapus Rekaman">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            <span class="btn-rec-label">Hapus</span>
           </button>
         </div>
       </div>
     `).join('');
+
+    // Attach card click listener to preview recording directly
+    recordingsListContainer.querySelectorAll('.recording-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.btn-dl-rec') || e.target.closest('.btn-del-rec')) return;
+        const id = card.getAttribute('data-rec-id');
+        const rec = recorder.recordings.find(r => r.id === id);
+        if (rec) showRecordingModal(rec);
+      });
+    });
 
     // Attach events directly to elements
     recordingsListContainer.querySelectorAll('.btn-play-rec').forEach(btn => {
@@ -1389,7 +1706,7 @@ async function initApp() {
     const titleEl = document.getElementById('modalRecTitle');
     const metaEl = document.getElementById('modalRecMeta');
     if (titleEl) titleEl.textContent = rec.songTitle;
-    if (metaEl) metaEl.textContent = `${rec.artist} • MP3 320 Kbps • Durasi ${formatTime(rec.duration)} • Preset: ${rec.preset ? rec.preset.toUpperCase() : 'STUDIO'}`;
+    if (metaEl) metaEl.textContent = `${rec.artist} • ${rec.format ? (rec.format + (rec.bitrate ? ` (${rec.bitrate})` : '')) : (rec.isMp3Converted ? 'MP3 320 Kbps' : 'AUDIO')} • Durasi ${formatTime(rec.duration)} • Preset: ${rec.preset ? rec.preset.toUpperCase() : 'STUDIO'}`;
 
     if (modalTimeCurrent) modalTimeCurrent.textContent = '00:00';
     if (modalTimeTotal) modalTimeTotal.textContent = formatTime(rec.duration);
@@ -1519,17 +1836,86 @@ async function initApp() {
     btnRequestStorage.addEventListener('click', requestStoragePermission);
   }
 
+  // --- RECORDING OUTPUT FORMAT & BITRATE SETTINGS ---
+  const recordingFormatSelect = document.getElementById('recordingFormatSelect');
+  const recordFormatBadge = document.getElementById('recordFormatBadge');
+  const recordBitrateBadge = document.getElementById('recordBitrateBadge');
   const audioQualitySelect = document.getElementById('audioQualitySelect');
-  if (audioQualitySelect) {
-    const savedQuality = localStorage.getItem('karaoke_audio_quality') || '320';
-    audioQualitySelect.value = savedQuality;
 
-    audioQualitySelect.addEventListener('change', () => {
-      const val = audioQualitySelect.value;
-      localStorage.setItem('karaoke_audio_quality', val);
-      showToast(window.i18n.t('toastBitrateChanged', { val }), 'success');
+  const updateRecordingSettingsBadges = (fmt, bitrate) => {
+    const currentFmt = (fmt || (recorder && recorder.recordingFormat) || 'mp3').toUpperCase();
+    const currentBitrate = bitrate || (recorder && recorder.recordingBitrate) || 320;
+    const bitrateFormGroup = document.getElementById('bitrateFormGroup');
+    const bitrateHintText = document.getElementById('bitrateHintText');
+
+    if (recordFormatBadge) {
+      recordFormatBadge.textContent = `FORMAT: ${currentFmt}`;
+    }
+
+    if (recordBitrateBadge) {
+      if (currentFmt === 'WAV') {
+        recordBitrateBadge.textContent = '⚡ Lossless 16-Bit Studio PCM (Uncompressed)';
+      } else if (currentFmt === 'M4A') {
+        recordBitrateBadge.textContent = '⚡ AAC High Efficiency Audio';
+      } else if (currentFmt === 'WEBM') {
+        recordBitrateBadge.textContent = '⚡ Opus High Fidelity Audio';
+      } else {
+        recordBitrateBadge.textContent = `⚡ ${currentBitrate} Kbps High-Bitrate Stereo`;
+      }
+    }
+
+    if (audioQualitySelect) {
+      if (currentFmt === 'WAV') {
+        audioQualitySelect.disabled = true;
+        if (bitrateFormGroup) bitrateFormGroup.classList.add('disabled-form-group');
+        if (bitrateHintText) {
+          bitrateHintText.textContent = '⚡ Format WAV menyimpan sinyal audio murni (Lossless 16-Bit / 44.1 kHz Studio Master) tanpa kompresi bitrate.';
+        }
+      } else {
+        audioQualitySelect.disabled = false;
+        if (bitrateFormGroup) bitrateFormGroup.classList.remove('disabled-form-group');
+        if (bitrateHintText) {
+          bitrateHintText.textContent = `⚡ Rekomendasi ${currentBitrate} Kbps untuk kejernihan vokal maksimal menyerupai rekaman studio master.`;
+        }
+      }
+    }
+  };
+  window.updateRecordingSettingsBadges = updateRecordingSettingsBadges;
+
+  window.onRecordingFormatChanged = (fmt) => {
+    if (recorder && typeof recorder.setRecordingFormat === 'function') {
+      recorder.setRecordingFormat(fmt);
+    }
+    updateRecordingSettingsBadges(fmt, recorder ? recorder.recordingBitrate : 320);
+    const fmtUpper = (fmt || 'mp3').toUpperCase();
+    showToast(`Format rekaman diatur ke ${fmtUpper}`, 'success');
+  };
+
+  window.onRecordingBitrateChanged = (kbps) => {
+    if (recorder && typeof recorder.setRecordingBitrate === 'function') {
+      recorder.setRecordingBitrate(kbps);
+    }
+    updateRecordingSettingsBadges(recorder ? recorder.recordingFormat : 'mp3', kbps);
+    showToast(window.i18n.t('toastBitrateChanged', { val: kbps }), 'success');
+  };
+
+  if (recordingFormatSelect) {
+    const savedFormat = (recorder && recorder.recordingFormat) || localStorage.getItem('sushee_record_format') || 'mp3';
+    recordingFormatSelect.value = savedFormat;
+    recordingFormatSelect.addEventListener('change', () => {
+      window.onRecordingFormatChanged(recordingFormatSelect.value);
     });
   }
+
+  if (audioQualitySelect) {
+    const savedQuality = (recorder && recorder.recordingBitrate) ? recorder.recordingBitrate.toString() : (localStorage.getItem('karaoke_audio_quality') || '320');
+    audioQualitySelect.value = savedQuality;
+    audioQualitySelect.addEventListener('change', () => {
+      window.onRecordingBitrateChanged(audioQualitySelect.value);
+    });
+  }
+
+  updateRecordingSettingsBadges(recorder ? recorder.recordingFormat : 'mp3', recorder ? recorder.recordingBitrate : 320);
 
   // --- PHP WEB HOSTING CLOUD INTEGRATION (my.php.id) ---
   const cloudListContainer = document.getElementById('cloudSongList');
@@ -1574,9 +1960,206 @@ async function initApp() {
     }
   }
 
+  // --- CLOUD HOSTING PLAYLIST CONTROLLER (DEDICATED MUSIC LISTENING) ---
+  let cloudPlaylist = [];
+  try {
+    const saved = localStorage.getItem('sushee_cloud_playlist');
+    if (saved) cloudPlaylist = JSON.parse(saved);
+  } catch (e) { cloudPlaylist = []; }
+
+  let cloudPlaylistIndex = -1;
+  let isCloudPlaylistMode = false;
+
+  const updateCloudPlaylistBadgeUI = () => {
+    const badge = document.getElementById('cloudPlaylistCountBadge');
+    const totalCount = document.getElementById('queueTotalCount');
+    if (badge) badge.textContent = cloudPlaylist.length.toString();
+    if (totalCount) totalCount.textContent = cloudPlaylist.length.toString();
+  };
+
+  const saveCloudPlaylist = () => {
+    try {
+      localStorage.setItem('sushee_cloud_playlist', JSON.stringify(cloudPlaylist));
+    } catch (e) {}
+    updateCloudPlaylistBadgeUI();
+  };
+
+  const renderCloudPlaylistItems = () => {
+    const container = document.getElementById('cloudPlaylistItems');
+    if (!container) return;
+    if (cloudPlaylist.length === 0) {
+      container.innerHTML = `<p class="queue-empty-text" data-i18n="playlistEmpty">${(window.i18n && window.i18n.t) ? window.i18n.t('playlistEmpty') : 'Playlist masih kosong. Ketuk \'+ Playlist\' pada lagu di bawah.'}</p>`;
+      return;
+    }
+    container.innerHTML = cloudPlaylist.map((s, idx) => `
+      <div class="queue-item ${cloudPlaylistIndex === idx ? 'active' : ''}" data-queue-idx="${idx}">
+        <div class="queue-item-info">
+          <span class="queue-item-title">${idx + 1}. ${s.title}</span>
+          <span class="queue-item-artist">${s.artist || 'PHP Hosting'}</span>
+        </div>
+        <button type="button" class="queue-item-remove" data-remove-idx="${idx}" title="Hapus">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    `).join('');
+
+    container.querySelectorAll('.queue-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('.queue-item-remove')) {
+          const rmIdx = parseInt(e.target.closest('.queue-item-remove').getAttribute('data-remove-idx'), 10);
+          removeCloudPlaylistSong(rmIdx);
+          return;
+        }
+        const idx = parseInt(item.getAttribute('data-queue-idx'), 10);
+        playCloudPlaylist(idx);
+      });
+    });
+  };
+
+  const toggleCloudPlaylistDrawer = () => {
+    const drawer = document.getElementById('cloudPlaylistQueue');
+    if (!drawer) return;
+    const isHidden = drawer.style.display === 'none';
+    drawer.style.display = isHidden ? 'block' : 'none';
+    if (isHidden) renderCloudPlaylistItems();
+  };
+  window.toggleCloudPlaylistDrawer = toggleCloudPlaylistDrawer;
+
+  const addToCloudPlaylist = (song, showToastNotice = true) => {
+    if (!song) return;
+    const exists = cloudPlaylist.some(s => s.id === song.id || (s.title === song.title && s.artist === song.artist));
+    if (!exists) {
+      cloudPlaylist.push(song);
+      saveCloudPlaylist();
+      renderCloudPlaylistItems();
+      if (showToastNotice) {
+        showToast(`✓ ${song.title} ${(window.i18n && window.i18n.t) ? window.i18n.t('btnAddedToPlaylist') : 'ditambahkan ke Playlist'}`, 'success');
+      }
+    } else if (showToastNotice) {
+      showToast(`${song.title} sudah ada di playlist`, 'info');
+    }
+  };
+  window.addToCloudPlaylist = addToCloudPlaylist;
+
+  const removeCloudPlaylistSong = (idx) => {
+    if (idx >= 0 && idx < cloudPlaylist.length) {
+      cloudPlaylist.splice(idx, 1);
+      if (cloudPlaylistIndex >= cloudPlaylist.length) {
+        cloudPlaylistIndex = cloudPlaylist.length - 1;
+      }
+      saveCloudPlaylist();
+      renderCloudPlaylistItems();
+    }
+  };
+  window.removeCloudPlaylistSong = removeCloudPlaylistSong;
+
+  const clearCloudPlaylist = () => {
+    cloudPlaylist = [];
+    cloudPlaylistIndex = -1;
+    saveCloudPlaylist();
+    renderCloudPlaylistItems();
+    const mini = document.getElementById('cloudPlaylistMiniPlayer');
+    if (mini) mini.style.display = 'none';
+    showToast('Playlist dikosongkan', 'info');
+  };
+  window.clearCloudPlaylist = clearCloudPlaylist;
+
+  const updateMiniPlayerPlayButton = (isPlaying) => {
+    const icon = document.getElementById('miniPlayIcon');
+    if (!icon) return;
+    if (isPlaying) {
+      icon.innerHTML = '<rect x="5" y="4" width="4" height="16"/><rect x="15" y="4" width="4" height="16"/>';
+    } else {
+      icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
+    }
+  };
+
+  const playCloudPlaylist = async (idx = 0) => {
+    if (cloudPlaylist.length === 0) {
+      showToast((window.i18n && window.i18n.t) ? window.i18n.t('playlistEmpty') : 'Playlist masih kosong', 'warning');
+      return;
+    }
+    if (idx < 0) idx = 0;
+    if (idx >= cloudPlaylist.length) idx = 0;
+
+    cloudPlaylistIndex = idx;
+    isCloudPlaylistMode = true;
+    const song = cloudPlaylist[idx];
+
+    // Select song without auto navigating away from Cloud tab
+    selectSong(song, false);
+
+    const mini = document.getElementById('cloudPlaylistMiniPlayer');
+    const miniTitle = document.getElementById('miniPlayerTitle');
+    const miniArtist = document.getElementById('miniPlayerArtist');
+    const nowText = document.getElementById('cloudPlaylistNowText');
+
+    if (mini) mini.style.display = 'flex';
+    if (miniTitle) miniTitle.textContent = `${idx + 1}. ${song.title}`;
+    if (miniArtist) miniArtist.textContent = song.artist || 'PHP Hosting';
+    if (nowText) nowText.textContent = `Memutar: ${song.title} (${idx + 1}/${cloudPlaylist.length})`;
+
+    renderCloudPlaylistItems();
+
+    try {
+      await audioEngine.init(audioElement);
+      await audioEngine.resumeContext();
+      audioElement.muted = false;
+      await audioElement.play();
+      updateMiniPlayerPlayButton(true);
+      setupMediaSession(song);
+    } catch (e) {
+      console.error('Playlist play error:', e);
+      showToast('Gagal memutar lagu: ' + (e.message || e), 'error');
+    }
+  };
+  window.playCloudPlaylist = playCloudPlaylist;
+
+  const toggleCloudPlaylistPlayback = () => {
+    if (audioElement.paused) {
+      audioElement.play().catch(console.warn);
+      updateMiniPlayerPlayButton(true);
+    } else {
+      audioElement.pause();
+      updateMiniPlayerPlayButton(false);
+    }
+  };
+  window.toggleCloudPlaylistPlayback = toggleCloudPlaylistPlayback;
+
+  const nextCloudPlaylistSong = () => {
+    if (cloudPlaylist.length === 0) return;
+    let nextIdx = cloudPlaylistIndex + 1;
+    if (nextIdx >= cloudPlaylist.length) nextIdx = 0;
+    playCloudPlaylist(nextIdx);
+  };
+  window.nextCloudPlaylistSong = nextCloudPlaylistSong;
+
+  const prevCloudPlaylistSong = () => {
+    if (cloudPlaylist.length === 0) return;
+    let prevIdx = cloudPlaylistIndex - 1;
+    if (prevIdx < 0) prevIdx = cloudPlaylist.length - 1;
+    playCloudPlaylist(prevIdx);
+  };
+  window.prevCloudPlaylistSong = prevCloudPlaylistSong;
+
+  const playAllCloudSongs = () => {
+    if (hostingService.cachedSongs && hostingService.cachedSongs.length > 0) {
+      cloudPlaylist = [...hostingService.cachedSongs];
+      saveCloudPlaylist();
+      renderCloudPlaylistItems();
+      playCloudPlaylist(0);
+      showToast(`Memutar semua ${cloudPlaylist.length} lagu Cloud`, 'success');
+    } else {
+      showToast('Belum ada lagu terhubung di Cloud Hosting', 'warning');
+    }
+  };
+  window.playAllCloudSongs = playAllCloudSongs;
+
   async function renderCloudSongList() {
     if (!cloudListContainer) return;
     const query = (cloudSearchInput ? cloudSearchInput.value : '').trim();
+
+    updateCloudPlaylistBadgeUI();
 
     // Show instant loading state if container is empty and songs not cached
     if ((!cloudListContainer.children || cloudListContainer.children.length === 0) && (!hostingService.cachedSongs || hostingService.cachedSongs.length === 0)) {
@@ -1591,7 +2174,7 @@ async function initApp() {
     try {
       const songs = await hostingService.searchSongs(query);
       updateServerStatusUI(hostingService.isConnected, songs.length);
-      renderSongList(); // Also update the library view so cloud songs show under 'Semua'
+      renderSongList(); // Also update library view
 
       if (songs.length === 0) {
         cloudListContainer.innerHTML = `
@@ -1617,46 +2200,81 @@ async function initApp() {
         return;
       }
 
-      cloudListContainer.innerHTML = songs.map(song => `
-        <div class="song-card ${currentSong && currentSong.id === song.id ? 'now-playing' : ''}" data-cloud-id="${song.id}">
-          <div class="song-card-avatar" style="background: rgba(0, 242, 254, 0.15); color: #00f2fe;">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
-          </div>
-          <div class="song-card-info">
-            <h4 class="song-card-title">${song.title}</h4>
-            <p class="song-card-artist">${song.artist}</p>
-            <div class="song-badges">
-              <span class="badge badge-format">${song.format || '.MP3'}</span>
-              <span class="badge" style="background: rgba(0, 242, 254, 0.15); color: var(--color-cyan); border: 1px solid rgba(0, 242, 254, 0.3);">PHP Hosting</span>
-              ${song.hasLyrics ? 
-                `<span class="badge badge-lyrics"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> ${window.i18n.t('badgeHasLyrics')}</span>` : 
-                `<span class="badge badge-no-lyrics">${window.i18n.t('badgeNoLyrics')}</span>`
-              }
+      cloudListContainer.innerHTML = songs.map(song => {
+        const isInPlaylist = cloudPlaylist.some(p => p.id === song.id || (p.title === song.title && p.artist === song.artist));
+        return `
+          <div class="song-card ${currentSong && currentSong.id === song.id ? 'now-playing' : ''}" data-cloud-id="${song.id}">
+            <div class="song-card-avatar" style="background: rgba(0, 242, 254, 0.15); color: #00f2fe;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+            </div>
+            <div class="song-card-info">
+              <h4 class="song-card-title">${song.title}</h4>
+              <p class="song-card-artist">${song.artist}</p>
+              <div class="song-badges">
+                <span class="badge badge-format">${song.format || '.MP3'}</span>
+                <span class="badge" style="background: rgba(0, 242, 254, 0.15); color: var(--color-cyan); border: 1px solid rgba(0, 242, 254, 0.3);">PHP Hosting</span>
+                ${song.hasLyrics ? 
+                  `<span class="badge badge-lyrics"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> ${window.i18n.t('badgeHasLyrics')}</span>` : 
+                  `<span class="badge badge-no-lyrics">${window.i18n.t('badgeNoLyrics')}</span>`
+                }
+              </div>
+            </div>
+            <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
+              <button class="btn btn-sm btn-cloud-playlist-add" data-song-id="${song.id}" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: ${isInPlaylist ? 'rgba(0, 242, 254, 0.2)' : 'rgba(255, 255, 255, 0.08)'}; color: ${isInPlaylist ? 'var(--color-cyan)' : 'var(--text-main)'}; border: 1px solid ${isInPlaylist ? 'rgba(0, 242, 254, 0.4)' : 'var(--border-subtle)'}; border-radius: 8px;">
+                ${isInPlaylist ? '✓ In Queue' : '+ Playlist'}
+              </button>
+              <button class="btn-icon-sing" title="${window.i18n.t('btnSingNow')}" data-cloud-id="${song.id}">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              </button>
             </div>
           </div>
-          <div class="song-card-actions">
-            <button class="btn-icon-sing" title="${window.i18n.t('btnSingNow')}" data-cloud-id="${song.id}">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            </button>
-          </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
 
       cloudListContainer.querySelectorAll('.song-card').forEach(card => {
         card.addEventListener('click', (e) => {
           const id = card.getAttribute('data-cloud-id');
           const song = songs.find(s => s.id === id);
-          if (song) {
-            selectSong(song, true);
-            // If user clicked the play icon directly, start music playback immediately!
-            if (e.target.closest('.btn-icon-sing')) {
-              toggleMusicPlayback();
+          if (!song) return;
+
+          // + Playlist button clicked:
+          if (e.target.closest('.btn-cloud-playlist-add')) {
+            e.stopPropagation();
+            addToCloudPlaylist(song, true);
+            const btn = card.querySelector('.btn-cloud-playlist-add');
+            if (btn) {
+              btn.textContent = '✓ In Queue';
+              btn.style.background = 'rgba(0, 242, 254, 0.2)';
+              btn.style.color = 'var(--color-cyan)';
+              btn.style.borderColor = 'rgba(0, 242, 254, 0.4)';
             }
+            return;
+          }
+
+          // Card or Sing button clicked:
+          selectSong(song, true);
+          if (e.target.closest('.btn-icon-sing')) {
+            toggleMusicPlayback();
           }
         });
       });
     } catch (e) {
       console.error("Error rendering Cloud Hosting list:", e);
+      if (cloudListContainer) {
+        cloudListContainer.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🌐</div>
+            <h4>Server Belum Terhubung</h4>
+            <p style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 12px;">Pastikan koneksi internet aktif atau periksa URL endpoint hosting Anda.</p>
+            <div class="empty-actions">
+              <button type="button" class="btn btn-primary btn-sm" onclick="window.toggleServerConfigDrawer && window.toggleServerConfigDrawer(event)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <span>Atur Endpoint Server</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }
     }
   }
 
@@ -1667,54 +2285,62 @@ async function initApp() {
   }
 
   let lastServerDrawerToggle = 0;
-  const toggleDrawer = () => {
+  const toggleDrawer = (e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
     const now = Date.now();
     if (now - lastServerDrawerToggle < 250) return;
     lastServerDrawerToggle = now;
-    if (!serverConfigDrawer) return;
-    const isVisible = serverConfigDrawer.style.display !== 'none';
-    serverConfigDrawer.style.display = isVisible ? 'none' : 'block';
+    const drawer = document.getElementById('serverConfigDrawer');
+    if (!drawer) return;
+    const isVisible = drawer.style.display !== 'none';
+    drawer.style.display = isVisible ? 'none' : 'block';
+    if (!isVisible) {
+      const input = document.getElementById('serverUrlInput');
+      if (input && (!input.value || input.value.trim() === '')) {
+        input.value = hostingService.serverUrl || 'https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SONGS/api.php';
+      }
+    }
   };
   window.toggleServerConfigDrawer = toggleDrawer;
-  if (btnToggleServerConfig) btnToggleServerConfig.addEventListener('click', toggleDrawer);
-  if (btnToggleServerConfigAlt) btnToggleServerConfigAlt.addEventListener('click', toggleDrawer);
-
-  if (btnSaveServerConfig) {
-    btnSaveServerConfig.addEventListener('click', async () => {
-      const url = serverUrlInput ? serverUrlInput.value.trim() : '';
-      if (!url) {
-        showToast(window.i18n.t('toastEnterServerUrl'), 'warning');
-        return;
-      }
-
-      showToast(window.i18n.t('toastConnectingServer'), 'info');
-      try {
-        const res = await hostingService.testConnection(url);
-        if (serverConfigDrawer) serverConfigDrawer.style.display = 'none';
-        showToast(window.i18n.t('toastConnectedServer', { count: res.total }), 'success');
-        renderCloudSongList();
-      } catch (err) {
-        showToast(window.i18n.t('toastConnectFailed', { err: err.message }), 'error');
-      }
-    });
+  if (btnToggleServerConfig) {
+    btnToggleServerConfig.addEventListener('click', toggleDrawer);
   }
 
-  if (btnOpenServerExternal) {
-    btnOpenServerExternal.addEventListener('click', () => {
-      if (hostingService.serverUrl) {
-        window.open(hostingService.serverUrl, '_blank');
-      } else {
-        showToast(window.i18n.t('toastFillServerFirst'), 'warning');
-      }
-    });
-  }
+  const saveServerConfig = async () => {
+    const input = document.getElementById('serverUrlInput');
+    const url = input ? input.value.trim() : '';
+    if (!url) {
+      showToast((window.i18n && window.i18n.t) ? window.i18n.t('toastEnterServerUrl') : 'Masukkan URL server hosting Anda', 'warning');
+      return;
+    }
 
-  if (btnRefreshCloudSongs) {
-    btnRefreshCloudSongs.addEventListener('click', () => {
-      showToast(window.i18n.t('toastRefreshingServer'), 'info');
+    showToast((window.i18n && window.i18n.t) ? window.i18n.t('toastConnectingServer') : 'Menghubungkan ke server...', 'info');
+    try {
+      const res = await hostingService.testConnection(url);
+      const drawer = document.getElementById('serverConfigDrawer');
+      if (drawer) drawer.style.display = 'none';
+      showToast((window.i18n && window.i18n.t) ? window.i18n.t('toastConnectedServer', { count: res.total }) : `Terhubung! Ditemukan ${res.total} lagu.`, 'success');
       renderCloudSongList();
-    });
-  }
+    } catch (err) {
+      showToast((window.i18n && window.i18n.t) ? window.i18n.t('toastConnectFailed', { err: err.message }) : `Gagal: ${err.message}`, 'error');
+    }
+  };
+  window.saveServerConfig = saveServerConfig;
+
+  const openServerExternal = () => {
+    if (hostingService.serverUrl) {
+      window.open(hostingService.serverUrl, '_blank');
+    } else {
+      showToast((window.i18n && window.i18n.t) ? window.i18n.t('toastFillServerFirst') : 'Isi URL server terlebih dahulu', 'warning');
+    }
+  };
+  window.openServerExternal = openServerExternal;
+
+  const refreshCloudSongs = () => {
+    showToast((window.i18n && window.i18n.t) ? window.i18n.t('toastRefreshingServer') : 'Menyegarkan server hosting...', 'info');
+    renderCloudSongList();
+  };
+  window.refreshCloudSongs = refreshCloudSongs;
 
   const openHostingGuide = () => {
     if (hostingGuideModal) hostingGuideModal.classList.add('open');

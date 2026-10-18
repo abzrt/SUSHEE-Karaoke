@@ -11,6 +11,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.PowerManager;
 import android.provider.MediaStore;
 import android.util.Base64;
 import android.util.Log;
@@ -23,6 +24,8 @@ import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -33,9 +36,11 @@ import java.util.List;
 public class MainActivity extends BridgeActivity {
     private static final int PERMISSION_REQ_CODE = 1001;
     private static final String TAG = "SUSHEE_MAIN";
+    private StorageBridge storageBridge;
 
     public class StorageBridge {
         private final Context context;
+        private PowerManager.WakeLock wakeLock;
 
         public StorageBridge(Context context) {
             this.context = context;
@@ -135,7 +140,7 @@ public class MainActivity extends BridgeActivity {
             } catch (Exception e) {
                 Log.w(TAG, "Could not determine hardware latency", e);
             }
-            return 110; // Optimal standard Android default for real-time vocal alignment
+            return 0; // Pure Realtime 0ms Direct Sync (Zero Delay)
         }
 
         @JavascriptInterface
@@ -166,7 +171,61 @@ public class MainActivity extends BridgeActivity {
                 android.media.AudioManager am = (android.media.AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
                 if (am != null) {
                     am.setMode(android.media.AudioManager.MODE_NORMAL);
-                    am.setSpeakerphoneOn(true);
+                }
+            } catch (Exception ignored) {}
+        }
+
+        @JavascriptInterface
+        public void setKeepScreenAwake(final boolean keepAwake) {
+            MainActivity.this.runOnUiThread(() -> {
+                try {
+                    Window window = getWindow();
+                    if (window != null) {
+                        if (keepAwake) {
+                            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                            Log.d(TAG, "Screen keep awake: ENABLED (recording in progress)");
+                        } else {
+                            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                            Log.d(TAG, "Screen keep awake: DISABLED (idle or playback only)");
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error updating FLAG_KEEP_SCREEN_ON: " + e.getMessage());
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void setBackgroundAudioActive(final boolean active) {
+            try {
+                if (active) {
+                    if (wakeLock == null) {
+                        PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+                        if (pm != null) {
+                            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "SUSHEE::KaraokeBackgroundAudioLock");
+                            wakeLock.setReferenceCounted(false);
+                        }
+                    }
+                    if (wakeLock != null && !wakeLock.isHeld()) {
+                        wakeLock.acquire(180 * 60 * 1000L); // 3 hours timeout safety
+                        Log.d(TAG, "Background audio WakeLock acquired");
+                    }
+                } else {
+                    if (wakeLock != null && wakeLock.isHeld()) {
+                        wakeLock.release();
+                        Log.d(TAG, "Background audio WakeLock released");
+                    }
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "WakeLock management error: " + e.getMessage());
+            }
+        }
+
+        public void releaseWakeLock() {
+            try {
+                if (wakeLock != null && wakeLock.isHeld()) {
+                    wakeLock.release();
+                    Log.d(TAG, "WakeLock cleanly released");
                 }
             } catch (Exception ignored) {}
         }
@@ -198,6 +257,15 @@ public class MainActivity extends BridgeActivity {
             WindowCompat.setDecorFitsSystemWindows(window, true);
             window.setStatusBarColor(Color.parseColor("#07080d"));
             window.setNavigationBarColor(Color.parseColor("#0a0c14"));
+
+            WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, window.getDecorView());
+            if (controller != null) {
+                // Dark status bar background (#07080d) requires crisp white icons (lightStatusBar = false)
+                controller.setAppearanceLightStatusBars(false);
+                controller.setAppearanceLightNavigationBars(false);
+                controller.show(WindowInsetsCompat.Type.statusBars());
+                controller.show(WindowInsetsCompat.Type.navigationBars());
+            }
         }
 
         // Optimize Android AudioManager for lowest hardware latency audio
@@ -205,8 +273,7 @@ public class MainActivity extends BridgeActivity {
             android.media.AudioManager am = (android.media.AudioManager) getSystemService(Context.AUDIO_SERVICE);
             if (am != null) {
                 am.setMode(android.media.AudioManager.MODE_NORMAL);
-                // Acquire high priority audio focus for glitch-free low latency audio
-                am.requestAudioFocus(null, android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.AUDIOFOCUS_GAIN);
+                am.requestAudioFocus(focusChange -> {}, android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.AUDIOFOCUS_GAIN);
             }
         } catch (Exception e) {
             Log.w(TAG, "Audio manager setup warning", e);
@@ -219,42 +286,40 @@ public class MainActivity extends BridgeActivity {
     }
 
     public void requestAppPermissions() {
-        List<String> permissions = new ArrayList<>();
+        try {
+            List<String> permissions = new ArrayList<>();
 
-        // Microphone & Audio Settings
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            permissions.add(Manifest.permission.RECORD_AUDIO);
-        }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.MODIFY_AUDIO_SETTINGS) != PackageManager.PERMISSION_GRANTED) {
-            permissions.add(Manifest.permission.MODIFY_AUDIO_SETTINGS);
-        }
+            // Microphone (Runtime permission)
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.RECORD_AUDIO);
+            }
 
-        // Bluetooth Connect for Low Latency Headphones (Android 12+)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                permissions.add(Manifest.permission.BLUETOOTH_CONNECT);
+            // Bluetooth Connect for Low Latency Headphones (Android 12+)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    permissions.add(Manifest.permission.BLUETOOTH_CONNECT);
+                }
             }
-        }
 
-        // Storage & Music/Audio Access
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // Android 13+
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                permissions.add(Manifest.permission.READ_MEDIA_AUDIO);
+            // Storage & Music/Audio Access
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // Android 13+
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    permissions.add(Manifest.permission.READ_MEDIA_AUDIO);
+                }
+            } else {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                    permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+                }
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                    permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+                }
             }
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
-                permissions.add(Manifest.permission.READ_MEDIA_IMAGES);
-            }
-        } else {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
-            }
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-            }
-        }
 
-        if (!permissions.isEmpty()) {
-            ActivityCompat.requestPermissions(this, permissions.toArray(new String[0]), PERMISSION_REQ_CODE);
+            if (!permissions.isEmpty()) {
+                ActivityCompat.requestPermissions(this, permissions.toArray(new String[0]), PERMISSION_REQ_CODE);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Permission request error: " + e.getMessage());
         }
     }
 
@@ -287,12 +352,46 @@ public class MainActivity extends BridgeActivity {
                 settings.setDomStorageEnabled(true);
                 settings.setJavaScriptEnabled(true);
 
-                // Add Javascript interface for saving recordings to smartphone storage
-                webView.addJavascriptInterface(new StorageBridge(this), "AndroidStorage");
+                // Add Javascript interface for saving recordings to smartphone storage and background audio
+                storageBridge = new StorageBridge(this);
+                webView.addJavascriptInterface(storageBridge, "AndroidStorage");
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        try {
+            WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+            if (webView != null) {
+                // Resume JavaScript timers when screen is locked or app is in background so audio playback continues uninterrupted
+                webView.resumeTimers();
+            }
+        } catch (Exception ignored) {}
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        try {
+            WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+            if (webView != null) {
+                webView.resumeTimers();
+            }
+        } catch (Exception ignored) {}
+    }
+
+    @Override
+    public void onDestroy() {
+        try {
+            if (storageBridge != null) {
+                storageBridge.releaseWakeLock();
+            }
+        } catch (Exception ignored) {}
+        super.onDestroy();
     }
 }
 

@@ -24,12 +24,19 @@ function copyRecursive(src, dest) {
   }
 }
 
-// Copy essential folders and files
-['index.html', 'manifest.json', 'css', 'js', 'assets'].forEach(item => {
-  const itemPath = path.join(srcDir, item);
-  if (fs.existsSync(itemPath)) {
-    copyRecursive(itemPath, path.join(wwwDir, item));
+// Copy essential folders and files to www and android public assets
+const targets = [wwwDir, path.join(__dirname, 'android', 'app', 'src', 'main', 'assets', 'public')];
+
+targets.forEach(targetDir => {
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
   }
+  ['index.html', 'manifest.json', 'css', 'js', 'assets'].forEach(item => {
+    const itemPath = path.join(srcDir, item);
+    if (fs.existsSync(itemPath)) {
+      copyRecursive(itemPath, path.join(targetDir, item));
+    }
+  });
 });
 
-console.log('✓ Successfully prepared www directory for Android build');
+console.log('✓ Successfully prepared www and android assets for Android build');
