@@ -34,6 +34,8 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.url}`);
+
   fs.stat(filePath, (err, stats) => {
     if (err || !stats.isFile()) {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -65,7 +67,10 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, {
         'Content-Length': stats.size,
         'Content-Type': contentType,
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       });
       fs.createReadStream(filePath).pipe(res);
     }

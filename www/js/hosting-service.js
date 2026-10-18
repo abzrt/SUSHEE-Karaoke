@@ -45,22 +45,165 @@ class HostingServerService {
         }
       }
     } catch (e) {}
+
+    // Instant offline/first-load fallback: load pre-bundled verified server catalog (59 songs)
+    const gObj = (typeof window !== 'undefined') ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+    const bundled = (gObj && Array.isArray(gObj.SUSHEE_DEFAULT_CLOUD_CATALOG)) ? gObj.SUSHEE_DEFAULT_CLOUD_CATALOG : [];
+    if (this.cachedSongs.length === 0 && bundled.length > 0) {
+      this.cachedSongs = [...bundled];
+      this.isConnected = true;
+    }
+
+    // DOM Pre-rendered Fallback: Extract from static HTML if JS loaded afterwards
+    if (this.cachedSongs.length === 0 && typeof document !== 'undefined') {
+      const cards = document.querySelectorAll('#cloudSongList .song-card, #songsList .song-card[data-song-id^="host_"]');
+      if (cards.length > 0) {
+        const domList = [];
+        cards.forEach(card => {
+          const id = card.getAttribute('data-cloud-id') || card.getAttribute('data-song-id');
+          if (id && !domList.some(s => s.id === id)) {
+            const title = card.querySelector('.song-card-title')?.textContent?.trim() || '';
+            const artist = card.querySelector('.song-card-artist')?.textContent?.trim() || '';
+            const hasLyrics = Boolean(card.querySelector('.badge-lyrics'));
+            domList.push({
+              id,
+              title,
+              artist,
+              format: '.MP3',
+              source: 'custom_host',
+              audioUrl: `https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SONGS/${encodeURIComponent(title)}.mp3`,
+              hasLyrics,
+              lrcUrl: hasLyrics ? `https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SONGS/${encodeURIComponent(title)}.lrc` : null
+            });
+          }
+        });
+        if (domList.length > 0) {
+          this.cachedSongs = domList;
+          this.isConnected = true;
+        }
+      }
+    }
+
+    this._activeSearchPromise = null;
+    this._activeSearchQuery = null;
   }
 
   /**
-   * Helper to safely format and encode URLs with spaces
+   * Client-side instantaneous 0ms filtering from memory cache
+   */
+  getFilteredCache(query = '') {
+    const q = (query || '').toLowerCase().trim();
+
+    // Self-healing: if cachedSongs is empty, attempt immediate recharge from global catalog or DOM
+    if (this.cachedSongs.length === 0) {
+      const gObj = (typeof window !== 'undefined') ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+      const bundled = (gObj && Array.isArray(gObj.SUSHEE_DEFAULT_CLOUD_CATALOG)) ? gObj.SUSHEE_DEFAULT_CLOUD_CATALOG : [];
+      if (bundled.length > 0) {
+        this.cachedSongs = [...bundled];
+        this.isConnected = true;
+      } else if (typeof document !== 'undefined') {
+        const cards = document.querySelectorAll('#cloudSongList .song-card, #songsList .song-card[data-song-id^="host_"]');
+        if (cards.length > 0) {
+          const domList = [];
+          cards.forEach(card => {
+            const id = card.getAttribute('data-cloud-id') || card.getAttribute('data-song-id');
+            if (id && !domList.some(s => s.id === id)) {
+              const title = card.querySelector('.song-card-title')?.textContent?.trim() || '';
+              const artist = card.querySelector('.song-card-artist')?.textContent?.trim() || '';
+              const hasLyrics = Boolean(card.querySelector('.badge-lyrics'));
+              domList.push({
+                id,
+                title,
+                artist,
+                format: '.MP3',
+                source: 'custom_host',
+                audioUrl: `https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SONGS/${encodeURIComponent(title)}.mp3`,
+                hasLyrics,
+                lrcUrl: hasLyrics ? `https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SONGS/${encodeURIComponent(title)}.lrc` : null
+              });
+            }
+          });
+          if (domList.length > 0) {
+            this.cachedSongs = domList;
+            this.isConnected = true;
+          }
+        }
+      }
+    }
+
+    if (!q) return [...this.cachedSongs];
+    return this.cachedSongs.filter(s =>
+      (s.title && s.title.toLowerCase().includes(q)) ||
+      (s.artist && s.artist.toLowerCase().includes(q))
+    );
+  }
+
+  /**
+   * Helper to safely format, validate, and encode URLs with spaces and auto-resolve api.php
    */
   cleanUrl(url) {
     let clean = (url || '').trim();
     if (!clean) return '';
+
+    // Auto-prepend https:// if no protocol provided
     if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
       clean = 'https://' + clean;
     }
+
+    // Auto-upgrade http:// to https:// on secure contexts (PWA, HTTPS, Capacitor) to prevent Mixed Content blocking
+    const isPageSecure = typeof window !== 'undefined' && window.location && window.location.protocol === 'https:';
+    const isLocalHost = clean.includes('localhost') || clean.includes('127.0.0.1') || clean.includes('192.168.') || clean.includes('10.');
+    if (isPageSecure && !isLocalHost && clean.startsWith('http://')) {
+      clean = clean.replace(/^http:\/\//i, 'https://');
+    }
+
+    // Auto-append api.php if user entered only the folder path (e.g. https://domain.com/songs or https://domain.com/songs/)
+    try {
+      const parts = clean.split('?');
+      let pathPart = parts[0].replace(/\/+$/, '');
+      const queryPart = parts.length > 1 ? '?' + parts.slice(1).join('?') : '';
+
+      if (!pathPart.toLowerCase().endsWith('.php') && !pathPart.toLowerCase().match(/\.(mp3|m4a|wav|lrc|ogg|flac)$/i)) {
+        clean = pathPart + '/api.php' + queryPart;
+      }
+    } catch (e) {}
+
     try {
       // Decode then encode to guarantee proper %20 encoding for spaces
       clean = encodeURI(decodeURI(clean));
     } catch (e) {}
     return clean;
+  }
+
+  /**
+   * Resilient HTTP fetch with automatic retry and exponential backoff
+   */
+  async fetchWithRetry(url, options = {}, retries = 2, timeoutMs = 18000) {
+    let lastError = null;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const resp = await fetch(url, {
+          ...options,
+          signal: controller.signal
+        });
+        clearTimeout(timer);
+        return resp;
+      } catch (err) {
+        clearTimeout(timer);
+        lastError = err;
+        // Don't retry if manually aborted by user
+        if (err.name === 'AbortError' && attempt >= retries) {
+          break;
+        }
+        if (attempt < retries) {
+          // Exponential backoff delay (400ms, 800ms)
+          await new Promise(r => setTimeout(r, 400 * Math.pow(2, attempt)));
+        }
+      }
+    }
+    throw lastError;
   }
 
   /**
@@ -86,22 +229,17 @@ class HostingServerService {
   }
 
   /**
-   * Test connection to personal hosting endpoint
+   * Test connection to personal hosting endpoint with resilient retry
    */
   async testConnection(url) {
     let target = this.cleanUrl(url || this.serverUrl);
     if (!target) throw new Error("URL Server belum diisi.");
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
-
     try {
-      const resp = await fetch(target, {
+      const resp = await this.fetchWithRetry(target, {
         method: 'GET',
-        headers: { 'Accept': 'application/json' },
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
+        headers: { 'Accept': 'application/json' }
+      }, 1, 18000);
 
       if (!resp.ok) {
         throw new Error(`Server merespons status HTTP ${resp.status}`);
@@ -128,45 +266,54 @@ class HostingServerService {
         throw new Error(data.message || "Format data JSON dari server tidak sesuai.");
       }
     } catch (err) {
-      clearTimeout(timeoutId);
       this.isConnected = false;
       if (err.name === 'AbortError') {
-        throw new Error("Koneksi timeout (12 detik). Pastikan server aktif dan dapat diakses.");
+        throw new Error("Koneksi timeout. Pastikan server hosting aktif dan internet stabil.");
       }
       throw err;
     }
   }
 
   /**
-   * Fetch songs from PHP Hosting server with search query support
+   * Fetch songs from PHP Hosting server with search query support & resilient cache fallback
    */
   async searchSongs(query = '') {
     const q = (query || '').toLowerCase().trim();
 
-    if (this.serverUrl) {
+    // 1. If an identical search is already in flight, reuse the active promise
+    if (this._activeSearchPromise && this._activeSearchQuery === q) {
+      return this._activeSearchPromise;
+    }
+
+    if (!this.serverUrl) {
+      return this.getFilteredCache(q);
+    }
+
+    this._activeSearchQuery = q;
+    this._activeSearchPromise = (async () => {
       try {
-        const cleanTarget = this.cleanUrl(this.serverUrl);
-        const urlObj = new URL(cleanTarget);
-        if (q) {
-          urlObj.searchParams.set('q', q);
+        const cleanBase = this.cleanUrl(this.serverUrl);
+        if (!cleanBase) {
+          return this.getFilteredCache(q);
         }
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        let fetchUrl = cleanBase;
+        if (q) {
+          const sep = cleanBase.includes('?') ? '&' : '?';
+          fetchUrl = `${cleanBase}${sep}q=${encodeURIComponent(q)}`;
+        }
 
-        const resp = await fetch(urlObj.toString(), {
+        const resp = await this.fetchWithRetry(fetchUrl, {
           method: 'GET',
-          headers: { 'Accept': 'application/json' },
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
+          headers: { 'Accept': 'application/json' }
+        }, 1, 15000);
 
-        if (resp.ok) {
+        if (resp && resp.ok) {
           const data = await resp.json();
           if (data && (data.status === 'success' || Array.isArray(data.songs))) {
             const list = Array.isArray(data.songs) ? data.songs : [];
             this.isConnected = true;
-            if (!q) {
+            if (!q && list.length > 0) {
               this.cachedSongs = list;
               try {
                 localStorage.setItem('sushee_cached_hosting_songs', JSON.stringify(list));
@@ -176,37 +323,32 @@ class HostingServerService {
           }
         }
       } catch (err) {
-        console.warn("Gagal menghubungi server hosting:", err);
-        // Fallback to cache
-        if (this.cachedSongs.length > 0) {
-          return this.cachedSongs.filter(s => 
-            !q || (s.title && s.title.toLowerCase().includes(q)) || 
-            (s.artist && s.artist.toLowerCase().includes(q))
-          );
-        }
+        console.warn("Notice: Menghubungi remote hosting gagal atau lambat, beralih ke cache offline:", err);
+      } finally {
+        this._activeSearchPromise = null;
       }
-    }
 
-    // Return cached songs if available
-    if (this.cachedSongs.length > 0) {
-      return this.cachedSongs.filter(s => 
-        !q || (s.title && s.title.toLowerCase().includes(q)) || 
-        (s.artist && s.artist.toLowerCase().includes(q))
-      );
-    }
+      // Always return filtered local/cached songs without crashing or rendering empty
+      return this.getFilteredCache(q);
+    })();
 
-    this.isConnected = false;
-    return [];
+    return this._activeSearchPromise;
   }
 
   /**
-   * Fetch synced LRC lyrics file directly via HTTP
+   * Fetch synced LRC lyrics file directly via HTTP with safety timeout
    */
   async fetchLrcContent(lrcUrl) {
     if (!lrcUrl) return null;
     try {
       const cleanUrl = this.cleanUrl(lrcUrl);
-      const resp = await fetch(cleanUrl, { cache: 'no-store' });
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+      const resp = await fetch(cleanUrl, { 
+        cache: 'no-store',
+        signal: controller.signal
+      });
+      clearTimeout(timer);
       if (resp.ok) {
         return await resp.text();
       }

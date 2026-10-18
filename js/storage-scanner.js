@@ -9,7 +9,7 @@ class StorageScanner {
     this.songs = [];
     this.lyricsMap = new Map(); // filename / cleanName -> File or text
     this.db = null;
-    this.initIndexedDB();
+    this.ready = this.initIndexedDB();
   }
 
   async initIndexedDB() {
@@ -20,23 +20,23 @@ class StorageScanner {
       }
       try {
         const request = indexedDB.open('KaraokeStarDB', 2);
-      request.onupgradeneeded = (e) => {
-        const db = e.target.result;
-        if (!db.objectStoreNames.contains('songs')) {
-          db.createObjectStore('songs', { keyPath: 'id' });
-        }
-        if (!db.objectStoreNames.contains('recordings')) {
-          db.createObjectStore('recordings', { keyPath: 'id' });
-        }
-      };
-      request.onsuccess = (e) => {
-        this.db = e.target.result;
-        this.loadSongsFromDB().then(resolve);
-      };
-      request.onerror = () => {
-        console.warn("IndexedDB not available, using in-memory library.");
-        resolve([]);
-      };
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('songs')) {
+            db.createObjectStore('songs', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('recordings')) {
+            db.createObjectStore('recordings', { keyPath: 'id' });
+          }
+        };
+        request.onsuccess = (e) => {
+          this.db = e.target.result;
+          this.loadSongsFromDB().then(resolve);
+        };
+        request.onerror = () => {
+          console.warn("IndexedDB not available, using in-memory library.");
+          resolve([]);
+        };
       } catch (err) {
         console.warn("IndexedDB open failed:", err);
         resolve([]);
@@ -47,26 +47,42 @@ class StorageScanner {
   async loadSongsFromDB() {
     if (!this.db) return [];
     return new Promise((resolve) => {
-      const tx = this.db.transaction('songs', 'readonly');
-      const store = tx.objectStore('songs');
-      const req = store.getAll();
-      req.onsuccess = () => {
-        // Filter out any legacy sample songs
-        const saved = (req.result || []).filter(s => s.source !== 'sample' && !s.id.startsWith('sample_'));
-        this.songs = saved.map(s => {
-          if (s.audioBlob && !s.audioUrl) {
-            s.audioUrl = URL.createObjectURL(s.audioBlob);
+      try {
+        const tx = this.db.transaction('songs', 'readonly');
+        const store = tx.objectStore('songs');
+        const req = store.getAll();
+        req.onsuccess = () => {
+          // Filter out any legacy sample songs
+          const saved = (req.result || []).filter(s => s.source !== 'sample' && !s.id.startsWith('sample_'));
+          this.songs = saved.map(s => {
+            // ALWAYS recreate a fresh object URL from audioBlob because previous session's blob URLs are revoked!
+            if (s.audioBlob) {
+              try {
+                s.audioUrl = URL.createObjectURL(s.audioBlob);
+              } catch (err) {
+                console.warn("Could not create object URL for song:", s.title, err);
+              }
+            }
+            return s;
+          });
+          // Remove legacy sample songs from IndexedDB
+          ['sample_bintang_kejora', 'sample_pop_beat'].forEach(id => this.deleteSongFromDB(id));
+
+          // Notify UI that persisted songs are ready
+          if (typeof window !== 'undefined' && window.dispatchEvent) {
+            window.dispatchEvent(new CustomEvent('sushee:songsLoaded', { detail: this.songs }));
           }
-          return s;
-        });
-        // Remove legacy sample songs from IndexedDB
-        ['sample_bintang_kejora', 'sample_pop_beat'].forEach(id => this.deleteSongFromDB(id));
-        resolve(this.songs);
-      };
-      req.onerror = () => {
+
+          resolve(this.songs);
+        };
+        req.onerror = () => {
+          this.songs = [];
+          resolve(this.songs);
+        };
+      } catch (e) {
         this.songs = [];
         resolve(this.songs);
-      };
+      }
     });
   }
 
@@ -75,7 +91,11 @@ class StorageScanner {
     try {
       const tx = this.db.transaction('songs', 'readwrite');
       const store = tx.objectStore('songs');
-      store.put(song);
+      // Strip out temporary audioUrl & audioFile to keep stored record persistent & avoid dead blob URLs
+      const toSave = { ...song };
+      delete toSave.audioUrl;
+      delete toSave.audioFile;
+      store.put(toSave);
     } catch (e) {
       console.warn("Could not save song to DB:", e);
     }

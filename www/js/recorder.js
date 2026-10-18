@@ -19,7 +19,7 @@ class KaraokeRecorder {
     this.recordingFormat = localStorage.getItem('sushee_record_format') || 'mp3';
     this.recordingBitrate = parseInt(localStorage.getItem('sushee_record_bitrate') || localStorage.getItem('karaoke_audio_quality') || '320', 10) || 320;
 
-    this.initDB();
+    this.ready = this.initDB();
   }
 
   async initDB() {
@@ -59,12 +59,22 @@ class KaraokeRecorder {
         const req = store.getAll();
         req.onsuccess = () => {
           this.recordings = req.result || [];
-          // Regenerate object URLs from saved Blobs
+          // ALWAYS regenerate object URLs from saved Blobs (old blob URLs are revoked on reload)
           this.recordings.forEach(rec => {
-            if (rec.blob && !rec.url) {
-              rec.url = URL.createObjectURL(rec.blob);
+            if (rec.blob) {
+              try {
+                rec.url = URL.createObjectURL(rec.blob);
+              } catch (err) {
+                console.warn("Could not recreate object URL for recording:", rec.id, err);
+              }
             }
           });
+
+          // Notify UI that persisted recordings are ready
+          if (typeof window !== 'undefined' && window.dispatchEvent) {
+            window.dispatchEvent(new CustomEvent('sushee:recordingsLoaded', { detail: this.recordings }));
+          }
+
           resolve(this.recordings);
         };
         req.onerror = () => resolve([]);

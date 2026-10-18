@@ -289,10 +289,112 @@ assert(updatedAppJs.includes('btnGoToKaraoke'), 'app.js includes empty state CTA
 assert(updatedAppJs.includes('bitrateHintText'), 'app.js updates bitrateHintText dynamically');
 assert(updatedAppJs.includes('recording-card-row-top'), 'app.js renders responsive mobile recording card rows');
 
+console.log('\n=== TEST SUITE 12: Audio Clarity & Studio Subtabs Responsiveness ===');
+assert(audioEffectsContent.includes('this.bufferTime = 0.12;'), 'WebAudioPitchShifter has 0.12s buffer time for anti-flutter clarity');
+assert(audioEffectsContent.includes('this.masterSpeakerGain'), 'AudioEffectsEngine routes musicMixGain to master limiter');
+assert(audioEffectsContent.includes('this.musicPitchShift = this.musicPitch;'), 'AudioEffectsEngine aliases musicPitchShift');
+assert(audioEffectsContent.includes('this.musicPlaybackSpeed = this.musicSpeed;'), 'AudioEffectsEngine aliases musicPlaybackSpeed');
+
+assert(indexHtml.includes('window.switchStudioSubtab = function'), 'index.html defines window.switchStudioSubtab in global action bridge');
+assert(indexHtml.includes('id="subtabBtnPitch"'), 'index.html has #subtabBtnPitch');
+assert(indexHtml.includes('id="subtabBtnSync"'), 'index.html has #subtabBtnSync');
+assert(!indexHtml.includes('<strong id="cloudStatusText" data-i18n="cloudNotConfigured">'), 'index.html does not overwrite configured server with cloudNotConfigured i18n attribute');
+
+assert(styleCss.includes('touch-action: manipulation;'), 'style.css defines touch-action: manipulation on .studio-subtab');
+assert(styleCss.includes('.studio-subtab *'), 'style.css passes pointer-events through children of .studio-subtab');
+
+assert(appJsContent.includes('handleSubtabTrigger'), 'app.js includes delegated touch & click handlers for .studio-subtab');
+assert(appJsContent.includes('audioEngine.musicPitch !== undefined ? audioEngine.musicPitch'), 'app.js uses robust musicPitch property access');
+assert(appJsContent.includes('audioEngine.musicSpeed !== undefined ? audioEngine.musicSpeed'), 'app.js uses robust musicSpeed property access');
+
+console.log('\n=== TEST SUITE 13: Cloud Hosting Tab Instant Songs & Catalog Integrity ===');
+assert(fs.existsSync('js/cloud-catalog.js'), 'js/cloud-catalog.js exists');
+const catalogContent = fs.readFileSync('js/cloud-catalog.js', 'utf8');
+assert(catalogContent.includes('window.SUSHEE_DEFAULT_CLOUD_CATALOG'), 'cloud-catalog.js defines window.SUSHEE_DEFAULT_CLOUD_CATALOG');
+
+const catalogSandbox = { window: {} };
+const catalogEval = new Function('sandbox', `${catalogContent}; sandbox.window.SUSHEE_DEFAULT_CLOUD_CATALOG = window.SUSHEE_DEFAULT_CLOUD_CATALOG;`);
+catalogEval(catalogSandbox);
+const bundledSongs = catalogSandbox.window.SUSHEE_DEFAULT_CLOUD_CATALOG;
+assert(Array.isArray(bundledSongs) && bundledSongs.length === 59, `Pre-bundled catalog contains exactly 59 verified songs (got ${bundledSongs ? bundledSongs.length : 0})`);
+assert(bundledSongs[0].title && bundledSongs[0].artist && bundledSongs[0].audioUrl, 'Bundled song records contain title, artist, and audioUrl');
+
+// Verify HostingServerService instant initialization with bundled catalog
+const freshHostingCode = fs.readFileSync('js/hosting-service.js', 'utf8');
+global.SUSHEE_DEFAULT_CLOUD_CATALOG = bundledSongs;
+if (global.window) global.window.SUSHEE_DEFAULT_CLOUD_CATALOG = bundledSongs;
+const suite13Sandbox = {
+  window: { SUSHEE_DEFAULT_CLOUD_CATALOG: bundledSongs },
+  globalThis: { SUSHEE_DEFAULT_CLOUD_CATALOG: bundledSongs },
+  SUSHEE_DEFAULT_CLOUD_CATALOG: bundledSongs,
+  localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+  encodeURI,
+  decodeURI,
+  console
+};
+suite13Sandbox.window = suite13Sandbox;
+suite13Sandbox.globalThis = suite13Sandbox;
+const suite13HostingEval = new Function('sandbox', 'with(sandbox) { ' + freshHostingCode + '; return HostingServerService; }');
+const LoadedHostingService = suite13HostingEval(suite13Sandbox);
+const hostingInst = new LoadedHostingService();
+
+assert(hostingInst.cachedSongs && hostingInst.cachedSongs.length === 59, 'HostingServerService automatically initializes with 59 songs on first load (0ms delay)');
+assert(hostingInst.isConnected === true, 'HostingServerService marks isConnected as true with available catalog');
+assert(typeof hostingInst.getFilteredCache === 'function', 'HostingServerService has getFilteredCache method');
+
+const filteredGwen = hostingInst.getFilteredCache('gwen');
+assert(filteredGwen.length > 0, `getFilteredCache filters locally by keyword (found ${filteredGwen.length} Gwen songs)`);
+assert(filteredGwen[0].title.toLowerCase().includes('morning') || filteredGwen[0].artist.toLowerCase().includes('gwen'), 'Filtered result matches keyword');
+
+assert(indexHtml.includes('src="js/cloud-catalog.js') || /src="js\/cloud-catalog\.js(\?v=[^"]+)?"/.test(indexHtml), 'index.html imports js/cloud-catalog.js');
+assert(appJsContent.includes('getFilteredCache'), 'app.js uses getFilteredCache for instant 0ms cloud tab rendering');
+
+
+console.log('\n=== TEST SUITE 14: Songs Playlist, Single Play Button & Playback Modes ===');
+const indexHtmlContent = fs.readFileSync('index.html', 'utf8');
+const freshAppJsContent = fs.readFileSync('js/app.js', 'utf8');
+const freshStyleCssContent = fs.readFileSync('css/style.css', 'utf8');
+const freshI18nContent = fs.readFileSync('js/i18n.js', 'utf8');
+
+// 1. Structure in Tab Songs (viewSongs)
+assert(indexHtmlContent.includes('id="songsPlaylistCard"'), 'index.html contains #songsPlaylistCard');
+const viewSongsPart = indexHtmlContent.substring(indexHtmlContent.indexOf('id="viewSongs"'), indexHtmlContent.indexOf('id="viewCloud"'));
+assert(viewSongsPart.includes('id="songsPlaylistCard"'), '#songsPlaylistCard is located inside Tab Songs (#viewSongs)');
+
+const viewCloudPart = indexHtmlContent.substring(indexHtmlContent.indexOf('id="viewCloud"'));
+assert(!viewCloudPart.includes('id="cloudPlaylistCard"'), 'Old #cloudPlaylistCard removed from Tab Cloud (#viewCloud)');
+
+// 2. Playback mode buttons (Sequential, Shuffle, Repeat One)
+assert(indexHtmlContent.includes('id="btnModeSequential"'), 'index.html contains #btnModeSequential (Berurut)');
+assert(indexHtmlContent.includes('id="btnModeShuffle"'), 'index.html contains #btnModeShuffle (Acak)');
+assert(indexHtmlContent.includes('id="btnModeRepeatOne"'), 'index.html contains #btnModeRepeatOne (Ulangi 1 Lagu)');
+
+// 3. Single unified play button
+assert(indexHtmlContent.includes('id="btnSongsPlaylistPlayPause"'), 'index.html contains single #btnSongsPlaylistPlayPause button');
+assert(!viewSongsPart.includes('id="btnPlayAllCloudSongs"'), 'Redundant secondary play all button is omitted in favor of single controller play button');
+
+// 4. Controller logic in app.js
+assert(freshAppJsContent.includes('window.setPlaylistMode = setPlaylistMode;'), 'app.js exposes window.setPlaylistMode');
+assert(freshAppJsContent.includes('window.toggleSongsPlaylistPlayback = toggleSongsPlaylistPlayback;'), 'app.js exposes window.toggleSongsPlaylistPlayback');
+assert(freshAppJsContent.includes('window.nextSongsPlaylistSong = nextSongsPlaylistSong;'), 'app.js exposes window.nextSongsPlaylistSong');
+assert(freshAppJsContent.includes('window.prevSongsPlaylistSong = prevSongsPlaylistSong;'), 'app.js exposes window.prevSongsPlaylistSong');
+assert(freshAppJsContent.includes('window.addToSongsPlaylist = addToSongsPlaylist;'), 'app.js exposes window.addToSongsPlaylist');
+assert(freshAppJsContent.includes('window.clearSongsPlaylist = clearSongsPlaylist;'), 'app.js exposes window.clearSongsPlaylist');
+assert(freshAppJsContent.includes('window.populateAllSongsToPlaylist = populateAllSongsToPlaylist;'), 'app.js exposes window.populateAllSongsToPlaylist');
+assert(freshAppJsContent.includes('window.addToCloudPlaylist = addToSongsPlaylist;'), 'app.js maintains backward compatibility alias window.addToCloudPlaylist');
+
+// 5. CSS styling
+assert(freshStyleCssContent.includes('.songs-playlist-card'), 'style.css defines .songs-playlist-card');
+assert(freshStyleCssContent.includes('.btn-mode-pill'), 'style.css defines .btn-mode-pill');
+assert(freshStyleCssContent.includes('.btn-transport-play'), 'style.css defines .btn-transport-play');
+
+// 6. i18n
+assert(freshI18nContent.includes('songsPlaylistTitle') && freshI18nContent.includes('modeSequential') && freshI18nContent.includes('modeShuffle') && freshI18nContent.includes('modeRepeatOne'), 'i18n.js has translations for all playlist modes and titles');
+
 console.log('\n======================================================');
 console.log(`TOTAL TESTS: ${testsPassed + testsFailed} | PASSED: ${testsPassed} | FAILED: ${testsFailed}`);
 if (testsFailed === 0) {
-  console.log('🎉 ALL 11 TEST SUITES OPERATIONAL WITH ZERO ERRORS!');
+  console.log('🎉 ALL 14 TEST SUITES OPERATIONAL WITH ZERO ERRORS!');
 } else {
   console.error('⚠️ SOME TESTS FAILED. PLEASE INVESTIGATE!');
   process.exit(1);

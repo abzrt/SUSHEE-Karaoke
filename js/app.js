@@ -51,6 +51,10 @@ async function initApp() {
     const autoDismissTimer = setTimeout(dismissSplash, 2050);
     splashTimers.push(autoDismissTimer);
 
+    // Hard absolute fail-safe: guarantees splash dismiss under all network or slow load conditions
+    const failSafeTimer = setTimeout(dismissSplash, 2400);
+    splashTimers.push(failSafeTimer);
+
     if (skipBtn) {
       skipBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -148,10 +152,62 @@ async function initApp() {
     }
   }
 
-  // Restore wake lock on visibility change if recording is in progress
-  document.addEventListener('visibilitychange', async () => {
-    if (document.visibilityState === 'visible' && isKaraokePlaying && recorder && recorder.isRecording) {
+  // --- LIFECYCLE & BACKGROUND/RESUME RECOVERY CONTROLLER ---
+  const handlePageResume = async () => {
+    // 1. Resume AudioContext if suspended by OS/browser
+    if (audioEngine && typeof audioEngine.resumeContext === 'function') {
+      try {
+        await audioEngine.resumeContext();
+      } catch (e) {}
+    }
+
+    // 2. Validate and refresh object URLs for local songs if needed
+    if (storageScanner && storageScanner.songs) {
+      storageScanner.songs.forEach(s => {
+        if (s.audioBlob && (!s.audioUrl || s.audioUrl.length === 0)) {
+          try { s.audioUrl = URL.createObjectURL(s.audioBlob); } catch (e) {}
+        }
+      });
+    }
+
+    // 3. Keep visualizer responsive
+    if (visualizer && isKaraokePlaying) {
+      visualizer.resizeCanvas();
+    }
+
+    // 4. Restore screen wake lock if recording
+    if (isKaraokePlaying && recorder && recorder.isRecording) {
       await requestScreenWakeLock();
+    }
+  };
+
+  const handlePageSuspend = () => {
+    // Cleanly stop microphone if user left app and not actively recording
+    if (!isKaraokePlaying && audioEngine && audioEngine.micStream) {
+      audioEngine.stopMicrophone();
+    }
+  };
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      handlePageResume();
+    } else {
+      handlePageSuspend();
+    }
+  });
+
+  window.addEventListener('pageshow', handlePageResume);
+  window.addEventListener('focus', handlePageResume);
+
+  // Clean shutdown on close/reload to release hardware microphone
+  window.addEventListener('pagehide', () => {
+    if (audioEngine) {
+      audioEngine.stopMicrophone();
+    }
+  });
+  window.addEventListener('beforeunload', () => {
+    if (audioEngine) {
+      audioEngine.stopMicrophone();
     }
   });
 
@@ -317,9 +373,8 @@ async function initApp() {
     if (musicPlayLabel && audioElement) {
       musicPlayLabel.textContent = !audioElement.paused ? window.i18n.t('btnPauseMusic') : window.i18n.t('btnPlayMusic');
     }
-    const cloudStatus = document.getElementById('cloudStatusText');
-    if (cloudStatus) {
-      cloudStatus.textContent = hostingService.isConfigured() ? window.i18n.t('cloudConnected') : window.i18n.t('cloudNotConfigured');
+    if (typeof updateServerStatusUI === 'function') {
+      updateServerStatusUI(hostingService.isConnected, (hostingService.cachedSongs && hostingService.cachedSongs.length) || 0);
     }
   });
 
@@ -439,7 +494,10 @@ async function initApp() {
             }
           </div>
         </div>
-        <div class="song-card-actions">
+        <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
+          <button type="button" class="btn btn-sm btn-songs-playlist-add" title="${(window.i18n && window.i18n.t) ? window.i18n.t('btnAddToPlaylist') : 'Tambah ke Playlist'}" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
+            + Playlist
+          </button>
           <button class="btn-icon-sing" title="${window.i18n.t('btnSingNow')}" data-song-id="${song.id}">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -453,12 +511,38 @@ async function initApp() {
         const songId = card.getAttribute('data-song-id');
         const song = allSongs.find(s => s.id === songId);
         if (song) {
+          if (e.target.closest('.btn-songs-playlist-add')) {
+            e.stopPropagation();
+            addToSongsPlaylist(song);
+            return;
+          }
           selectSong(song, true);
           if (e.target.closest('.btn-icon-sing')) {
             toggleMusicPlayback();
           }
         }
       });
+    });
+  }
+
+  
+  // Delegated click listener to ensure pre-rendered song cards are instantly clickable
+  if (songsListContainer) {
+    songsListContainer.addEventListener('click', (e) => {
+      const card = e.target.closest('.song-card');
+      if (!card) return;
+      const songId = card.getAttribute('data-song-id');
+      if (!songId) return;
+
+      const allCombined = [...((hostingService && hostingService.cachedSongs) || []), ...((storageScanner && storageScanner.songs) || [])];
+      const song = allCombined.find(s => s.id === songId);
+      if (!song) return;
+
+      if (e.target.closest('.btn-songs-playlist-add')) {
+        e.stopPropagation();
+        addToSongsPlaylist(song);
+        return;
+      }
     });
   }
 
@@ -888,8 +972,16 @@ async function initApp() {
     if (window.AndroidStorage && typeof window.AndroidStorage.setBackgroundAudioActive === 'function') {
       try { window.AndroidStorage.setBackgroundAudioActive(false); } catch (e) {}
     }
-    if (typeof isCloudPlaylistMode !== 'undefined' && isCloudPlaylistMode) {
-      nextCloudPlaylistSong();
+    if ((typeof isSongsPlaylistMode !== 'undefined' && isSongsPlaylistMode) || (typeof isCloudPlaylistMode !== 'undefined' && isCloudPlaylistMode)) {
+      if (typeof playlistPlaybackMode !== 'undefined' && playlistPlaybackMode === 'repeat_one') {
+        // Repeat one single song indefinitely
+        audioElement.currentTime = 0;
+        audioElement.play().then(() => {
+          if (typeof updatePlaylistPlayButtonUI === 'function') updatePlaylistPlayButtonUI(true);
+        }).catch(console.warn);
+      } else {
+        nextSongsPlaylistSong();
+      }
     }
   });
 
@@ -1084,8 +1176,14 @@ async function initApp() {
   // Subtab navigation inside combined studio drawer
   const switchStudioSubtab = (tabName) => {
     document.querySelectorAll('.studio-subtab').forEach(btn => {
-      if (btn.getAttribute('data-subtab') === tabName) btn.classList.add('active');
-      else btn.classList.remove('active');
+      const match = btn.getAttribute('data-subtab') === tabName;
+      if (match) {
+        btn.classList.add('active');
+        btn.setAttribute('aria-selected', 'true');
+      } else {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-selected', 'false');
+      }
     });
     const paneVocal = document.getElementById('paneVocalTab');
     const panePitch = document.getElementById('panePitchTab');
@@ -1105,6 +1203,19 @@ async function initApp() {
     }
   };
   window.switchStudioSubtab = switchStudioSubtab;
+
+  // Delegated click and touch handler for subtab buttons to ensure 100% responsiveness on mobile
+  const handleSubtabTrigger = (e) => {
+    const btn = e.target && e.target.closest && e.target.closest('.studio-subtab');
+    if (btn) {
+      const tabName = btn.getAttribute('data-subtab');
+      if (tabName) {
+        switchStudioSubtab(tabName);
+      }
+    }
+  };
+  document.addEventListener('click', handleSubtabTrigger);
+  document.addEventListener('touchend', handleSubtabTrigger, { passive: true });
 
   // Backward compatibility triggers for tests and external bindings
   const vocalEffectsCollapseContainer = document.getElementById('vocalEffectsCollapseContainer') || studioSettingsCollapseContainer;
@@ -1159,7 +1270,7 @@ async function initApp() {
 
   window.stepMusicPitch = (delta) => {
     if (!audioEngine) return;
-    const current = parseInt(audioEngine.musicPitchShift || 0, 10);
+    const current = parseInt((audioEngine.musicPitch !== undefined ? audioEngine.musicPitch : audioEngine.musicPitchShift) || 0, 10);
     const target = Math.max(-6, Math.min(6, current + delta));
     audioEngine.setMusicPitch(target);
     if (musicPitchSlider) musicPitchSlider.value = target;
@@ -1175,7 +1286,7 @@ async function initApp() {
 
   window.stepMusicSpeed = (delta) => {
     if (!audioEngine) return;
-    const current = parseFloat(audioEngine.musicPlaybackSpeed || 1.0);
+    const current = parseFloat((audioEngine.musicSpeed !== undefined ? audioEngine.musicSpeed : audioEngine.musicPlaybackSpeed) || 1.0);
     const target = Math.max(0.75, Math.min(1.35, Math.round((current + delta) * 100) / 100));
     audioEngine.setMusicSpeed(target);
     if (musicSpeedSlider) musicSpeedSlider.value = target;
@@ -1941,18 +2052,25 @@ async function initApp() {
   function updateServerStatusUI(isConnected, songCount = 0) {
     if (!serverActiveLabel) return;
     if (hostingService.serverUrl) {
+      let hostDisplay = hostingService.serverUrl;
       try {
         const u = new URL(hostingService.serverUrl);
-        serverActiveLabel.innerHTML = `Server: <strong>${u.hostname}</strong> (${songCount} Lagu)`;
-      } catch (e) {
-        serverActiveLabel.innerHTML = `Server: <strong>${hostingService.serverUrl}</strong>`;
-      }
+        hostDisplay = u.hostname;
+      } catch (e) {}
+
+      const statusTag = isConnected ? 
+        `<strong id="cloudStatusText" style="color: #00f2fe; font-weight: 700;">Terhubung</strong>` : 
+        (songCount > 0 ? `<strong id="cloudStatusText" style="color: #f59e0b; font-weight: 600;">Mode Cache Offline</strong>` : `<strong id="cloudStatusText" style="color: #00f2fe; font-weight: 600;">Menghubungkan...</strong>`);
+
+      const songTag = songCount > 0 ? ` (${songCount} Lagu)` : '';
+      serverActiveLabel.innerHTML = `Server: <strong>${hostDisplay}</strong> &bull; ${statusTag}${songTag}`;
+
       if (serverStatusPulse) {
-        serverStatusPulse.style.background = isConnected ? '#00f2fe' : '#f59e0b';
-        serverStatusPulse.style.boxShadow = isConnected ? '0 0 8px #00f2fe' : '0 0 8px #f59e0b';
+        serverStatusPulse.style.background = isConnected ? '#00f2fe' : (songCount > 0 ? '#f59e0b' : '#00f2fe');
+        serverStatusPulse.style.boxShadow = isConnected ? '0 0 8px #00f2fe' : (songCount > 0 ? '0 0 8px #f59e0b' : '0 0 8px #00f2fe');
       }
     } else {
-      serverActiveLabel.innerHTML = `Server: <strong>Belum Dikonfigurasi (Demo Cloud)</strong>`;
+      serverActiveLabel.innerHTML = `Server: <strong id="cloudStatusText" style="color: #888;">Belum Dikonfigurasi</strong>`;
       if (serverStatusPulse) {
         serverStatusPulse.style.background = '#888';
         serverStatusPulse.style.boxShadow = 'none';
@@ -1960,42 +2078,97 @@ async function initApp() {
     }
   }
 
-  // --- CLOUD HOSTING PLAYLIST CONTROLLER (DEDICATED MUSIC LISTENING) ---
-  let cloudPlaylist = [];
+  // Immediately update status with current server connection state
+  updateServerStatusUI(hostingService.isConnected, (hostingService.cachedSongs && hostingService.cachedSongs.length) || 0);
+
+    // --- SONGS PLAYLIST CONTROLLER (DEDICATED SEQUENTIAL, SHUFFLE & REPEAT PLAYBACK) ---
+  let songsPlaylist = [];
   try {
-    const saved = localStorage.getItem('sushee_cloud_playlist');
-    if (saved) cloudPlaylist = JSON.parse(saved);
-  } catch (e) { cloudPlaylist = []; }
+    const saved = localStorage.getItem('sushee_songs_playlist') || localStorage.getItem('sushee_cloud_playlist');
+    if (saved) songsPlaylist = JSON.parse(saved);
+  } catch (e) { songsPlaylist = []; }
 
-  let cloudPlaylistIndex = -1;
-  let isCloudPlaylistMode = false;
+  let songsPlaylistIndex = -1;
+  let isSongsPlaylistMode = false;
+  let playlistPlaybackMode = 'sequential'; // 'sequential', 'shuffle', 'repeat_one'
+  try {
+    const savedMode = localStorage.getItem('sushee_playlist_mode');
+    if (savedMode && ['sequential', 'shuffle', 'repeat_one'].includes(savedMode)) {
+      playlistPlaybackMode = savedMode;
+    }
+  } catch (e) {}
 
-  const updateCloudPlaylistBadgeUI = () => {
-    const badge = document.getElementById('cloudPlaylistCountBadge');
+  const updateSongsPlaylistBadgeUI = () => {
+    const badge = document.getElementById('songsPlaylistCountBadge');
     const totalCount = document.getElementById('queueTotalCount');
-    if (badge) badge.textContent = cloudPlaylist.length.toString();
-    if (totalCount) totalCount.textContent = cloudPlaylist.length.toString();
+    const oldCloudBadge = document.getElementById('cloudPlaylistCountBadge');
+    if (badge) badge.textContent = songsPlaylist.length.toString();
+    if (totalCount) totalCount.textContent = songsPlaylist.length.toString();
+    if (oldCloudBadge) oldCloudBadge.textContent = songsPlaylist.length.toString();
   };
 
-  const saveCloudPlaylist = () => {
+  const updatePlaylistModeUI = () => {
+    document.querySelectorAll('.btn-mode-pill').forEach(btn => {
+      const mode = btn.getAttribute('data-mode');
+      if (mode === playlistPlaybackMode) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+  };
+
+  const setPlaylistMode = (mode) => {
+    if (!mode || !['sequential', 'shuffle', 'repeat_one'].includes(mode)) return;
+    playlistPlaybackMode = mode;
     try {
-      localStorage.setItem('sushee_cloud_playlist', JSON.stringify(cloudPlaylist));
+      localStorage.setItem('sushee_playlist_mode', mode);
     } catch (e) {}
-    updateCloudPlaylistBadgeUI();
+    updatePlaylistModeUI();
+
+    let toastText = 'Mode: Putar Berurut';
+    if (mode === 'shuffle') {
+      toastText = (window.i18n && window.i18n.t) ? window.i18n.t('toastModeShuffle') : 'Mode: Putar Acak (Shuffle)';
+    } else if (mode === 'repeat_one') {
+      toastText = (window.i18n && window.i18n.t) ? window.i18n.t('toastModeRepeatOne') : 'Mode: Ulangi 1 Lagu (Repeat One)';
+    } else {
+      toastText = (window.i18n && window.i18n.t) ? window.i18n.t('toastModeSequential') : 'Mode: Putar Berurut (Sequential)';
+    }
+    showToast(toastText, 'info');
+  };
+  window.setPlaylistMode = setPlaylistMode;
+
+  const saveSongsPlaylist = () => {
+    try {
+      localStorage.setItem('sushee_songs_playlist', JSON.stringify(songsPlaylist));
+      localStorage.setItem('sushee_cloud_playlist', JSON.stringify(songsPlaylist));
+    } catch (e) {}
+    updateSongsPlaylistBadgeUI();
   };
 
-  const renderCloudPlaylistItems = () => {
-    const container = document.getElementById('cloudPlaylistItems');
+  const updatePlaylistPlayButtonUI = (isPlaying) => {
+    const playIcon = document.getElementById('songsPlaylistPlayIcon');
+    const miniIcon = document.getElementById('miniPlayIcon');
+    const iconHtml = isPlaying ? 
+      '<rect x="5" y="4" width="4" height="16"/><rect x="15" y="4" width="4" height="16"/>' : 
+      '<polygon points="5 3 19 12 5 21 5 3"/>';
+
+    if (playIcon) playIcon.innerHTML = iconHtml;
+    if (miniIcon) miniIcon.innerHTML = iconHtml;
+  };
+
+  const renderSongsPlaylistItems = () => {
+    const container = document.getElementById('songsPlaylistItems') || document.getElementById('cloudPlaylistItems');
     if (!container) return;
-    if (cloudPlaylist.length === 0) {
+    if (songsPlaylist.length === 0) {
       container.innerHTML = `<p class="queue-empty-text" data-i18n="playlistEmpty">${(window.i18n && window.i18n.t) ? window.i18n.t('playlistEmpty') : 'Playlist masih kosong. Ketuk \'+ Playlist\' pada lagu di bawah.'}</p>`;
       return;
     }
-    container.innerHTML = cloudPlaylist.map((s, idx) => `
-      <div class="queue-item ${cloudPlaylistIndex === idx ? 'active' : ''}" data-queue-idx="${idx}">
+    container.innerHTML = songsPlaylist.map((s, idx) => `
+      <div class="queue-item ${songsPlaylistIndex === idx ? 'active' : ''}" data-queue-idx="${idx}">
         <div class="queue-item-info">
           <span class="queue-item-title">${idx + 1}. ${s.title}</span>
-          <span class="queue-item-artist">${s.artist || 'PHP Hosting'}</span>
+          <span class="queue-item-artist">${s.artist || (s.source === 'custom_host' ? 'PHP Hosting' : 'Penyimpanan HP')}</span>
         </div>
         <button type="button" class="queue-item-remove" data-remove-idx="${idx}" title="Hapus">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -2007,31 +2180,31 @@ async function initApp() {
       item.addEventListener('click', (e) => {
         if (e.target.closest('.queue-item-remove')) {
           const rmIdx = parseInt(e.target.closest('.queue-item-remove').getAttribute('data-remove-idx'), 10);
-          removeCloudPlaylistSong(rmIdx);
+          removeSongsPlaylistSong(rmIdx);
           return;
         }
         const idx = parseInt(item.getAttribute('data-queue-idx'), 10);
-        playCloudPlaylist(idx);
+        playSongsPlaylist(idx);
       });
     });
   };
 
-  const toggleCloudPlaylistDrawer = () => {
-    const drawer = document.getElementById('cloudPlaylistQueue');
+  const toggleSongsPlaylistDrawer = () => {
+    const drawer = document.getElementById('songsPlaylistQueue') || document.getElementById('cloudPlaylistQueue');
     if (!drawer) return;
     const isHidden = drawer.style.display === 'none';
     drawer.style.display = isHidden ? 'block' : 'none';
-    if (isHidden) renderCloudPlaylistItems();
+    if (isHidden) renderSongsPlaylistItems();
   };
-  window.toggleCloudPlaylistDrawer = toggleCloudPlaylistDrawer;
+  window.toggleSongsPlaylistDrawer = toggleSongsPlaylistDrawer;
 
-  const addToCloudPlaylist = (song, showToastNotice = true) => {
+  const addToSongsPlaylist = (song, showToastNotice = true) => {
     if (!song) return;
-    const exists = cloudPlaylist.some(s => s.id === song.id || (s.title === song.title && s.artist === song.artist));
+    const exists = songsPlaylist.some(s => s.id === song.id || (s.title === song.title && s.artist === song.artist));
     if (!exists) {
-      cloudPlaylist.push(song);
-      saveCloudPlaylist();
-      renderCloudPlaylistItems();
+      songsPlaylist.push(song);
+      saveSongsPlaylist();
+      renderSongsPlaylistItems();
       if (showToastNotice) {
         showToast(`✓ ${song.title} ${(window.i18n && window.i18n.t) ? window.i18n.t('btnAddedToPlaylist') : 'ditambahkan ke Playlist'}`, 'success');
       }
@@ -2039,121 +2212,320 @@ async function initApp() {
       showToast(`${song.title} sudah ada di playlist`, 'info');
     }
   };
-  window.addToCloudPlaylist = addToCloudPlaylist;
+  window.addToSongsPlaylist = addToSongsPlaylist;
 
-  const removeCloudPlaylistSong = (idx) => {
-    if (idx >= 0 && idx < cloudPlaylist.length) {
-      cloudPlaylist.splice(idx, 1);
-      if (cloudPlaylistIndex >= cloudPlaylist.length) {
-        cloudPlaylistIndex = cloudPlaylist.length - 1;
+  const removeSongsPlaylistSong = (idx) => {
+    if (idx >= 0 && idx < songsPlaylist.length) {
+      songsPlaylist.splice(idx, 1);
+      if (songsPlaylistIndex >= songsPlaylist.length) {
+        songsPlaylistIndex = songsPlaylist.length - 1;
       }
-      saveCloudPlaylist();
-      renderCloudPlaylistItems();
+      saveSongsPlaylist();
+      renderSongsPlaylistItems();
     }
   };
-  window.removeCloudPlaylistSong = removeCloudPlaylistSong;
+  window.removeSongsPlaylistSong = removeSongsPlaylistSong;
 
-  const clearCloudPlaylist = () => {
-    cloudPlaylist = [];
-    cloudPlaylistIndex = -1;
-    saveCloudPlaylist();
-    renderCloudPlaylistItems();
-    const mini = document.getElementById('cloudPlaylistMiniPlayer');
-    if (mini) mini.style.display = 'none';
+  const clearSongsPlaylist = () => {
+    songsPlaylist = [];
+    songsPlaylistIndex = -1;
+    isSongsPlaylistMode = false;
+    saveSongsPlaylist();
+    renderSongsPlaylistItems();
+    const trackTitle = document.getElementById('songsPlaylistTrackTitle');
+    const trackArtist = document.getElementById('songsPlaylistTrackArtist');
+    if (trackTitle) trackTitle.textContent = '-';
+    if (trackArtist) trackArtist.textContent = 'Ketuk tombol putar untuk mulai mendengarkan';
+    updatePlaylistPlayButtonUI(false);
     showToast('Playlist dikosongkan', 'info');
   };
-  window.clearCloudPlaylist = clearCloudPlaylist;
+  window.clearSongsPlaylist = clearSongsPlaylist;
 
-  const updateMiniPlayerPlayButton = (isPlaying) => {
-    const icon = document.getElementById('miniPlayIcon');
-    if (!icon) return;
-    if (isPlaying) {
-      icon.innerHTML = '<rect x="5" y="4" width="4" height="16"/><rect x="15" y="4" width="4" height="16"/>';
-    } else {
-      icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
-    }
-  };
-
-  const playCloudPlaylist = async (idx = 0) => {
-    if (cloudPlaylist.length === 0) {
-      showToast((window.i18n && window.i18n.t) ? window.i18n.t('playlistEmpty') : 'Playlist masih kosong', 'warning');
+  const populateAllSongsToPlaylist = () => {
+    const allCandidates = [
+      ...((storageScanner && storageScanner.songs) || []),
+      ...((hostingService && hostingService.cachedSongs) || [])
+    ];
+    if (allCandidates.length === 0) {
+      showToast('Tidak ada lagu yang ditemukan untuk dimasukkan ke playlist', 'warning');
       return;
     }
+    let addedCount = 0;
+    allCandidates.forEach(song => {
+      const exists = songsPlaylist.some(s => s.id === song.id || (s.title === song.title && s.artist === song.artist));
+      if (!exists) {
+        songsPlaylist.push(song);
+        addedCount++;
+      }
+    });
+    saveSongsPlaylist();
+    renderSongsPlaylistItems();
+    showToast(`✓ Ditambahkan ${addedCount} lagu ke playlist (Total: ${songsPlaylist.length})`, 'success');
+  };
+  window.populateAllSongsToPlaylist = populateAllSongsToPlaylist;
+
+  const playSongsPlaylist = async (idx = 0) => {
+    if (songsPlaylist.length === 0) {
+      // Auto populate if library has songs
+      const allCandidates = [
+        ...((storageScanner && storageScanner.songs) || []),
+        ...((hostingService && hostingService.cachedSongs) || [])
+      ];
+      if (allCandidates.length > 0) {
+        songsPlaylist = [...allCandidates];
+        saveSongsPlaylist();
+        renderSongsPlaylistItems();
+      } else {
+        showToast((window.i18n && window.i18n.t) ? window.i18n.t('playlistEmpty') : 'Playlist masih kosong', 'warning');
+        return;
+      }
+    }
+
     if (idx < 0) idx = 0;
-    if (idx >= cloudPlaylist.length) idx = 0;
+    if (idx >= songsPlaylist.length) idx = 0;
 
-    cloudPlaylistIndex = idx;
-    isCloudPlaylistMode = true;
-    const song = cloudPlaylist[idx];
+    songsPlaylistIndex = idx;
+    isSongsPlaylistMode = true;
+    const song = songsPlaylist[idx];
 
-    // Select song without auto navigating away from Cloud tab
+    // Select song without auto-navigating to karaoke studio tab
     selectSong(song, false);
 
-    const mini = document.getElementById('cloudPlaylistMiniPlayer');
-    const miniTitle = document.getElementById('miniPlayerTitle');
-    const miniArtist = document.getElementById('miniPlayerArtist');
-    const nowText = document.getElementById('cloudPlaylistNowText');
+    const trackTitle = document.getElementById('songsPlaylistTrackTitle');
+    const trackArtist = document.getElementById('songsPlaylistTrackArtist');
+    const nowText = document.getElementById('songsPlaylistNowText');
 
-    if (mini) mini.style.display = 'flex';
-    if (miniTitle) miniTitle.textContent = `${idx + 1}. ${song.title}`;
-    if (miniArtist) miniArtist.textContent = song.artist || 'PHP Hosting';
-    if (nowText) nowText.textContent = `Memutar: ${song.title} (${idx + 1}/${cloudPlaylist.length})`;
+    if (trackTitle) trackTitle.textContent = `${idx + 1}. ${song.title}`;
+    if (trackArtist) trackArtist.textContent = `${song.artist || (song.source === 'custom_host' ? 'PHP Hosting' : 'Penyimpanan HP')} (${idx + 1}/${songsPlaylist.length})`;
+    if (nowText) nowText.textContent = `Memutar: ${song.title} (${idx + 1}/${songsPlaylist.length})`;
 
-    renderCloudPlaylistItems();
+    renderSongsPlaylistItems();
 
     try {
       await audioEngine.init(audioElement);
       await audioEngine.resumeContext();
       audioElement.muted = false;
       await audioElement.play();
-      updateMiniPlayerPlayButton(true);
+      updatePlaylistPlayButtonUI(true);
       setupMediaSession(song);
     } catch (e) {
       console.error('Playlist play error:', e);
       showToast('Gagal memutar lagu: ' + (e.message || e), 'error');
     }
   };
-  window.playCloudPlaylist = playCloudPlaylist;
+  window.playSongsPlaylist = playSongsPlaylist;
 
-  const toggleCloudPlaylistPlayback = () => {
+  const toggleSongsPlaylistPlayback = () => {
+    if (songsPlaylist.length === 0) {
+      // Auto-populate from all available songs and start playing
+      const allCandidates = [
+        ...((storageScanner && storageScanner.songs) || []),
+        ...((hostingService && hostingService.cachedSongs) || [])
+      ];
+      if (allCandidates.length > 0) {
+        songsPlaylist = [...allCandidates];
+        saveSongsPlaylist();
+        renderSongsPlaylistItems();
+        playSongsPlaylist(0);
+        return;
+      } else {
+        showToast((window.i18n && window.i18n.t) ? window.i18n.t('playlistEmpty') : 'Playlist masih kosong', 'warning');
+        return;
+      }
+    }
+
+    if (songsPlaylistIndex === -1) {
+      playSongsPlaylist(0);
+      return;
+    }
+
     if (audioElement.paused) {
       audioElement.play().catch(console.warn);
-      updateMiniPlayerPlayButton(true);
+      updatePlaylistPlayButtonUI(true);
     } else {
       audioElement.pause();
-      updateMiniPlayerPlayButton(false);
+      updatePlaylistPlayButtonUI(false);
     }
   };
-  window.toggleCloudPlaylistPlayback = toggleCloudPlaylistPlayback;
+  window.toggleSongsPlaylistPlayback = toggleSongsPlaylistPlayback;
 
-  const nextCloudPlaylistSong = () => {
-    if (cloudPlaylist.length === 0) return;
-    let nextIdx = cloudPlaylistIndex + 1;
-    if (nextIdx >= cloudPlaylist.length) nextIdx = 0;
-    playCloudPlaylist(nextIdx);
-  };
-  window.nextCloudPlaylistSong = nextCloudPlaylistSong;
-
-  const prevCloudPlaylistSong = () => {
-    if (cloudPlaylist.length === 0) return;
-    let prevIdx = cloudPlaylistIndex - 1;
-    if (prevIdx < 0) prevIdx = cloudPlaylist.length - 1;
-    playCloudPlaylist(prevIdx);
-  };
-  window.prevCloudPlaylistSong = prevCloudPlaylistSong;
-
-  const playAllCloudSongs = () => {
-    if (hostingService.cachedSongs && hostingService.cachedSongs.length > 0) {
-      cloudPlaylist = [...hostingService.cachedSongs];
-      saveCloudPlaylist();
-      renderCloudPlaylistItems();
-      playCloudPlaylist(0);
-      showToast(`Memutar semua ${cloudPlaylist.length} lagu Cloud`, 'success');
+  const nextSongsPlaylistSong = () => {
+    if (songsPlaylist.length === 0) return;
+    let nextIdx = 0;
+    if (playlistPlaybackMode === 'shuffle') {
+      nextIdx = Math.floor(Math.random() * songsPlaylist.length);
+      if (songsPlaylist.length > 1 && nextIdx === songsPlaylistIndex) {
+        nextIdx = (nextIdx + 1) % songsPlaylist.length;
+      }
     } else {
-      showToast('Belum ada lagu terhubung di Cloud Hosting', 'warning');
+      nextIdx = songsPlaylistIndex + 1;
+      if (nextIdx >= songsPlaylist.length) nextIdx = 0;
     }
+    playSongsPlaylist(nextIdx);
   };
-  window.playAllCloudSongs = playAllCloudSongs;
+  window.nextSongsPlaylistSong = nextSongsPlaylistSong;
+
+  const prevSongsPlaylistSong = () => {
+    if (songsPlaylist.length === 0) return;
+    let prevIdx = 0;
+    if (playlistPlaybackMode === 'shuffle') {
+      prevIdx = Math.floor(Math.random() * songsPlaylist.length);
+    } else {
+      prevIdx = songsPlaylistIndex - 1;
+      if (prevIdx < 0) prevIdx = songsPlaylist.length - 1;
+    }
+    playSongsPlaylist(prevIdx);
+  };
+  window.prevSongsPlaylistSong = prevSongsPlaylistSong;
+
+  // Initialize UI for Songs Playlist
+  updateSongsPlaylistBadgeUI();
+  updatePlaylistModeUI();
+
+  // Backward compatibility aliases
+  window.cloudPlaylist = songsPlaylist;
+  window.addToCloudPlaylist = addToSongsPlaylist;
+  window.removeCloudPlaylistSong = removeSongsPlaylistSong;
+  window.clearCloudPlaylist = clearSongsPlaylist;
+  window.playCloudPlaylist = playSongsPlaylist;
+  window.toggleCloudPlaylistPlayback = toggleSongsPlaylistPlayback;
+  window.nextCloudPlaylistSong = nextSongsPlaylistSong;
+  window.prevCloudPlaylistSong = prevSongsPlaylistSong;
+  window.playAllCloudSongs = populateAllSongsToPlaylist;
+  window.toggleCloudPlaylistDrawer = toggleSongsPlaylistDrawer;
+
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  // Helper to render cloud song cards into cloudListContainer
+  function renderCloudCards(songs) {
+    if (!cloudListContainer) return;
+    if (!songs || songs.length === 0) {
+      cloudListContainer.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">🌐</div>
+          <h4>Belum Ada Lagu di Server</h4>
+          <p>Upload file .mp3 dan .lrc ke folder <code>songs/</code> di hosting Anda.</p>
+          <div class="empty-actions">
+            <button class="btn btn-primary" id="btnEmptyConfigServer">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              <span>Atur URL Hosting Anda</span>
+            </button>
+          </div>
+        </div>
+      `;
+      const btnEmpty = document.getElementById('btnEmptyConfigServer');
+      if (btnEmpty && serverConfigDrawer) {
+        btnEmpty.addEventListener('click', () => {
+          serverConfigDrawer.style.display = 'block';
+          if (serverUrlInput) serverUrlInput.focus();
+        });
+      }
+      return;
+    }
+
+    const hasLyricsLabel = (window.i18n && window.i18n.t('badgeHasLyrics')) || 'Ada Lirik (.LRC)';
+    const noLyricsLabel = (window.i18n && window.i18n.t('badgeNoLyrics')) || 'Tanpa Lirik';
+    const singTitle = (window.i18n && window.i18n.t('btnSingNow')) || 'Nyalakan Karaoke';
+
+    cloudListContainer.innerHTML = songs.map(song => {
+      const isInPlaylist = cloudPlaylist.some(p => p.id === song.id || (p.title === song.title && p.artist === song.artist));
+      return `
+        <div class="song-card ${currentSong && currentSong.id === song.id ? 'now-playing' : ''}" data-cloud-id="${song.id}">
+          <div class="song-card-avatar" style="background: rgba(0, 242, 254, 0.15); color: #00f2fe;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+          </div>
+          <div class="song-card-info">
+            <h4 class="song-card-title">${song.title}</h4>
+            <p class="song-card-artist">${song.artist}</p>
+            <div class="song-badges">
+              <span class="badge badge-format">${song.format || '.MP3'}</span>
+              <span class="badge" style="background: rgba(0, 242, 254, 0.15); color: var(--color-cyan); border: 1px solid rgba(0, 242, 254, 0.3);">PHP Hosting</span>
+              ${song.hasLyrics ? 
+                `<span class="badge badge-lyrics"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> ${hasLyricsLabel}</span>` : 
+                `<span class="badge badge-no-lyrics">${noLyricsLabel}</span>`
+              }
+            </div>
+          </div>
+          <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
+            <button class="btn btn-sm btn-cloud-playlist-add" data-song-id="${song.id}" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: ${isInPlaylist ? 'rgba(0, 242, 254, 0.2)' : 'rgba(255, 255, 255, 0.08)'}; color: ${isInPlaylist ? 'var(--color-cyan)' : 'var(--text-main)'}; border: 1px solid ${isInPlaylist ? 'rgba(0, 242, 254, 0.4)' : 'var(--border-subtle)'}; border-radius: 8px;">
+              ${isInPlaylist ? '✓ In Queue' : '+ Playlist'}
+            </button>
+            <button class="btn-icon-sing" title="${singTitle}" data-cloud-id="${song.id}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    cloudListContainer.querySelectorAll('.song-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        const id = card.getAttribute('data-cloud-id');
+        const song = songs.find(s => s.id === id);
+        if (!song) return;
+
+        // + Playlist button clicked:
+        if (e.target.closest('.btn-cloud-playlist-add')) {
+          e.stopPropagation();
+          addToCloudPlaylist(song, true);
+          const btn = card.querySelector('.btn-cloud-playlist-add');
+          if (btn) {
+            btn.textContent = '✓ In Queue';
+            btn.style.background = 'rgba(0, 242, 254, 0.2)';
+            btn.style.color = 'var(--color-cyan)';
+            btn.style.borderColor = 'rgba(0, 242, 254, 0.4)';
+          }
+          return;
+        }
+
+        // Card or Sing button clicked:
+        selectSong(song, true);
+        if (e.target.closest('.btn-icon-sing')) {
+          toggleMusicPlayback();
+        }
+      });
+    });
+  }
+
+  // Delegated click listener to ensure pre-rendered cloud cards are instantly clickable
+  if (cloudListContainer) {
+    cloudListContainer.addEventListener('click', (e) => {
+      const card = e.target.closest('.song-card');
+      if (!card) return;
+      const id = card.getAttribute('data-cloud-id');
+      if (!id) return;
+      const allCloud = (hostingService && hostingService.cachedSongs) || [];
+      const song = allCloud.find(s => s.id === id);
+      if (!song) return;
+
+      if (e.target.closest('.btn-cloud-playlist-add')) {
+        e.stopPropagation();
+        addToCloudPlaylist(song, true);
+        const btn = card.querySelector('.btn-cloud-playlist-add');
+        if (btn) {
+          btn.textContent = '✓ In Queue';
+          btn.style.background = 'rgba(0, 242, 254, 0.2)';
+          btn.style.color = 'var(--color-cyan)';
+          btn.style.borderColor = 'rgba(0, 242, 254, 0.4)';
+        }
+        return;
+      }
+
+      selectSong(song, true);
+      if (e.target.closest('.btn-icon-sing')) {
+        toggleMusicPlayback();
+      }
+    });
+  }
 
   async function renderCloudSongList() {
     if (!cloudListContainer) return;
@@ -2161,126 +2533,58 @@ async function initApp() {
 
     updateCloudPlaylistBadgeUI();
 
-    // Show instant loading state if container is empty and songs not cached
-    if ((!cloudListContainer.children || cloudListContainer.children.length === 0) && (!hostingService.cachedSongs || hostingService.cachedSongs.length === 0)) {
+    // 1. INSTANT LOCAL RENDER (0ms delay) from memory cache
+    const initialList = hostingService.getFilteredCache(query);
+    if (initialList.length > 0) {
+      renderCloudCards(initialList);
+      updateServerStatusUI(hostingService.isConnected, initialList.length);
+    } else if (query) {
       cloudListContainer.innerHTML = `
-        <div style="text-align: center; padding: 36px 16px; color: var(--color-cyan);">
-          <div class="status-dot-pulse" style="width: 14px; height: 14px; margin: 0 auto 12px; background: #00f2fe; box-shadow: 0 0 12px #00f2fe;"></div>
-          <p style="font-size: 0.85rem; font-weight: 600;">Menghubungkan ke server hosting & memuat lagu...</p>
+        <div class="empty-state">
+          <div class="empty-icon">🔍</div>
+          <h4>Lagu Tidak Ditemukan</h4>
+          <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 12px;">Tidak ada lagu yang cocok dengan kata kunci "${escapeHtml(query)}".</p>
         </div>
       `;
+      updateServerStatusUI(hostingService.isConnected, 0);
+    } else if (!cloudListContainer.children || cloudListContainer.children.length === 0) {
+      const gObj = (typeof window !== 'undefined') ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+      const bundled = (gObj && Array.isArray(gObj.SUSHEE_DEFAULT_CLOUD_CATALOG)) ? gObj.SUSHEE_DEFAULT_CLOUD_CATALOG : [];
+      if (bundled.length > 0) {
+        hostingService.cachedSongs = [...bundled];
+        hostingService.isConnected = true;
+        renderCloudCards(bundled);
+        updateServerStatusUI(true, bundled.length);
+      }
     }
 
+    // 2. Fetch fresh catalog from remote hosting in background
     try {
       const songs = await hostingService.searchSongs(query);
-      updateServerStatusUI(hostingService.isConnected, songs.length);
-      renderSongList(); // Also update library view
-
-      if (songs.length === 0) {
-        cloudListContainer.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">🌐</div>
-            <h4>Belum Ada Lagu di Server</h4>
-            <p>Upload file .mp3 dan .lrc ke folder <code>songs/</code> di hosting Anda.</p>
-            <div class="empty-actions">
-              <button class="btn btn-primary" id="btnEmptyConfigServer">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                <span>Atur URL Hosting Anda</span>
-              </button>
-            </div>
-          </div>
-        `;
-        const btnEmpty = document.getElementById('btnEmptyConfigServer');
-        if (btnEmpty && serverConfigDrawer) {
-          btnEmpty.addEventListener('click', () => {
-            serverConfigDrawer.style.display = 'block';
-            if (serverUrlInput) serverUrlInput.focus();
-          });
-        }
-        return;
+      if (songs && songs.length > 0) {
+        updateServerStatusUI(hostingService.isConnected, songs.length);
+        renderCloudCards(songs);
+        renderSongList(); // Also update combined library view
+      } else if (initialList.length > 0) {
+        updateServerStatusUI(hostingService.isConnected, initialList.length);
+        renderCloudCards(initialList);
       }
-
-      cloudListContainer.innerHTML = songs.map(song => {
-        const isInPlaylist = cloudPlaylist.some(p => p.id === song.id || (p.title === song.title && p.artist === song.artist));
-        return `
-          <div class="song-card ${currentSong && currentSong.id === song.id ? 'now-playing' : ''}" data-cloud-id="${song.id}">
-            <div class="song-card-avatar" style="background: rgba(0, 242, 254, 0.15); color: #00f2fe;">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
-            </div>
-            <div class="song-card-info">
-              <h4 class="song-card-title">${song.title}</h4>
-              <p class="song-card-artist">${song.artist}</p>
-              <div class="song-badges">
-                <span class="badge badge-format">${song.format || '.MP3'}</span>
-                <span class="badge" style="background: rgba(0, 242, 254, 0.15); color: var(--color-cyan); border: 1px solid rgba(0, 242, 254, 0.3);">PHP Hosting</span>
-                ${song.hasLyrics ? 
-                  `<span class="badge badge-lyrics"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> ${window.i18n.t('badgeHasLyrics')}</span>` : 
-                  `<span class="badge badge-no-lyrics">${window.i18n.t('badgeNoLyrics')}</span>`
-                }
-              </div>
-            </div>
-            <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-              <button class="btn btn-sm btn-cloud-playlist-add" data-song-id="${song.id}" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: ${isInPlaylist ? 'rgba(0, 242, 254, 0.2)' : 'rgba(255, 255, 255, 0.08)'}; color: ${isInPlaylist ? 'var(--color-cyan)' : 'var(--text-main)'}; border: 1px solid ${isInPlaylist ? 'rgba(0, 242, 254, 0.4)' : 'var(--border-subtle)'}; border-radius: 8px;">
-                ${isInPlaylist ? '✓ In Queue' : '+ Playlist'}
-              </button>
-              <button class="btn-icon-sing" title="${window.i18n.t('btnSingNow')}" data-cloud-id="${song.id}">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              </button>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      cloudListContainer.querySelectorAll('.song-card').forEach(card => {
-        card.addEventListener('click', (e) => {
-          const id = card.getAttribute('data-cloud-id');
-          const song = songs.find(s => s.id === id);
-          if (!song) return;
-
-          // + Playlist button clicked:
-          if (e.target.closest('.btn-cloud-playlist-add')) {
-            e.stopPropagation();
-            addToCloudPlaylist(song, true);
-            const btn = card.querySelector('.btn-cloud-playlist-add');
-            if (btn) {
-              btn.textContent = '✓ In Queue';
-              btn.style.background = 'rgba(0, 242, 254, 0.2)';
-              btn.style.color = 'var(--color-cyan)';
-              btn.style.borderColor = 'rgba(0, 242, 254, 0.4)';
-            }
-            return;
-          }
-
-          // Card or Sing button clicked:
-          selectSong(song, true);
-          if (e.target.closest('.btn-icon-sing')) {
-            toggleMusicPlayback();
-          }
-        });
-      });
     } catch (e) {
-      console.error("Error rendering Cloud Hosting list:", e);
-      if (cloudListContainer) {
-        cloudListContainer.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">🌐</div>
-            <h4>Server Belum Terhubung</h4>
-            <p style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 12px;">Pastikan koneksi internet aktif atau periksa URL endpoint hosting Anda.</p>
-            <div class="empty-actions">
-              <button type="button" class="btn btn-primary btn-sm" onclick="window.toggleServerConfigDrawer && window.toggleServerConfigDrawer(event)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                <span>Atur Endpoint Server</span>
-              </button>
-            </div>
-          </div>
-        `;
+      console.warn("Background cloud hosting refresh notice:", e);
+      if (initialList.length > 0) {
+        updateServerStatusUI(hostingService.isConnected, initialList.length);
+        renderCloudCards(initialList);
       }
     }
   }
 
+  let cloudSearchDebounceTimer = null;
   if (cloudSearchInput) {
     cloudSearchInput.addEventListener('input', () => {
-      renderCloudSongList();
+      clearTimeout(cloudSearchDebounceTimer);
+      cloudSearchDebounceTimer = setTimeout(() => {
+        renderCloudSongList();
+      }, 300);
     });
   }
 
@@ -2387,18 +2691,60 @@ async function initApp() {
     }
   });
 
-  // --- INITIALIZE UI ---
-  renderSongList();
-  renderRecordingsList();
-  renderCloudSongList().then(() => {
+  // --- REACTIVE DB EVENT LISTENERS ---
+  // Ensure that whenever songs or recordings are loaded/updated from IndexedDB, UI updates immediately
+  window.addEventListener('sushee:songsLoaded', () => {
     renderSongList();
-    // Select first real cloud song by default if available
-    if (!currentSong && hostingService.cachedSongs && hostingService.cachedSongs.length > 0) {
-      selectSong(hostingService.cachedSongs[0], false);
-    } else if (!currentSong && storageScanner.songs.length > 0) {
+    if (!currentSong && storageScanner.songs && storageScanner.songs.length > 0) {
       selectSong(storageScanner.songs[0], false);
     }
   });
+
+  window.addEventListener('sushee:recordingsLoaded', () => {
+    renderRecordingsList();
+  });
+
+  // --- INITIALIZE UI ---
+  // 1. Wait briefly (up to 500ms) for local IndexedDB to load cached songs & recordings so initial render isn't empty
+  try {
+    await Promise.race([
+      Promise.allSettled([
+        (storageScanner && storageScanner.ready) || Promise.resolve(),
+        (recorder && recorder.ready) || Promise.resolve()
+      ]),
+      new Promise(resolve => setTimeout(resolve, 500))
+    ]);
+  } catch (e) {}
+
+  // 2. Immediate First Render from Local & Cached Data
+  renderSongList();
+  renderRecordingsList();
+  updateServerStatusUI(hostingService.isConnected, (hostingService.cachedSongs && hostingService.cachedSongs.length) || 0);
+
+  // 3. Immediately select a default song if available from local or cached cloud library
+  if (!currentSong) {
+    if (storageScanner.songs && storageScanner.songs.length > 0) {
+      selectSong(storageScanner.songs[0], false);
+    } else if (hostingService.cachedSongs && hostingService.cachedSongs.length > 0) {
+      selectSong(hostingService.cachedSongs[0], false);
+    }
+  }
+
+  // 4. Background Cloud Sync: query remote hosting without blocking or hiding local songs
+  renderCloudSongList()
+    .catch(err => {
+      console.warn("Background cloud songs check error:", err);
+    })
+    .finally(() => {
+      renderSongList();
+      if (!currentSong) {
+        if (storageScanner.songs && storageScanner.songs.length > 0) {
+          selectSong(storageScanner.songs[0], false);
+        } else if (hostingService.cachedSongs && hostingService.cachedSongs.length > 0) {
+          selectSong(hostingService.cachedSongs[0], false);
+        }
+      }
+    });
 }
 
 // Ensure initApp runs whether DOM is loading or already ready

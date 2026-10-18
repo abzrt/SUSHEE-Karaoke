@@ -3260,6 +3260,8 @@ select.form-input:disabled {
   border-radius: var(--border-radius-md);
   margin-bottom: 14px;
   border: 1px solid var(--border-subtle);
+  position: relative;
+  z-index: 10;
 }
 
 .studio-subtab {
@@ -3278,6 +3280,16 @@ select.form-input:disabled {
   gap: 6px;
   transition: all 0.2s ease;
   white-space: nowrap;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  position: relative;
+  z-index: 10;
+}
+
+.studio-subtab * {
+  pointer-events: none;
 }
 
 .studio-subtab.active {
@@ -3316,16 +3328,19 @@ select.form-input:disabled {
   margin-top: 0 !important;
 }
 
-/* 5. Cloud Hosting Playlist Styling */
+/* 5. Songs Playlist & Cloud Playlist Styling */
+.songs-playlist-card,
 .cloud-playlist-card {
-  background: linear-gradient(135deg, rgba(0, 242, 254, 0.12) 0%, rgba(121, 40, 202, 0.12) 100%);
-  border: 1px solid rgba(0, 242, 254, 0.3);
+  background: linear-gradient(135deg, rgba(0, 242, 254, 0.12) 0%, rgba(121, 40, 202, 0.14) 100%);
+  border: 1px solid rgba(0, 242, 254, 0.35);
   border-radius: var(--border-radius-md);
   padding: 14px;
   margin-top: 14px;
-  box-shadow: var(--shadow-card);
+  margin-bottom: 4px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
 }
 
+.songs-playlist-header,
 .cloud-playlist-header {
   display: flex;
   align-items: center;
@@ -3333,21 +3348,25 @@ select.form-input:disabled {
   gap: 10px;
 }
 
+.songs-playlist-badge,
 .cloud-playlist-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   color: var(--color-cyan);
   font-weight: 700;
-  font-size: 0.88rem;
+  font-size: 0.92rem;
+  letter-spacing: -0.2px;
 }
 
+.songs-playlist-now,
 .cloud-playlist-now {
   font-size: 0.74rem;
   color: var(--text-secondary);
   margin-top: 2px;
 }
 
+.songs-playlist-actions,
 .cloud-playlist-actions {
   display: flex;
   align-items: center;
@@ -3358,6 +3377,138 @@ select.form-input:disabled {
   font-size: 0.78rem;
   padding: 7px 12px;
   white-space: nowrap;
+}
+
+/* Playback Mode Buttons (Berurut, Acak, Ulangi 1) */
+.playlist-mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--border-radius-sm);
+}
+
+.playlist-mode-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.playlist-mode-buttons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.btn-mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-mode-pill:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.btn-mode-pill.active {
+  background: rgba(0, 242, 254, 0.2);
+  border-color: rgba(0, 242, 254, 0.6);
+  color: var(--color-cyan);
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
+  font-weight: 700;
+}
+
+/* Single Unified Playlist Controller Row */
+.songs-playlist-controller {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: rgba(14, 18, 30, 0.95);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.playlist-current-track {
+  flex: 1;
+  min-width: 0;
+}
+
+.playlist-track-title {
+  display: block;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.playlist-track-artist {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--color-cyan);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.playlist-transport-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-transport {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-transport:active {
+  transform: scale(0.92);
+}
+
+.btn-transport-play {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+  border: none;
+  color: #07080d;
+  box-shadow: 0 0 14px rgba(0, 242, 254, 0.5);
+}
+
+.btn-transport-play:hover {
+  box-shadow: 0 0 18px rgba(0, 242, 254, 0.75);
 }
 
 .cloud-playlist-miniplayer {
@@ -3426,6 +3577,7 @@ select.form-input:disabled {
   color: #ffffff;
 }
 
+.songs-playlist-queue,
 .cloud-playlist-queue {
   margin-top: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);

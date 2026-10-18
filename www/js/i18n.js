@@ -14,7 +14,7 @@ const translations = {
     splashStatusSync: "Menyiapkan Pemutar Musik & Dual Sync...",
     splashStatusReady: "Siap Bernyanyi!",
     navSongs: "Lagu",
-    navCloud: "Cloud Hosting",
+    navCloud: "Cloud",
     navKaraoke: "Karaoke",
     navRecordings: "Rekaman",
     navSettings: "Setelan",
@@ -138,16 +138,26 @@ const translations = {
     speedHint: "Perlambat atau percepat musik pengiring secara presisi (0.75x s/d 1.35x)",
     speedNormal: "1.00x (Normal)",
 
-    // Cloud Playlist (Listening Only)
-    cloudPlaylistTitle: "Playlist Cloud (Dengar Lagu)",
-    cloudPlaylistSubtitle: "Putar lagu berturut-turut di latar belakang",
+    // Songs Playlist (Listening Only)
+    songsPlaylistTitle: "Songs Playlist",
+    songsPlaylistSubtitle: "Mode dengar lagu berturut-turut tanpa vokal mic",
+    cloudPlaylistTitle: "Songs Playlist",
+    cloudPlaylistSubtitle: "Mode dengar lagu berturut-turut tanpa vokal mic",
+    modeSequential: "Berurut",
+    modeShuffle: "Acak",
+    modeRepeatOne: "Ulangi 1",
+    toastModeSequential: "Mode putar: Berurut (Sequential)",
+    toastModeShuffle: "Mode putar: Acak (Shuffle)",
+    toastModeRepeatOne: "Mode putar: Ulangi 1 lagu saja (Repeat One)",
+    btnAddAllToPlaylist: "+ Masukkan Semua",
+    btnAddedAllToPlaylist: "Semua {count} lagu dimasukkan ke Songs Playlist",
     btnAddToPlaylist: "+ Playlist",
     btnAddedToPlaylist: "✓ Di Playlist",
-    btnPlayAllCloud: "▶ Putar Semua",
+    btnPlayAllCloud: "▶ Putar",
     btnOpenPlaylist: "Daftar Putar",
     btnClearPlaylist: "Kosongkan",
-    playlistEmpty: "Playlist masih kosong. Ketuk '+ Playlist' pada lagu di atas.",
-    nowPlayingPlaylist: "Sedang Memutar Playlist Cloud",
+    playlistEmpty: "Playlist masih kosong. Ketuk '+ Playlist' pada lagu di bawah.",
+    nowPlayingPlaylist: "Sedang Memutar Songs Playlist",
     playlistCount: "{count} Lagu",
     
     // Lyrics Viewer
@@ -155,6 +165,9 @@ const translations = {
     lyricsNotFound: "Lirik sinkronisasi (.lrc) belum tersedia untuk lagu ini.",
     btnAddLyricsManual: "Unggah File .LRC",
     lyricSyncHint: "Lirik akan otomatis tersinkronisasi mengikuti ketukan lagu",
+    badgeHasLyrics: "Ada Lirik (.LRC)",
+    badgeNoLyrics: "Tanpa Lirik",
+    btnSingNow: "Nyalakan Karaoke",
     
     // Recordings & Preview Modal
     recordingsTitle: "Hasil Rekaman Saya",
@@ -257,7 +270,7 @@ const translations = {
     splashStatusSync: "Preparing Music Player & Dual Sync...",
     splashStatusReady: "Ready to Sing!",
     navSongs: "Songs",
-    navCloud: "Cloud Hosting",
+    navCloud: "Cloud",
     navKaraoke: "Karaoke",
     navRecordings: "Recordings",
     navSettings: "Settings",
@@ -381,16 +394,26 @@ const translations = {
     speedHint: "Slow down or speed up the backing track accurately (0.75x to 1.35x)",
     speedNormal: "1.00x (Normal)",
 
-    // Cloud Playlist (Listening Only)
-    cloudPlaylistTitle: "Cloud Playlist (Music Listening)",
-    cloudPlaylistSubtitle: "Stream songs sequentially in background",
+    // Songs Playlist (Listening Only)
+    songsPlaylistTitle: "Songs Playlist",
+    songsPlaylistSubtitle: "Sequential listening mode without mic vocals",
+    cloudPlaylistTitle: "Songs Playlist",
+    cloudPlaylistSubtitle: "Sequential listening mode without mic vocals",
+    modeSequential: "Sequential",
+    modeShuffle: "Shuffle",
+    modeRepeatOne: "Repeat 1",
+    toastModeSequential: "Playback mode: Sequential",
+    toastModeShuffle: "Playback mode: Shuffle",
+    toastModeRepeatOne: "Playback mode: Repeat One",
+    btnAddAllToPlaylist: "+ Add All",
+    btnAddedAllToPlaylist: "All {count} songs added to Songs Playlist",
     btnAddToPlaylist: "+ Playlist",
     btnAddedToPlaylist: "✓ In Playlist",
-    btnPlayAllCloud: "▶ Play All",
+    btnPlayAllCloud: "▶ Play",
     btnOpenPlaylist: "Queue List",
     btnClearPlaylist: "Clear",
-    playlistEmpty: "Playlist is empty. Tap '+ Playlist' on songs above.",
-    nowPlayingPlaylist: "Now Playing Cloud Playlist",
+    playlistEmpty: "Playlist is empty. Tap '+ Playlist' on songs below.",
+    nowPlayingPlaylist: "Now Playing Songs Playlist",
     playlistCount: "{count} Songs",
     
     // Lyrics Viewer
@@ -398,6 +421,9 @@ const translations = {
     lyricsNotFound: "Synchronized lyric (.lrc) is not attached to this song yet.",
     btnAddLyricsManual: "Upload .LRC File",
     lyricSyncHint: "Lyrics will automatically scroll and highlight with the rhythm",
+    badgeHasLyrics: "Has Lyrics (.LRC)",
+    badgeNoLyrics: "No Lyrics",
+    btnSingNow: "Sing Karaoke",
     
     // Recordings & Preview Modal
     recordingsTitle: "My Recordings",

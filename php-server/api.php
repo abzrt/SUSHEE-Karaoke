@@ -21,8 +21,8 @@ header("Access-Control-Allow-Headers: Range, Content-Type, Authorization");
 header("Access-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges");
 header("Content-Type: application/json; charset=UTF-8");
 
-// Tangani HTTP OPTIONS preflight request
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+// Tangani HTTP OPTIONS preflight & HEAD health check request secara instan
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS' || $_SERVER['REQUEST_METHOD'] === 'HEAD') {
     http_response_code(200);
     exit;
 }
@@ -30,6 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // 1. Deteksi protokol URL (http:// atau https://)
 $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') 
     || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+    || (isset($_SERVER['HTTP_CF_VISITOR']) && strpos($_SERVER['HTTP_CF_VISITOR'], '"scheme":"https"') !== false)
+    || (isset($_SERVER['HTTP_X_FORWARDED_SSL']) && $_SERVER['HTTP_X_FORWARDED_SSL'] === 'on')
     || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443);
 
 $protocol = $isHttps ? "https://" : "http://";

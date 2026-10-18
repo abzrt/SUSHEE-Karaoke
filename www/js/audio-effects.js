@@ -54,7 +54,9 @@ class AudioEffectsEngine {
 
     // Music Pitch Transpose (-6 to +6 semitones) and Speed/Tempo (0.75x to 1.5x)
     this.musicPitch = parseInt(localStorage.getItem('sushee_music_pitch') || '0', 10) || 0;
+    this.musicPitchShift = this.musicPitch;
     this.musicSpeed = parseFloat(localStorage.getItem('sushee_music_speed') || '1.0') || 1.0;
+    this.musicPlaybackSpeed = this.musicSpeed;
     this.pitchShifter = null;
 
     // Default balanced backing track level (0.85 = 85%) for clear, loud playback
@@ -77,6 +79,14 @@ class AudioEffectsEngine {
   }
 
   async resumeContext() {
+    if (!this.audioCtx || this.audioCtx.state === 'closed') {
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        this.audioCtx = new AudioContextClass({ latencyHint: 'interactive' });
+      } catch (e) {
+        console.warn("Could not recreate AudioContext:", e);
+      }
+    }
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
       try {
         await this.audioCtx.resume();
@@ -191,8 +201,12 @@ class AudioEffectsEngine {
       this.pitchShifter.output.connect(this.musicMixGain);
       this.musicMixGain.connect(this.musicAnalyser);
 
-      // Route directly to Master Audio Destination for full clarity & zero distortion
-      this.musicMixGain.connect(this.audioCtx.destination);
+      // Route directly to Master Audio Destination with anti-clipping limiter protection
+      if (this.masterSpeakerGain) {
+        this.musicMixGain.connect(this.masterSpeakerGain);
+      } else {
+        this.musicMixGain.connect(this.audioCtx.destination);
+      }
       
       // Delay Node for Latency Alignment
       this.musicDelayNode = this.audioCtx.createDelay(1.0);
@@ -627,6 +641,7 @@ class AudioEffectsEngine {
   setMusicPitch(semitones) {
     const val = Math.max(-6, Math.min(6, parseInt(semitones, 10) || 0));
     this.musicPitch = val;
+    this.musicPitchShift = val;
     if (this.pitchShifter) {
       this.pitchShifter.setPitch(val);
     }
@@ -641,6 +656,7 @@ class AudioEffectsEngine {
     // Round to nearest 0.05
     const rounded = Math.round(s * 20) / 20;
     this.musicSpeed = rounded;
+    this.musicPlaybackSpeed = rounded;
     if (this.musicElement) {
       try {
         this.musicElement.preservesPitch = true;
@@ -847,6 +863,7 @@ class WebAudioPitchShifter {
     this.input = audioCtx.createGain();
     this.output = audioCtx.createGain();
     this.pitchSemitones = 0;
+    this.pitchRatio = 1.0;
 
     // Dry bypass gain (1.0 when 0 semitones)
     this.dryGain = audioCtx.createGain();
@@ -856,8 +873,8 @@ class WebAudioPitchShifter {
     this.wetGain = audioCtx.createGain();
     this.wetGain.gain.value = 0.0;
 
-    // 60ms grain window provides crystal clear audio without phase smearing or distortion
-    this.bufferTime = 0.06;
+    // 120ms grain window provides crystal clear audio without phase smearing, flutter, or robotic distortion
+    this.bufferTime = 0.12;
 
     this.delay1 = audioCtx.createDelay(1.0);
     this.delay2 = audioCtx.createDelay(1.0);
@@ -866,8 +883,8 @@ class WebAudioPitchShifter {
 
     this.delay1.delayTime.value = 0;
     this.delay2.delayTime.value = 0;
-    this.fadeGain1.gain.value = 0.5;
-    this.fadeGain2.gain.value = 0.5;
+    this.fadeGain1.gain.value = 0.0;
+    this.fadeGain2.gain.value = 0.0;
 
     // Audio Graph Connections
     this.input.connect(this.dryGain);
@@ -891,20 +908,44 @@ class WebAudioPitchShifter {
     this.stopModulation();
     if (!this.audioCtx || this.pitchSemitones === 0) {
       if (this.dryGain && this.wetGain) {
-        this.dryGain.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
-        this.wetGain.gain.setValueAtTime(0.0, this.audioCtx.currentTime);
+        try {
+          this.dryGain.gain.setValueAtTime(1.0, this.audioCtx.currentTime || 0);
+        } catch (e) {}
+        this.dryGain.gain.value = 1.0;
+        try {
+          this.wetGain.gain.setValueAtTime(0.0, this.audioCtx.currentTime || 0);
+        } catch (e) {}
+        this.wetGain.gain.value = 0.0;
+        if (this.fadeGain1) this.fadeGain1.gain.value = 0.0;
+        if (this.fadeGain2) this.fadeGain2.gain.value = 0.0;
+        if (this.delay1) this.delay1.delayTime.value = 0.0;
+        if (this.delay2) this.delay2.delayTime.value = 0.0;
       }
       return;
     }
 
-    this.dryGain.gain.setValueAtTime(0.0, this.audioCtx.currentTime);
-    this.wetGain.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
+    try {
+      this.dryGain.gain.setValueAtTime(0.0, this.audioCtx.currentTime || 0);
+    } catch (e) {}
+    this.dryGain.gain.value = 0.0;
+    try {
+      this.wetGain.gain.setValueAtTime(1.0, this.audioCtx.currentTime || 0);
+    } catch (e) {}
+    this.wetGain.gain.value = 1.0;
 
     const pitchRatio = Math.pow(2, this.pitchSemitones / 12);
+    this.pitchRatio = pitchRatio;
     const delta = pitchRatio - 1;
     if (Math.abs(delta) < 0.001) {
-      this.dryGain.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
-      this.wetGain.gain.setValueAtTime(0.0, this.audioCtx.currentTime);
+      this.pitchRatio = 1.0;
+      try {
+        this.dryGain.gain.setValueAtTime(1.0, this.audioCtx.currentTime || 0);
+      } catch (e) {}
+      this.dryGain.gain.value = 1.0;
+      try {
+        this.wetGain.gain.setValueAtTime(0.0, this.audioCtx.currentTime || 0);
+      } catch (e) {}
+      this.wetGain.gain.value = 0.0;
       return;
     }
 
