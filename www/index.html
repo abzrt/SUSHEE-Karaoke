@@ -17,7 +17,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- App Stylesheet -->
-  <link rel="stylesheet" href="css/style.css?v=songsplay_1792345919282">
+  <link rel="stylesheet" href="css/style.css?v=playlist_fix_v2_1792407063603">
 </head>
 <body>
 
@@ -77,8 +77,19 @@
       };
 
       // Global fail-safe studio subtab switcher (vocalFX, pitch & speed, latency sync)
+            // Global fail-safe playlist toggle bridge
+      window.toggleSongsPlaylist = function(songOrId, showToast, event) {
+        if (event) {
+          try { event.preventDefault(); event.stopPropagation(); } catch (e) {}
+        }
+        if (typeof window._toggleSongsPlaylistImpl === 'function') {
+          return window._toggleSongsPlaylistImpl(songOrId, showToast !== false, event);
+        }
+      };
+
       window.switchStudioSubtab = function(tabName) {
         if (!tabName) return;
+        try { localStorage.setItem('sushee_active_studio_subtab', tabName); } catch (e) {}
         document.querySelectorAll('.studio-subtab').forEach(function(btn) {
           var match = btn.getAttribute('data-subtab') === tabName;
           if (match) {
@@ -356,9 +367,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_b01bf088ba" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_b01bf088ba">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -380,9 +389,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_89eecd0d1e" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_89eecd0d1e">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -404,9 +411,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_9906a40dfb" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_9906a40dfb">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -428,9 +433,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_bc1f817dfc" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_bc1f817dfc">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -452,9 +455,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_19d3d8abca" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_19d3d8abca">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -476,9 +477,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_5ae99b5cd9" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_5ae99b5cd9">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -500,9 +499,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_b85a5fdb34" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_b85a5fdb34">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -524,9 +521,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_0599e4cfef" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_0599e4cfef">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -548,9 +543,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_4799f5eca6" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_4799f5eca6">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -572,9 +565,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_3bd7a2f04f" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_3bd7a2f04f">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -596,9 +587,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_d63c085d7f" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_d63c085d7f">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -620,9 +609,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_9186ff997c" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_9186ff997c">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -644,9 +631,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_915df163e1" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_915df163e1">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -668,9 +653,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_8588ea214a" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_8588ea214a">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -692,9 +675,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_508c760236" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_508c760236">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -716,9 +697,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_69943de0aa" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_69943de0aa">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -740,9 +719,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_eaee005c04" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_eaee005c04">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -764,9 +741,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_bd33acaad7" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_bd33acaad7">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -788,9 +763,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_e8302a3d81" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_e8302a3d81">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -812,9 +785,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_b08d0022c0" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_b08d0022c0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -836,9 +807,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_9793ecd8fd" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_9793ecd8fd">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -860,9 +829,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_a8929028be" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_a8929028be">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -884,9 +851,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_dc3572ab65" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_dc3572ab65">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -908,9 +873,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_045b6ee969" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_045b6ee969">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -932,9 +895,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_bd9d6504c3" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_bd9d6504c3">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -956,9 +917,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_4d519fa5f1" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_4d519fa5f1">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -980,9 +939,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_ce56b24af7" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_ce56b24af7">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1004,9 +961,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_60cad41260" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_60cad41260">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1028,9 +983,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_977771d5f4" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_977771d5f4">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1052,9 +1005,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_d2e73b2f7f" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_d2e73b2f7f">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1076,9 +1027,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_7f7a881100" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_7f7a881100">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1100,9 +1049,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_235a7bc194" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_235a7bc194">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1124,9 +1071,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_c71d4c81ae" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_c71d4c81ae">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1148,9 +1093,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_f6e2460f4b" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_f6e2460f4b">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1172,9 +1115,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_ecac2ef1ea" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_ecac2ef1ea">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1196,9 +1137,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_8cc3345dce" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_8cc3345dce">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1220,9 +1159,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_9eb09c0e50" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_9eb09c0e50">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1244,9 +1181,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_c02694194c" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_c02694194c">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1268,9 +1203,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_600be9af09" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_600be9af09">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1292,9 +1225,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_fb55b210c3" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_fb55b210c3">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1316,9 +1247,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_3216e929d8" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_3216e929d8">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1340,9 +1269,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_8cd244a55f" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_8cd244a55f">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1364,9 +1291,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_766b7a8537" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_766b7a8537">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1388,9 +1313,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_c1b3bffd86" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_c1b3bffd86">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1412,9 +1335,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_68ca386b85" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_68ca386b85">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1436,9 +1357,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_a20c8dcb4a" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_a20c8dcb4a">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1460,9 +1379,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_fc96bbf2bb" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_fc96bbf2bb">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1484,9 +1401,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_97f59da524" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_97f59da524">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1508,9 +1423,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_c37927c888" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_c37927c888">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1532,9 +1445,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_5eb01aab4e" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_5eb01aab4e">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1556,9 +1467,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_d9527c4b54" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_d9527c4b54">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1580,9 +1489,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_c561327c8d" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_c561327c8d">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1604,9 +1511,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_3ff8bcd204" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_3ff8bcd204">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1628,9 +1533,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_cdc665c398" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_cdc665c398">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1652,9 +1555,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_21b4d33a88" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_21b4d33a88">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1676,9 +1577,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_cbb0f6c27b" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_cbb0f6c27b">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1700,9 +1599,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_e93bd9a195" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_e93bd9a195">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1724,9 +1621,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_853bda165c" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_853bda165c">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -1748,9 +1643,7 @@
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-            <button class="btn btn-sm btn-songs-playlist-add" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: rgba(255, 255, 255, 0.08); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 8px;">
-              + Playlist
-            </button>
+            <button type="button" class="btn btn-sm btn-songs-playlist-add" data-song-id="host_5421f3cd7d" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist(this.getAttribute('data-song-id'), true, event)" title="Tambah ke Playlist Dengar">+ Playlist</button>
             <button class="btn-icon-sing" title="Nyalakan Karaoke" data-song-id="host_5421f3cd7d">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </button>
@@ -3183,13 +3076,13 @@
               
               <!-- Tab Switcher for Easy Navigation Inside Combined Group -->
               <div class="studio-subtabs-bar" role="tablist">
-                <button type="button" class="studio-subtab active" id="subtabBtnVocal" data-subtab="vocalTab" role="tab" aria-selected="true" onclick="window.switchStudioSubtab && window.switchStudioSubtab('vocalTab')" ontouchend="window.switchStudioSubtab && window.switchStudioSubtab('vocalTab')">
+                <button type="button" class="studio-subtab active" id="subtabBtnVocal" data-subtab="vocalTab" role="tab" aria-selected="true" onclick="window.switchStudioSubtab && window.switchStudioSubtab('vocalTab')">
                   <span>🎤</span> <span data-i18n="tabVocalFX">Efek Vokal</span>
                 </button>
-                <button type="button" class="studio-subtab" id="subtabBtnPitch" data-subtab="pitchTab" role="tab" aria-selected="false" onclick="window.switchStudioSubtab && window.switchStudioSubtab('pitchTab')" ontouchend="window.switchStudioSubtab && window.switchStudioSubtab('pitchTab')">
+                <button type="button" class="studio-subtab" id="subtabBtnPitch" data-subtab="pitchTab" role="tab" aria-selected="false" onclick="window.switchStudioSubtab && window.switchStudioSubtab('pitchTab')">
                   <span>🎛️</span> <span data-i18n="tabMusicPitch">Pitch & Musik</span>
                 </button>
-                <button type="button" class="studio-subtab" id="subtabBtnSync" data-subtab="syncTab" role="tab" aria-selected="false" onclick="window.switchStudioSubtab && window.switchStudioSubtab('syncTab')" ontouchend="window.switchStudioSubtab && window.switchStudioSubtab('syncTab')">
+                <button type="button" class="studio-subtab" id="subtabBtnSync" data-subtab="syncTab" role="tab" aria-selected="false" onclick="window.switchStudioSubtab && window.switchStudioSubtab('syncTab')">
                   <span>⚡</span> <span data-i18n="tabLatency">Sinkronisasi</span>
                 </button>
               </div>
@@ -3878,16 +3771,16 @@ echo json_encode(['status' => 'success', 'server' => 'SUSHEE PHP Hosting Server'
   </div>
 
   <!-- App Scripts in Correct Dependency Order -->
-  <script src="js/lame.min.js?v=songsplay_1792345919282"></script>
-  <script src="js/i18n.js?v=songsplay_1792345919282"></script>
-  <script src="js/lrc-parser.js?v=songsplay_1792345919282"></script>
-  <script src="js/audio-effects.js?v=songsplay_1792345919282"></script>
-  <script src="js/storage-scanner.js?v=songsplay_1792345919282"></script>
-  <script src="js/recorder.js?v=songsplay_1792345919282"></script>
-  <script src="js/visualizer.js?v=songsplay_1792345919282"></script>
-  <script src="js/cloud-catalog.js?v=songsplay_1792345919282"></script>
-  <script src="js/hosting-service.js?v=songsplay_1792345919282"></script>
-  <script src="js/app.js?v=songsplay_1792345919282"></script>
+  <script src="js/lame.min.js?v=playlist_fix_v2_1792407063603"></script>
+  <script src="js/i18n.js?v=playlist_fix_v2_1792407063603"></script>
+  <script src="js/lrc-parser.js?v=playlist_fix_v2_1792407063603"></script>
+  <script src="js/audio-effects.js?v=playlist_fix_v2_1792407063603"></script>
+  <script src="js/storage-scanner.js?v=playlist_fix_v2_1792407063603"></script>
+  <script src="js/recorder.js?v=playlist_fix_v2_1792407063603"></script>
+  <script src="js/visualizer.js?v=playlist_fix_v2_1792407063603"></script>
+  <script src="js/cloud-catalog.js?v=playlist_fix_v2_1792407063603"></script>
+  <script src="js/hosting-service.js?v=playlist_fix_v2_1792407063603"></script>
+  <script src="js/app.js?v=playlist_fix_v2_1792407063603"></script>
 
 </body>
 </html>

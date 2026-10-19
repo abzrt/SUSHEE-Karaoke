@@ -2994,6 +2994,8 @@ select.form-input:disabled {
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -3013,6 +3015,55 @@ select.form-input:disabled {
   color: var(--color-cyan, #00f2fe);
   font-weight: 700;
 }
+
+/* Playlist Add / In-Playlist Button States for Tab Lagu & Cloud */
+.btn-songs-playlist-add,
+.btn-cloud-playlist-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 10px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-songs-playlist-add:hover,
+.btn-cloud-playlist-add:hover {
+  background: rgba(0, 242, 254, 0.15);
+  border-color: rgba(0, 242, 254, 0.35);
+  color: var(--color-cyan, #00f2fe);
+}
+
+.btn-songs-playlist-add.in-playlist,
+.btn-cloud-playlist-add.in-playlist {
+  background: rgba(0, 242, 254, 0.22) !important;
+  color: var(--color-cyan, #00f2fe) !important;
+  border: 1px solid rgba(0, 242, 254, 0.5) !important;
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.25);
+  font-weight: 700;
+}
+
+@keyframes badgePulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 rgba(0, 242, 254, 0); }
+  50% { transform: scale(1.35); box-shadow: 0 0 14px rgba(0, 242, 254, 0.7); }
+  100% { transform: scale(1); box-shadow: 0 0 0 rgba(0, 242, 254, 0); }
+}
+
+.pulse-badge {
+  animation: badgePulse 0.4s ease-out;
+}
+
 
 .slider-scale-row {
   display: flex;
