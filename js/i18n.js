@@ -135,7 +135,7 @@ const translations = {
     pitchResetBtn: "0 Normal",
     pitchUpBtn: "♯ Naik (+1)",
     musicSpeed: "Kecepatan Lagu (Tempo / Speed)",
-    speedHint: "Perlambat atau percepat musik pengiring secara presisi (0.75x s/d 1.35x)",
+    speedHint: "Perlambat atau percepat musik pengiring secara presisi (0.75x s/d 1.25x)",
     speedNormal: "1.00x (Normal)",
 
     // Songs Playlist (Listening Only)
@@ -391,7 +391,7 @@ const translations = {
     pitchResetBtn: "0 Normal",
     pitchUpBtn: "♯ Up (+1)",
     musicSpeed: "Playback Speed (Tempo)",
-    speedHint: "Slow down or speed up the backing track accurately (0.75x to 1.35x)",
+    speedHint: "Slow down or speed up the backing track accurately (0.75x to 1.25x)",
     speedNormal: "1.00x (Normal)",
 
     // Songs Playlist (Listening Only)

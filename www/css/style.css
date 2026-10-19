@@ -1482,12 +1482,8 @@ button,
   pointer-events: auto !important;
 }
 
-button svg,
-button path,
-button span,
-.btn svg,
-.btn path,
-.btn span,
+button *,
+.btn *,
 .lang-btn *,
 .filter-chip *,
 .preset-btn *,
@@ -3083,9 +3079,9 @@ select.form-input:disabled {
   letter-spacing: 0.2px;
 }
 
-/* Prevent accidental horizontal drag on range inputs while scrolling vertically */
+/* Allow smooth horizontal sliding and dragging on mobile touchscreens */
 .custom-range {
-  touch-action: pan-y !important;
+  touch-action: pan-x manipulation !important;
 }
 
 .time-row,

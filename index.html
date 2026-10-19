@@ -17,7 +17,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- App Stylesheet -->
-  <link rel="stylesheet" href="css/style.css?v=playlist_fix_v2_1792407063603">
+  <link rel="stylesheet" href="css/style.css?v=touch_fix_v3_1792439900000">
 </head>
 <body>
 
@@ -1703,6 +1703,9 @@
               <button type="button" class="btn btn-secondary btn-sm" id="btnRefreshCloudSongs" onclick="window.refreshCloudSongs && window.refreshCloudSongs()" title="Segarkan">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               </button>
+            </div>
+          </div>
+        </div>
 
         <!-- Search Bar -->
         <div class="search-wrapper" style="margin-top: 14px;">
@@ -3209,7 +3212,7 @@
                     <div class="slider-label-row">
                       <div>
                         <span class="slider-title" data-i18n="musicSpeed">Kecepatan Lagu (Tempo / Speed)</span>
-                        <p class="slider-subhint" data-i18n="speedHint">Perlambat atau percepat musik pengiring secara presisi (0.75x s/d 1.35x)</p>
+                        <p class="slider-subhint" data-i18n="speedHint">Perlambat atau percepat musik pengiring secara presisi (0.75x s/d 1.25x)</p>
                       </div>
                       <span class="slider-val-badge speed-badge" id="musicSpeedVal">1.00x (Normal)</span>
                     </div>
@@ -3224,11 +3227,11 @@
                         <span>+ 0.05x</span>
                       </button>
                     </div>
-                    <input type="range" class="custom-range" id="musicSpeedSlider" min="0.75" max="1.35" step="0.05" value="1.0">
+                    <input type="range" class="custom-range" id="musicSpeedSlider" min="0.75" max="1.25" step="0.05" value="1.0">
                     <div class="slider-scale-row">
                       <span>0.75x (Lambat)</span>
                       <span style="color: var(--color-cyan); font-weight: 700;">1.00x (Normal)</span>
-                      <span>1.35x (Cepat)</span>
+                      <span>1.25x (Cepat)</span>
                     </div>
                   </div>
 
@@ -3626,8 +3629,8 @@
             </p>
             <pre style="background: rgba(0,0,0,0.5); padding: 8px; border-radius: 6px; font-size: 0.75rem; color: #a5f3fc;">public_html/
 └── karaoke/
-    ├── api.php      <-- script di bawah
-    └── songs/        <-- file .mp3 & .lrc</pre>
+    ├── api.php      &lt;-- script di bawah
+    └── songs/        &lt;-- file .mp3 &amp; .lrc</pre>
           </div>
 
           <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-subtle); border-radius: var(--border-radius-sm); padding: 12px; margin-bottom: 14px;">
@@ -3771,16 +3774,16 @@ echo json_encode(['status' => 'success', 'server' => 'SUSHEE PHP Hosting Server'
   </div>
 
   <!-- App Scripts in Correct Dependency Order -->
-  <script src="js/lame.min.js?v=playlist_fix_v2_1792407063603"></script>
-  <script src="js/i18n.js?v=playlist_fix_v2_1792407063603"></script>
-  <script src="js/lrc-parser.js?v=playlist_fix_v2_1792407063603"></script>
-  <script src="js/audio-effects.js?v=playlist_fix_v2_1792407063603"></script>
-  <script src="js/storage-scanner.js?v=playlist_fix_v2_1792407063603"></script>
-  <script src="js/recorder.js?v=playlist_fix_v2_1792407063603"></script>
-  <script src="js/visualizer.js?v=playlist_fix_v2_1792407063603"></script>
-  <script src="js/cloud-catalog.js?v=playlist_fix_v2_1792407063603"></script>
-  <script src="js/hosting-service.js?v=playlist_fix_v2_1792407063603"></script>
-  <script src="js/app.js?v=playlist_fix_v2_1792407063603"></script>
+  <script src="js/lame.min.js?v=touch_fix_v3_1792439900000"></script>
+  <script src="js/i18n.js?v=touch_fix_v3_1792439900000"></script>
+  <script src="js/lrc-parser.js?v=touch_fix_v3_1792439900000"></script>
+  <script src="js/audio-effects.js?v=touch_fix_v3_1792439900000"></script>
+  <script src="js/storage-scanner.js?v=touch_fix_v3_1792439900000"></script>
+  <script src="js/recorder.js?v=touch_fix_v3_1792439900000"></script>
+  <script src="js/visualizer.js?v=touch_fix_v3_1792439900000"></script>
+  <script src="js/cloud-catalog.js?v=touch_fix_v3_1792439900000"></script>
+  <script src="js/hosting-service.js?v=touch_fix_v3_1792439900000"></script>
+  <script src="js/app.js?v=touch_fix_v3_1792439900000"></script>
 
 </body>
 </html>

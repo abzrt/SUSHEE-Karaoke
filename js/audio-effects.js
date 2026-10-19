@@ -689,7 +689,7 @@ class AudioEffectsEngine {
   }
 
   setMusicSpeed(speed) {
-    const s = Math.max(0.75, Math.min(1.35, parseFloat(speed) || 1.0));
+    const s = Math.max(0.75, Math.min(1.25, parseFloat(speed) || 1.0));
     // Round to nearest 0.05
     const rounded = Math.round(s * 20) / 20;
     this.musicSpeed = rounded;

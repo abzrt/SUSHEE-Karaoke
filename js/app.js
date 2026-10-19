@@ -292,7 +292,7 @@ async function initApp() {
 
   // --- AUDIO & LYRIC POSITION RESET TO 00:00 ---
   function resetAudioAndLyricsToStart() {
-    if (audioElement) {
+    if (audioElement && audioElement.readyState > 0) {
       try {
         audioElement.currentTime = 0;
       } catch (e) {
@@ -364,6 +364,8 @@ async function initApp() {
     const now = Date.now();
     if (now - lastPlayFromList < 350) return;
     lastPlayFromList = now;
+
+    isSongsPlaylistMode = false;
 
     // 1. Select the song without auto-navigation
     selectSong(song, false);
@@ -1104,6 +1106,8 @@ async function initApp() {
     if (now - lastMusicToggle < 250) return;
     lastMusicToggle = now;
 
+    isSongsPlaylistMode = false;
+
     if (!currentSong) {
       if (hostingService.cachedSongs && hostingService.cachedSongs.length > 0) {
         selectSong(hostingService.cachedSongs[0], false);
@@ -1183,6 +1187,7 @@ async function initApp() {
 
   audioElement.addEventListener('play', () => {
     updateMusicPlayButtonUI(true);
+    if (typeof updatePlaylistPlayButtonUI === 'function') updatePlaylistPlayButtonUI(true);
     if (window.AndroidStorage && typeof window.AndroidStorage.setBackgroundAudioActive === 'function') {
       try { window.AndroidStorage.setBackgroundAudioActive(true); } catch (e) {}
     }
@@ -1191,8 +1196,18 @@ async function initApp() {
 
   audioElement.addEventListener('pause', () => {
     updateMusicPlayButtonUI(false);
+    if (typeof updatePlaylistPlayButtonUI === 'function') updatePlaylistPlayButtonUI(false);
     if (window.AndroidStorage && typeof window.AndroidStorage.setBackgroundAudioActive === 'function') {
       try { window.AndroidStorage.setBackgroundAudioActive(false); } catch (e) {}
+    }
+  });
+
+  audioElement.addEventListener('error', (e) => {
+    console.warn('audioElement playback error:', e);
+    if ((typeof isSongsPlaylistMode !== 'undefined' && isSongsPlaylistMode) && typeof nextSongsPlaylistSong === 'function') {
+      setTimeout(() => {
+        if (typeof nextSongsPlaylistSong === 'function') nextSongsPlaylistSong();
+      }, 1200);
     }
   });
 
@@ -1200,6 +1215,7 @@ async function initApp() {
     isKaraokePlaying = false;
     if (visualizer) visualizer.stop();
     updateMusicPlayButtonUI(false);
+    if (typeof updatePlaylistPlayButtonUI === 'function') updatePlaylistPlayButtonUI(false);
     updateKaraokeUIState(false);
     if (window.AndroidStorage && typeof window.AndroidStorage.setBackgroundAudioActive === 'function') {
       try { window.AndroidStorage.setBackgroundAudioActive(false); } catch (e) {}
@@ -1210,7 +1226,10 @@ async function initApp() {
         audioElement.currentTime = 0;
         audioElement.play().then(() => {
           if (typeof updatePlaylistPlayButtonUI === 'function') updatePlaylistPlayButtonUI(true);
-        }).catch(console.warn);
+        }).catch(err => {
+          console.warn("Repeat playback error, reloading:", err);
+          playSongsPlaylist(songsPlaylistIndex >= 0 ? songsPlaylistIndex : 0);
+        });
       } else {
         nextSongsPlaylistSong();
       }
@@ -1542,7 +1561,7 @@ async function initApp() {
 
     if (!audioEngine) return;
     const current = parseFloat((audioEngine.musicSpeed !== undefined ? audioEngine.musicSpeed : audioEngine.musicPlaybackSpeed) || 1.0);
-    const target = Math.max(0.75, Math.min(1.35, Math.round((current + delta) * 20) / 20));
+    const target = Math.max(0.75, Math.min(1.25, Math.round((current + delta) * 20) / 20));
     audioEngine.setMusicSpeed(target);
     enforcePlaybackSpeed();
     if (musicSpeedSlider) musicSpeedSlider.value = target;
@@ -2507,11 +2526,15 @@ async function initApp() {
   }
   window.updateSongsPlaylistButtonsUI = updateSongsPlaylistButtonsUI;
 
+  let lastPlaylistToggleTime = 0;
+  let lastPlaylistToggleId = null;
+
   function toggleSongsPlaylist(songOrId, showToastNotice = true, event = null) {
     if (event) {
       try {
         event.preventDefault();
         event.stopPropagation();
+        if (event.stopImmediatePropagation) event.stopImmediatePropagation();
       } catch (e) {}
     }
     const song = findSongById(songOrId, (event && event.target) ? event.target.closest('.song-card') : null);
@@ -2519,6 +2542,14 @@ async function initApp() {
       console.warn("toggleSongsPlaylist: could not resolve song from", songOrId);
       return false;
     }
+
+    const songKey = song.id || song.cloudId || song.title;
+    const now = Date.now();
+    if (songKey && songKey === lastPlaylistToggleId && (now - lastPlaylistToggleTime) < 350) {
+      return isSongInPlaylist(song);
+    }
+    lastPlaylistToggleTime = now;
+    lastPlaylistToggleId = songKey;
 
     const existsIdx = songsPlaylist.findIndex(s => s && (
       (s.id && (s.id === song.id || s.cloudId === song.id)) ||
@@ -2690,8 +2721,8 @@ async function initApp() {
     isSongsPlaylistMode = true;
     const song = songsPlaylist[idx];
 
-    if (audioEffectsEngine) {
-      await audioEffectsEngine.setMusicMuted(false);
+    if (audioElement) {
+      audioElement.muted = false;
     }
 
     const trackTitle = document.getElementById('songsPlaylistTrackTitle');
@@ -2704,7 +2735,7 @@ async function initApp() {
 
     try {
       if (audioEngine) {
-        await audioEngine.init();
+        await audioEngine.init(audioElement);
         await audioEngine.resumeContext();
       }
       selectSong(song, false);
@@ -2712,17 +2743,21 @@ async function initApp() {
       if (audioEngine) audioEngine.setMusicSpeed(audioEngine.musicSpeed);
       if (audioElement) {
         enforcePlaybackSpeed();
-        await audioElement.play();
+        const playPromise = audioElement.play();
+        if (playPromise !== undefined) {
+          await playPromise;
+        }
         updatePlaylistPlayButtonUI(true);
       }
       renderSongsPlaylistItems();
     } catch (e) {
       console.warn("Playlist play error:", e);
+      updatePlaylistPlayButtonUI(false);
     }
   }
   window.playSongsPlaylist = playSongsPlaylist;
 
-  function toggleSongsPlaylistPlayback() {
+  async function toggleSongsPlaylistPlayback() {
     if (songsPlaylist.length === 0) {
       const defaultCatalog = (window.SUSHEE_DEFAULT_CLOUD_CATALOG && Array.isArray(window.SUSHEE_DEFAULT_CLOUD_CATALOG)) ? window.SUSHEE_DEFAULT_CLOUD_CATALOG : [];
       const cloudSongs = (hostingService && hostingService.cachedSongs && hostingService.cachedSongs.length > 0) ? hostingService.cachedSongs : defaultCatalog;
@@ -2743,14 +2778,28 @@ async function initApp() {
       }
     }
 
-    if (songsPlaylistIndex === -1) {
-      playSongsPlaylist(0);
+    const currentTargetSong = (songsPlaylistIndex >= 0 && songsPlaylistIndex < songsPlaylist.length) ? songsPlaylist[songsPlaylistIndex] : songsPlaylist[0];
+    const isCurrentTrackLoaded = currentSong && currentTargetSong && (currentSong.id === currentTargetSong.id || audioElement.src === currentTargetSong.audioUrl);
+
+    if (songsPlaylistIndex === -1 || !isCurrentTrackLoaded || !audioElement.src || audioElement.src === '' || audioElement.src === window.location.href || audioElement.error) {
+      playSongsPlaylist(songsPlaylistIndex >= 0 ? songsPlaylistIndex : 0);
       return;
     }
 
     if (audioElement.paused) {
-      audioElement.play().catch(console.warn);
-      updatePlaylistPlayButtonUI(true);
+      try {
+        if (audioEngine) {
+          await audioEngine.init(audioElement);
+          await audioEngine.resumeContext();
+        }
+        audioElement.muted = false;
+        await audioElement.play();
+        enforcePlaybackSpeed();
+        updatePlaylistPlayButtonUI(true);
+      } catch (err) {
+        console.warn('Playback error, reloading track:', err);
+        playSongsPlaylist(songsPlaylistIndex >= 0 ? songsPlaylistIndex : 0);
+      }
     } else {
       audioElement.pause();
       updatePlaylistPlayButtonUI(false);
