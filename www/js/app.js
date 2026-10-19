@@ -84,7 +84,7 @@ async function initApp() {
   window.addEventListener('click', unlockAudioContext, { once: true });
   if (audioElement) {
     try {
-      const vol = (audioEngine.musicVolume !== undefined && !isNaN(audioEngine.musicVolume)) ? audioEngine.musicVolume : 0.85;
+      const vol = (audioEngine.musicVolume !== undefined && !isNaN(audioEngine.musicVolume)) ? audioEngine.musicVolume : 0.35;
       audioElement.volume = Math.max(0, Math.min(1, vol));
     } catch (e) {
       console.warn("Could not set initial audio volume:", e);
@@ -455,17 +455,14 @@ async function initApp() {
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
               <span>${window.i18n.t('btnScanStorage')}</span>
             </button>
-            <button class="btn btn-secondary" id="btnEmptyCloud">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
-              <span>Buka Server Hosting</span>
-            </button>
+            
           </div>
         </div>
       `;
       const emptyScan = document.getElementById('btnEmptyScan');
       if (emptyScan) emptyScan.addEventListener('click', openScanModal);
       const emptyCloud = document.getElementById('btnEmptyCloud');
-      if (emptyCloud) emptyCloud.addEventListener('click', () => switchTab('viewCloud'));
+      if (emptyCloud) emptyCloud.addEventListener('click', () => switchTab('viewSongs'));
       return;
     }
 
@@ -526,7 +523,7 @@ async function initApp() {
   }
 
   
-  // Delegated click listener to ensure pre-rendered song cards are instantly clickable
+  // Delegated click & touch listener ensuring all song cards are responsive immediately
   if (songsListContainer) {
     songsListContainer.addEventListener('click', (e) => {
       const card = e.target.closest('.song-card');
@@ -543,8 +540,24 @@ async function initApp() {
         addToSongsPlaylist(song);
         return;
       }
+
+      selectSong(song, true);
+      if (e.target.closest('.btn-icon-sing')) {
+        toggleMusicPlayback();
+      }
     });
   }
+
+  // Delegated listener for playlist mode buttons
+  document.addEventListener('click', (e) => {
+    const modeBtn = e.target && e.target.closest && e.target.closest('.btn-mode-pill');
+    if (modeBtn) {
+      const mode = modeBtn.getAttribute('data-mode');
+      if (mode && typeof window.setPlaylistMode === 'function') {
+        window.setPlaylistMode(mode);
+      }
+    }
+  });
 
   // --- SONG SELECTION & KARAOKE SETUP ---
   function selectSong(song, autoNavigate = false) {
@@ -714,7 +727,7 @@ async function initApp() {
         selectSong(storageScanner.songs[0], false);
       } else {
         showToast(window.i18n.t('noSongSelected'), 'warning');
-        switchTab('viewCloud');
+        switchTab('viewSongs');
         return;
       }
     }
@@ -883,7 +896,7 @@ async function initApp() {
         selectSong(storageScanner.songs[0], false);
       } else {
         showToast(window.i18n.t('noSongSelected'), 'warning');
-        switchTab('viewCloud');
+        switchTab('viewSongs');
         return;
       }
     }
@@ -1056,6 +1069,7 @@ async function initApp() {
   };
 
   if (vocalVolSlider) {
+    vocalVolSlider.value = (audioEngine.vocalVolume !== undefined) ? audioEngine.vocalVolume : 0.60;
     vocalVolSlider.addEventListener('input', () => {
       audioEngine.setVocalVolume(vocalVolSlider.value);
       updateSliderBadgesUI();
@@ -1063,7 +1077,7 @@ async function initApp() {
   }
 
   if (musicVolSlider) {
-    musicVolSlider.value = audioEngine.musicVolume;
+    musicVolSlider.value = (audioEngine.musicVolume !== undefined) ? audioEngine.musicVolume : 0.35;
     musicVolSlider.addEventListener('input', () => {
       audioEngine.setMusicVolume(musicVolSlider.value);
       updateSliderBadgesUI();
@@ -2393,6 +2407,7 @@ async function initApp() {
   window.prevCloudPlaylistSong = prevSongsPlaylistSong;
   window.playAllCloudSongs = populateAllSongsToPlaylist;
   window.toggleCloudPlaylistDrawer = toggleSongsPlaylistDrawer;
+  window.updateCloudPlaylistBadgeUI = updateSongsPlaylistBadgeUI;
 
 
   function escapeHtml(str) {
@@ -2531,7 +2546,7 @@ async function initApp() {
     if (!cloudListContainer) return;
     const query = (cloudSearchInput ? cloudSearchInput.value : '').trim();
 
-    updateCloudPlaylistBadgeUI();
+    if (typeof updateSongsPlaylistBadgeUI === 'function') updateSongsPlaylistBadgeUI();
 
     // 1. INSTANT LOCAL RENDER (0ms delay) from memory cache
     const initialList = hostingService.getFilteredCache(query);

@@ -617,7 +617,7 @@ body {
 .karaoke-studio {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 
 .studio-header-card {
@@ -625,7 +625,7 @@ body {
   backdrop-filter: blur(16px);
   border: 1px solid var(--border-subtle);
   border-radius: var(--border-radius-lg);
-  padding: 16px;
+  padding: 12px 14px 10px;
   text-align: center;
   position: relative;
   overflow: hidden;
@@ -636,10 +636,10 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: var(--color-coral);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -663,20 +663,20 @@ body {
 }
 
 .current-song-title {
-  font-size: 1.25rem;
+  font-size: 1.12rem;
   font-weight: 700;
   margin-bottom: 2px;
 }
 
 .current-song-artist {
-  font-size: 0.88rem;
+  font-size: 0.8rem;
   color: var(--text-secondary);
 }
 
-/* Visualizer Canvas */
+/* Compact Visualizer Canvas - Sleek Minimalist Equalizer Bar */
 .visualizer-wrapper {
-  margin: 12px 0 6px;
-  height: 60px;
+  margin: 6px 0 4px;
+  height: 28px;
   width: 100%;
   display: flex;
   align-items: center;
@@ -685,17 +685,18 @@ body {
 
 #visualizerCanvas {
   width: 100%;
-  height: 60px;
+  height: 28px;
   display: block;
 }
 
-/* Lyrics Display Screen */
+/* Expanded & Spacious Lyrics Display Screen */
 .lyrics-screen {
-  background: rgba(10, 13, 22, 0.85);
+  background: rgba(10, 13, 22, 0.88);
   backdrop-filter: blur(20px);
   border: 1px solid var(--border-subtle);
   border-radius: var(--border-radius-lg);
-  height: 240px;
+  height: min(400px, 52vh);
+  min-height: 340px;
   overflow-y: auto;
   padding: 24px 16px;
   position: relative;
@@ -715,11 +716,12 @@ body {
 
 .lyric-line {
   text-align: center;
-  font-size: 1rem;
+  font-size: 1.05rem;
+  line-height: 1.5;
   color: var(--text-muted);
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-radius: var(--border-radius-md);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   font-weight: 500;
@@ -727,12 +729,14 @@ body {
 
 .lyric-line.active {
   color: #ffffff;
-  font-size: 1.22rem;
-  font-weight: 700;
-  background: linear-gradient(90deg, rgba(121, 40, 202, 0.25) 0%, rgba(0, 242, 254, 0.2) 100%);
-  border: 1px solid rgba(0, 242, 254, 0.3);
-  transform: scale(1.03);
-  text-shadow: 0 0 12px rgba(0, 242, 254, 0.4);
+  font-size: 1.28rem;
+  font-weight: 800;
+  line-height: 1.45;
+  background: linear-gradient(90deg, rgba(121, 40, 202, 0.3) 0%, rgba(0, 242, 254, 0.25) 100%);
+  border: 1px solid rgba(0, 242, 254, 0.4);
+  transform: scale(1.02);
+  text-shadow: 0 0 14px rgba(0, 242, 254, 0.5);
+  box-shadow: 0 4px 18px rgba(0, 242, 254, 0.15);
 }
 
 .empty-lyrics {
@@ -3409,14 +3413,14 @@ select.form-input:disabled {
 .btn-mode-pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
-  font-size: 0.74rem;
-  font-weight: 600;
+  justify-content: center;
+  width: 34px;
+  height: 32px;
+  padding: 0;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--text-secondary);
-  border-radius: 20px;
+  border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
@@ -3424,16 +3428,16 @@ select.form-input:disabled {
 }
 
 .btn-mode-pill:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
   color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .btn-mode-pill.active {
   background: rgba(0, 242, 254, 0.2);
   border-color: rgba(0, 242, 254, 0.6);
   color: var(--color-cyan);
-  box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
-  font-weight: 700;
+  box-shadow: 0 0 12px rgba(0, 242, 254, 0.35);
 }
 
 /* Single Unified Playlist Controller Row */

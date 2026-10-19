@@ -5,7 +5,9 @@
   "main": "index.html",
   "scripts": {
     "dev": "node server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "test:preview": "node server.js",
+    "build:apk": "node prepare-www.js && npx cap sync android && cd android && gradlew.bat assembleDebug"
   },
   "keywords": [
     "sushee",

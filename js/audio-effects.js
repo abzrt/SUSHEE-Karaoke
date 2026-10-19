@@ -50,7 +50,8 @@ class AudioEffectsEngine {
     // State
     this.currentPreset = 'studio';
     this.isMonitoring = false;
-    this.vocalVolume = 1.0;
+    const savedVocalVol = localStorage.getItem('sushee_vocal_volume');
+    this.vocalVolume = (savedVocalVol !== null && !isNaN(parseFloat(savedVocalVol))) ? parseFloat(savedVocalVol) : 0.60;
 
     // Music Pitch Transpose (-6 to +6 semitones) and Speed/Tempo (0.75x to 1.5x)
     this.musicPitch = parseInt(localStorage.getItem('sushee_music_pitch') || '0', 10) || 0;
@@ -61,7 +62,7 @@ class AudioEffectsEngine {
 
     // Default balanced backing track level (0.85 = 85%) for clear, loud playback
     const savedMusicVol = localStorage.getItem('sushee_music_volume');
-    this.musicVolume = (savedMusicVol !== null && !isNaN(parseFloat(savedMusicVol))) ? parseFloat(savedMusicVol) : 0.85;
+    this.musicVolume = (savedMusicVol !== null && !isNaN(parseFloat(savedMusicVol))) ? parseFloat(savedMusicVol) : 0.35;
     // Real-Time Direct Vocal Sync (0ms delay for true zero-latency simultaneous recording)
     let defaultLatency = 0;
     const savedLatency = localStorage.getItem('sushee_latency_offset');
@@ -613,6 +614,9 @@ class AudioEffectsEngine {
 
   setVocalVolume(val) {
     this.vocalVolume = Math.max(0, Math.min(2.0, parseFloat(val) || 0));
+    try {
+      localStorage.setItem('sushee_vocal_volume', this.vocalVolume);
+    } catch (e) {}
     if (this.micPreAmp && this.audioCtx) {
       this.micPreAmp.gain.setTargetAtTime(this.vocalVolume, this.audioCtx.currentTime, 0.015);
     } else if (this.micPreAmp) {
