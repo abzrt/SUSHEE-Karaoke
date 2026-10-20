@@ -277,6 +277,7 @@ public class MainActivity extends BridgeActivity {
         });
         Window window = getWindow();
         if (window != null) {
+            WindowCompat.setDecorFitsSystemWindows(window, true);
             window.getDecorView().setBackgroundColor(Color.parseColor("#07080d"));
             window.setStatusBarColor(Color.parseColor("#07080d"));
             window.setNavigationBarColor(Color.parseColor("#0a0c14"));
@@ -291,12 +292,9 @@ public class MainActivity extends BridgeActivity {
             }
         }
 
-        // Offsets root view to ensure UI never blocks statusbar icons or navbar (Android 15+ edge-to-edge guard)
+        // Ensure zero inset padding so the app sits flush between status bar and phone navigation bar without gaps
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content), (view, windowInsets) -> {
-            androidx.core.graphics.Insets insets = windowInsets.getInsets(
-                WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
-            );
-            view.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+            view.setPadding(0, 0, 0, 0);
             return windowInsets;
         });
 
