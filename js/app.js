@@ -239,6 +239,17 @@ async function initApp() {
   // Initialize UI language
   window.i18n.updateDOM();
 
+  // Helper to format artist display with bilingual support for local songs
+  function formatArtistDisplay(artist) {
+    if (!artist) return '';
+    const trimmed = String(artist).trim().toLowerCase();
+    if (trimmed === 'artis lokal' || trimmed === 'local artist') {
+      return (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('defaultLocalArtist') : artist;
+    }
+    return artist;
+  }
+  window.formatArtistDisplay = formatArtistDisplay;
+
   // Initialize Visualizer
   if (visualizerCanvas) {
     visualizer = new AudioVisualizer(visualizerCanvas, audioEngine);
@@ -425,6 +436,7 @@ async function initApp() {
     }
     lastTabSwitchTime = now;
     lastTabSwitchedId = viewId;
+    lastExitToastTime = 0;
     if (!viewId) return;
     const views = document.querySelectorAll('.app-view');
     const navButtons = document.querySelectorAll('.nav-item');
@@ -488,6 +500,82 @@ async function initApp() {
     }
   });
 
+  // --- SEQUENTIAL BACK NAVIGATION & EXIT HANDLER ---
+  const APP_TAB_ORDER = ['viewSongs', 'viewKaraoke', 'viewRecordings', 'viewSettings'];
+  let lastExitToastTime = 0;
+
+  function handleAppBackButton() {
+    // 1. If any modal overlay is open, close it first
+    const openModal = document.querySelector('.modal-overlay.open');
+    if (openModal) {
+      openModal.classList.remove('open');
+      return true;
+    }
+
+    // 2. If songs playlist drawer is open, close it first
+    const playlistQueue = document.getElementById('songsPlaylistQueue');
+    if (playlistQueue && playlistQueue.style.display !== 'none') {
+      playlistQueue.style.display = 'none';
+      return true;
+    }
+    const cloudPlaylistQueue = document.getElementById('cloudPlaylistQueue');
+    if (cloudPlaylistQueue && cloudPlaylistQueue.style.display !== 'none') {
+      cloudPlaylistQueue.style.display = 'none';
+      return true;
+    }
+
+    // 3. Find current active view
+    const activeView = document.querySelector('.app-view.active');
+    const currentViewId = activeView ? activeView.id : 'viewSongs';
+
+    // If on viewCloud, return to viewSongs
+    if (currentViewId === 'viewCloud') {
+      switchTab('viewSongs');
+      return true;
+    }
+
+    // Step backwards sequentially in APP_TAB_ORDER: viewSettings -> viewRecordings -> viewKaraoke -> viewSongs
+    const currentIndex = APP_TAB_ORDER.indexOf(currentViewId);
+    if (currentIndex > 0) {
+      const prevTab = APP_TAB_ORDER[currentIndex - 1];
+      switchTab(prevTab);
+      return true;
+    }
+
+    // 4. If already at viewSongs (tab lagu - end of sequential back navigation)
+    const now = Date.now();
+    if (now - lastExitToastTime < 2500) {
+      showToast((window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('toastAppClosing') : 'Aplikasi ditutup...', 'info');
+      setTimeout(() => {
+        if (window.AndroidStorage && typeof window.AndroidStorage.exitApp === 'function') {
+          window.AndroidStorage.exitApp();
+        } else {
+          try {
+            window.close();
+          } catch (e) {}
+        }
+      }, 300);
+      return false;
+    } else {
+      lastExitToastTime = now;
+      showToast((window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('toastPressBackToExit') : 'Tekan sekali lagi untuk keluar dari aplikasi', 'info');
+      return true;
+    }
+  }
+  window.handleAppBackButton = handleAppBackButton;
+
+  // Browser navigation history support (popstate)
+  try {
+    if (window.history && window.history.pushState) {
+      window.history.replaceState({ susheeTab: 'viewSongs' }, '', '#viewSongs');
+      window.history.pushState({ susheeTab: 'active' }, '', window.location.href);
+      window.addEventListener('popstate', () => {
+        window.history.pushState({ susheeTab: 'active' }, '', window.location.href);
+        handleAppBackButton();
+      });
+    }
+  } catch (e) {}
+
   // --- LANGUAGE SWITCHING ---
   let lastLangSwitch = 0;
   function setAppLanguage(lang) {
@@ -532,7 +620,7 @@ async function initApp() {
     updateKaraokeUIState(isKaraokePlaying);
     if (currentSong) {
       document.querySelectorAll('.current-song-title').forEach(el => el.textContent = currentSong.title);
-      document.querySelectorAll('.current-song-artist').forEach(el => el.textContent = currentSong.artist);
+      document.querySelectorAll('.current-song-artist').forEach(el => el.textContent = formatArtistDisplay(currentSong.artist));
     } else {
       document.querySelectorAll('.current-song-title').forEach(el => el.textContent = window.i18n.t('selectSongHint'));
       document.querySelectorAll('.current-song-artist').forEach(el => el.textContent = window.i18n.t('studioReady'));
@@ -543,6 +631,22 @@ async function initApp() {
     }
     if (typeof updateServerStatusUI === 'function') {
       updateServerStatusUI(hostingService.isConnected, (hostingService.cachedSongs && hostingService.cachedSongs.length) || 0);
+    }
+    if (typeof window.updatePitchBadge === 'function') {
+      const pitchSlider = document.getElementById('musicPitchSlider');
+      window.updatePitchBadge(pitchSlider ? pitchSlider.value : 0);
+    }
+    if (typeof window.updateSpeedBadge === 'function') {
+      const speedSlider = document.getElementById('musicSpeedSlider');
+      window.updateSpeedBadge(speedSlider ? speedSlider.value : 1.0);
+    }
+    if (typeof window.updateRecordingSettingsBadges === 'function') {
+      const curFmt = (recorder && recorder.recordingFormat) || localStorage.getItem('sushee_record_format') || 'mp3';
+      const curBitrate = (recorder && recorder.recordingBitrate) || parseInt(localStorage.getItem('sushee_record_bitrate') || '320', 10);
+      window.updateRecordingSettingsBadges(curFmt, curBitrate);
+    }
+    if (typeof window.updateStudioDrawerLangUI === 'function') {
+      window.updateStudioDrawerLangUI();
     }
   });
 
@@ -647,12 +751,12 @@ async function initApp() {
         </div>
         <div class="song-card-info">
           <h4 class="song-card-title">${song.title}</h4>
-          <p class="song-card-artist">${song.artist}</p>
+          <p class="song-card-artist">${formatArtistDisplay(song.artist)}</p>
           <div class="song-badges">
             <span class="badge badge-format">${song.format || '.MP3'}</span>
             ${song.source === 'custom_host' ? 
               `<span class="badge" style="background: rgba(0, 242, 254, 0.15); color: var(--color-cyan); border: 1px solid rgba(0, 242, 254, 0.3);">PHP Hosting</span>` :
-              `<span class="badge badge-source">HP</span>`
+              `<span class="badge badge-source">${(window.i18n && window.i18n.t) ? window.i18n.t('sourceBadgePhone') : 'HP'}</span>`
             }
             ${song.hasLyrics ? 
               `<span class="badge badge-lyrics"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> ${window.i18n.t('badgeHasLyrics')}</span>` : 
@@ -661,7 +765,7 @@ async function initApp() {
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
-          <button type="button" class="btn btn-sm btn-songs-playlist-add ${(typeof isSongInPlaylist === 'function' && isSongInPlaylist(song)) ? 'in-playlist' : ''}" data-song-id="${song.id}" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist('${song.id}', true, event)" title="${(typeof isSongInPlaylist === 'function' && isSongInPlaylist(song)) ? 'Di Playlist (Ketuk untuk menghapus)' : ((window.i18n && window.i18n.t) ? window.i18n.t('btnAddToPlaylist') : '+ Playlist')}">
+          <button type="button" class="btn btn-sm btn-songs-playlist-add ${(typeof isSongInPlaylist === 'function' && isSongInPlaylist(song)) ? 'in-playlist' : ''}" data-song-id="${song.id}" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist('${song.id}', true, event)" title="${(typeof isSongInPlaylist === 'function' && isSongInPlaylist(song)) ? ((window.i18n && window.i18n.t) ? window.i18n.t('playlistRemoveHint') : 'Di Playlist (Ketuk untuk menghapus)') : ((window.i18n && window.i18n.t) ? window.i18n.t('btnAddToPlaylist') : '+ Playlist')}">
             ${(typeof isSongInPlaylist === 'function' && isSongInPlaylist(song)) ? ((window.i18n && window.i18n.t) ? window.i18n.t('btnAddedToPlaylist') : '✓ Di Playlist') : ((window.i18n && window.i18n.t) ? window.i18n.t('btnAddToPlaylist') : '+ Playlist')}
           </button>
           <button class="btn-icon-sing" title="${window.i18n.t('btnSingNow')}" data-song-id="${song.id}">
@@ -755,7 +859,7 @@ async function initApp() {
 
     // Update Player Bar and Studio UI
     document.querySelectorAll('.current-song-title').forEach(el => el.textContent = song.title);
-    document.querySelectorAll('.current-song-artist').forEach(el => el.textContent = song.artist);
+    document.querySelectorAll('.current-song-artist').forEach(el => el.textContent = formatArtistDisplay(song.artist));
 
     // Audio element source: ensure CORS is set before src for remote hosting URLs
     if (song.audioUrl && (song.audioUrl.startsWith('http://') || song.audioUrl.startsWith('https://'))) {
@@ -1098,13 +1202,13 @@ async function initApp() {
     if (!btnToggleMusicPlayback) return;
     if (isPlaying) {
       btnToggleMusicPlayback.classList.add('is-playing');
-      if (musicPlayLabel) musicPlayLabel.textContent = 'Jeda Musik';
+      if (musicPlayLabel) musicPlayLabel.textContent = (window.i18n && window.i18n.t) ? window.i18n.t('btnPauseMusic') : 'Jeda Musik';
       if (musicPlayIcon) {
         musicPlayIcon.innerHTML = `<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>`;
       }
     } else {
       btnToggleMusicPlayback.classList.remove('is-playing');
-      if (musicPlayLabel) musicPlayLabel.textContent = 'Putar Musik';
+      if (musicPlayLabel) musicPlayLabel.textContent = (window.i18n && window.i18n.t) ? window.i18n.t('btnPlayMusic') : 'Putar Musik';
       if (musicPlayIcon) {
         musicPlayIcon.innerHTML = `<polygon points="5 3 19 12 5 21 5 3"/>`;
       }
@@ -1445,6 +1549,15 @@ async function initApp() {
     }
   };
 
+  window.updateStudioDrawerLangUI = () => {
+    const toggleAction = document.getElementById('toggleStudioSettingsAction');
+    if (toggleAction) {
+      toggleAction.textContent = isStudioDrawerOpen
+        ? ((window.i18n && window.i18n.t) ? window.i18n.t('btnHideSettings') : 'Sembunyikan')
+        : ((window.i18n && window.i18n.t) ? window.i18n.t('btnShowSettings') : 'Buka Pengaturan');
+    }
+  };
+
   let lastStudioToggleTime = 0;
   const toggleStudioSettingsDrawer = (e) => {
     if (e && e.stopPropagation) e.stopPropagation();
@@ -1533,32 +1646,36 @@ async function initApp() {
   const updatePitchBadge = (semitones) => {
     if (!musicPitchVal) return;
     const val = parseInt(semitones, 10) || 0;
+    const isEn = window.i18n && window.i18n.currentLang === 'en';
     if (val === 0) {
       musicPitchVal.textContent = '0 (Normal)';
       musicPitchVal.style.color = 'var(--color-cyan, #00f2fe)';
     } else if (val > 0) {
-      musicPitchVal.textContent = `+${val} (♯ Naik)`;
+      musicPitchVal.textContent = `+${val} (♯ ${isEn ? 'Up' : 'Naik'})`;
       musicPitchVal.style.color = '#38ef7d';
     } else {
-      musicPitchVal.textContent = `${val} (♭ Turun)`;
+      musicPitchVal.textContent = `${val} (♭ ${isEn ? 'Down' : 'Turun'})`;
       musicPitchVal.style.color = '#ff4b91';
     }
   };
+  window.updatePitchBadge = updatePitchBadge;
 
   const updateSpeedBadge = (speed) => {
     if (!musicSpeedVal) return;
     const val = parseFloat(speed) || 1.0;
+    const isEn = window.i18n && window.i18n.currentLang === 'en';
     if (Math.abs(val - 1.0) < 0.01) {
       musicSpeedVal.textContent = '1.00x (Normal)';
       musicSpeedVal.style.color = 'var(--color-cyan, #00f2fe)';
     } else if (val > 1.0) {
-      musicSpeedVal.textContent = `${val.toFixed(2)}x (Cepat)`;
+      musicSpeedVal.textContent = `${val.toFixed(2)}x (${isEn ? 'Fast' : 'Cepat'})`;
       musicSpeedVal.style.color = '#38ef7d';
     } else {
-      musicSpeedVal.textContent = `${val.toFixed(2)}x (Lambat)`;
+      musicSpeedVal.textContent = `${val.toFixed(2)}x (${isEn ? 'Slow' : 'Lambat'})`;
       musicSpeedVal.style.color = '#ffb300';
     }
   };
+  window.updateSpeedBadge = updateSpeedBadge;
 
   // Initialize Pitch & Speed sliders and badges with current state on startup
   const initPitchVal = parseInt((audioEngine.musicPitch !== undefined ? audioEngine.musicPitch : audioEngine.musicPitchShift) || 0, 10);
@@ -1740,7 +1857,7 @@ async function initApp() {
     });
     modalRecSyncSlider.addEventListener('change', () => {
       const val = parseInt(modalRecSyncSlider.value, 10);
-      showToast(`⚡ Real-time delay diatur: ${(val > 0 ? '+' : '') + val} ms`, 'info');
+      showToast((window.i18n && window.i18n.t) ? window.i18n.t('toastRealtimeDelaySet', { ms: (val > 0 ? '+' : '') + val }) : `⚡ Real-time delay diatur: ${(val > 0 ? '+' : '') + val} ms`, 'info');
     });
   }
 
@@ -1750,7 +1867,7 @@ async function initApp() {
       const next = Math.max(-300, current - 20);
       updateLatencyUI(next, true);
       audioEngine.setLatencyOffset(next);
-      showToast(`⚡ Real-time delay: ${(next > 0 ? '+' : '') + next} ms`, 'info');
+      showToast((window.i18n && window.i18n.t) ? window.i18n.t('toastRealtimeDelaySet', { ms: (next > 0 ? '+' : '') + next }) : `⚡ Real-time delay: ${(next > 0 ? '+' : '') + next} ms`, 'info');
     });
   }
 
@@ -1760,7 +1877,7 @@ async function initApp() {
       const next = Math.min(300, current + 20);
       updateLatencyUI(next, true);
       audioEngine.setLatencyOffset(next);
-      showToast(`⚡ Real-time delay: ${(next > 0 ? '+' : '') + next} ms`, 'info');
+      showToast((window.i18n && window.i18n.t) ? window.i18n.t('toastRealtimeDelaySet', { ms: (next > 0 ? '+' : '') + next }) : `⚡ Real-time delay: ${(next > 0 ? '+' : '') + next} ms`, 'info');
     });
   }
 
@@ -1769,7 +1886,7 @@ async function initApp() {
       const val = parseInt(chip.getAttribute('data-latency'), 10) || 0;
       updateLatencyUI(val, true);
       audioEngine.setLatencyOffset(val);
-      showToast(`⚡ Preset Real-time: ${(val > 0 ? '+' : '') + val} ms`, 'info');
+      showToast((window.i18n && window.i18n.t) ? window.i18n.t('toastRealtimePresetSet', { ms: (val > 0 ? '+' : '') + val }) : `⚡ Preset Real-time: ${(val > 0 ? '+' : '') + val} ms`, 'info');
     });
   });
 
@@ -2014,22 +2131,22 @@ async function initApp() {
             </div>
             <span class="recording-date">${new Date(rec.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
           </div>
-          <button type="button" class="btn-rec-action btn-play-rec" data-rec-id="${rec.id}" title="Putar Rekaman" aria-label="Putar Rekaman">
+          <button type="button" class="btn-rec-action btn-play-rec" data-rec-id="${rec.id}" title="${(window.i18n && window.i18n.t) ? window.i18n.t('btnPlayRecording') : 'Putar'}" aria-label="${(window.i18n && window.i18n.t) ? window.i18n.t('btnPlayRecording') : 'Putar'}">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
           </button>
         </div>
         <div class="recording-card-actions">
-          <button type="button" class="btn-rec-action btn-play-rec btn-play-rec-mobile" data-rec-id="${rec.id}" title="Putar Rekaman" aria-label="Putar Rekaman">
+          <button type="button" class="btn-rec-action btn-play-rec btn-play-rec-mobile" data-rec-id="${rec.id}" title="${(window.i18n && window.i18n.t) ? window.i18n.t('btnPlayRecording') : 'Putar'}" aria-label="${(window.i18n && window.i18n.t) ? window.i18n.t('btnPlayRecording') : 'Putar'}">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
-            <span class="btn-rec-label">Putar</span>
+            <span class="btn-rec-label">${(window.i18n && window.i18n.t) ? window.i18n.t('btnPlayRecording') : 'Putar'}</span>
           </button>
-          <button type="button" class="btn-rec-action btn-dl-rec" data-rec-id="${rec.id}" title="Simpan / Download Rekaman" aria-label="Simpan Rekaman">
+          <button type="button" class="btn-rec-action btn-dl-rec" data-rec-id="${rec.id}" title="${(window.i18n && window.i18n.t) ? window.i18n.t('btnDownloadRecording') : 'Simpan'}" aria-label="${(window.i18n && window.i18n.t) ? window.i18n.t('btnDownloadRecording') : 'Simpan'}">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span class="btn-rec-label">Simpan</span>
+            <span class="btn-rec-label">${(window.i18n && window.i18n.t) ? window.i18n.t('btnDownloadRecording') : 'Simpan'}</span>
           </button>
-          <button type="button" class="btn-rec-action btn-del-rec" data-rec-id="${rec.id}" title="Hapus Rekaman" aria-label="Hapus Rekaman">
+          <button type="button" class="btn-rec-action btn-del-rec" data-rec-id="${rec.id}" title="${(window.i18n && window.i18n.t) ? window.i18n.t('btnDeleteRecording') : 'Hapus'}" aria-label="${(window.i18n && window.i18n.t) ? window.i18n.t('btnDeleteRecording') : 'Hapus'}">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            <span class="btn-rec-label">Hapus</span>
+            <span class="btn-rec-label">${(window.i18n && window.i18n.t) ? window.i18n.t('btnDeleteRecording') : 'Hapus'}</span>
           </button>
         </div>
       </div>
@@ -2301,13 +2418,17 @@ async function initApp() {
         audioQualitySelect.disabled = true;
         if (bitrateFormGroup) bitrateFormGroup.classList.add('disabled-form-group');
         if (bitrateHintText) {
-          bitrateHintText.textContent = '⚡ Format WAV menyimpan sinyal audio murni (Lossless 16-Bit / 44.1 kHz Studio Master) tanpa kompresi bitrate.';
+          bitrateHintText.textContent = (window.i18n && window.i18n.t)
+            ? window.i18n.t('bitrateHintWav')
+            : '⚡ Format WAV menyimpan sinyal audio murni (Lossless 16-Bit / 44.1 kHz Studio Master) tanpa kompresi bitrate.';
         }
       } else {
         audioQualitySelect.disabled = false;
         if (bitrateFormGroup) bitrateFormGroup.classList.remove('disabled-form-group');
         if (bitrateHintText) {
-          bitrateHintText.textContent = `⚡ Rekomendasi ${currentBitrate} Kbps untuk kejernihan vokal maksimal menyerupai rekaman studio master.`;
+          bitrateHintText.textContent = (window.i18n && window.i18n.t)
+            ? window.i18n.t('bitrateHintMp3', { bitrate: currentBitrate })
+            : `⚡ Rekomendasi ${currentBitrate} Kbps untuk kejernihan vokal maksimal menyerupai rekaman studio master.`;
         }
       }
     }
@@ -2320,7 +2441,7 @@ async function initApp() {
     }
     updateRecordingSettingsBadges(fmt, recorder ? recorder.recordingBitrate : 320);
     const fmtUpper = (fmt || 'mp3').toUpperCase();
-    showToast(`Format rekaman diatur ke ${fmtUpper}`, 'success');
+    showToast((window.i18n && window.i18n.t) ? window.i18n.t('toastFormatChanged', { fmt: fmtUpper }) : `Format rekaman diatur ke ${fmtUpper}`, 'success');
   };
 
   window.onRecordingBitrateChanged = (kbps) => {
@@ -2500,7 +2621,7 @@ async function initApp() {
       <div class="queue-item ${songsPlaylistIndex === idx ? 'active' : ''}" data-queue-idx="${idx}">
         <div class="queue-item-info">
           <span class="queue-item-title">${idx + 1}. ${s.title}</span>
-          <span class="queue-item-artist">${s.artist || (s.source === 'custom_host' ? 'PHP Hosting' : 'Penyimpanan HP')}</span>
+          <span class="queue-item-artist">${formatArtistDisplay(s.artist) || (s.source === 'custom_host' ? 'PHP Hosting' : 'Penyimpanan HP')}</span>
         </div>
         <button type="button" class="queue-item-remove" data-remove-idx="${idx}" title="Hapus">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -2607,8 +2728,8 @@ async function initApp() {
         const trackArtist = document.getElementById('songsPlaylistTrackArtist');
         const nowText = document.getElementById('songsPlaylistNowText');
         if (trackTitle) trackTitle.textContent = songsPlaylist[0].title;
-        if (trackArtist) trackArtist.textContent = `${songsPlaylist[0].artist || 'PHP Hosting'} • Siap diputar (${songsPlaylist.length} lagu)`;
-        if (nowText) nowText.textContent = `Antrean: ${songsPlaylist.length} Lagu siap diputar`;
+        if (trackArtist) trackArtist.textContent = `${formatArtistDisplay(songsPlaylist[0].artist) || 'PHP Hosting'} • ${(window.i18n && window.i18n.t) ? window.i18n.t('queueReadyToPlay', { count: songsPlaylist.length }) : `Siap diputar (${songsPlaylist.length} lagu)`}`;
+        if (nowText) nowText.textContent = (window.i18n && window.i18n.t) ? window.i18n.t('queueReadyToPlay', { count: songsPlaylist.length }) : `Antrean: ${songsPlaylist.length} Lagu siap diputar`;
       }
       // Automatically open queue drawer so user gets immediate visual confirmation
       const drawer = document.getElementById('songsPlaylistQueue') || document.getElementById('cloudPlaylistQueue');
@@ -2622,7 +2743,7 @@ async function initApp() {
       }
       inPlaylist = false;
       if (showToastNotice) {
-        showToast(`${song.title} dihapus dari playlist`, 'info');
+        showToast(`${song.title} ${window.i18n && window.i18n.currentLang === 'en' ? 'removed from playlist' : 'dihapus dari playlist'}`, 'info');
       }
       if (songsPlaylist.length === 0) {
         songsPlaylistIndex = -1;
@@ -2630,13 +2751,13 @@ async function initApp() {
         const trackArtist = document.getElementById('songsPlaylistTrackArtist');
         const nowText = document.getElementById('songsPlaylistNowText');
         if (trackTitle) trackTitle.textContent = '-';
-        if (trackArtist) trackArtist.textContent = (window.i18n && window.i18n.t) ? window.i18n.t('btnPlayMusic') : 'Ketuk tombol putar untuk mulai mendengarkan';
+        if (trackArtist) trackArtist.textContent = (window.i18n && window.i18n.t) ? window.i18n.t('tapPlayToListen') : 'Ketuk tombol putar untuk mulai mendengarkan';
         if (nowText) nowText.textContent = (window.i18n && window.i18n.t) ? window.i18n.t('songsPlaylistSubtitle') : 'Mode dengar lagu berturut-turut tanpa vokal mic';
       } else if (songsPlaylistIndex === -1) {
         const trackTitle = document.getElementById('songsPlaylistTrackTitle');
         const trackArtist = document.getElementById('songsPlaylistTrackArtist');
         if (trackTitle) trackTitle.textContent = songsPlaylist[0].title;
-        if (trackArtist) trackArtist.textContent = `${songsPlaylist[0].artist || 'PHP Hosting'} • Siap diputar (${songsPlaylist.length} lagu)`;
+        if (trackArtist) trackArtist.textContent = `${formatArtistDisplay(songsPlaylist[0].artist) || 'PHP Hosting'} • ${(window.i18n && window.i18n.t) ? window.i18n.t('queueReadyToPlay', { count: songsPlaylist.length }) : `Siap diputar (${songsPlaylist.length} lagu)`}`;
       }
     }
 
@@ -2692,7 +2813,7 @@ async function initApp() {
         const trackTitle = document.getElementById('songsPlaylistTrackTitle');
         const trackArtist = document.getElementById('songsPlaylistTrackArtist');
         if (trackTitle) trackTitle.textContent = '-';
-        if (trackArtist) trackArtist.textContent = 'Ketuk tombol putar untuk mulai mendengarkan';
+        if (trackArtist) trackArtist.textContent = (window.i18n && window.i18n.t) ? window.i18n.t('tapPlayToListen') : 'Ketuk tombol putar untuk mulai mendengarkan';
       }
     }
   }
@@ -2706,7 +2827,7 @@ async function initApp() {
     const trackTitle = document.getElementById('songsPlaylistTrackTitle');
     const trackArtist = document.getElementById('songsPlaylistTrackArtist');
     if (trackTitle) trackTitle.textContent = '-';
-    if (trackArtist) trackArtist.textContent = (window.i18n && window.i18n.t) ? window.i18n.t('btnPlayMusic') : 'Ketuk tombol putar untuk mulai mendengarkan';
+    if (trackArtist) trackArtist.textContent = (window.i18n && window.i18n.t) ? window.i18n.t('tapPlayToListen') : 'Ketuk tombol putar untuk mulai mendengarkan';
     showToast((window.i18n && window.i18n.t) ? window.i18n.t('toastPlaylistCleared') : 'Playlist berhasil dikosongkan', 'info');
   }
   window.clearSongsPlaylist = clearSongsPlaylist;
@@ -2719,7 +2840,7 @@ async function initApp() {
       ...cloudSongs
     ];
     if (allCandidates.length === 0) {
-      showToast('Tidak ada lagu untuk dimasukkan ke playlist', 'info');
+      showToast((window.i18n && window.i18n.t) ? window.i18n.t('toastNoSongsToQueue') : 'Tidak ada lagu untuk dimasukkan ke playlist', 'info');
       return;
     }
     let addedCount = 0;
@@ -2738,11 +2859,11 @@ async function initApp() {
       const trackTitle = document.getElementById('songsPlaylistTrackTitle');
       const trackArtist = document.getElementById('songsPlaylistTrackArtist');
       if (trackTitle) trackTitle.textContent = songsPlaylist[0].title;
-      if (trackArtist) trackArtist.textContent = `${songsPlaylist[0].artist || 'PHP Hosting'} • Siap diputar (${songsPlaylist.length} lagu)`;
+      if (trackArtist) trackArtist.textContent = `${formatArtistDisplay(songsPlaylist[0].artist) || 'PHP Hosting'} • ${(window.i18n && window.i18n.t) ? window.i18n.t('queueReadyToPlay', { count: songsPlaylist.length }) : `Siap diputar (${songsPlaylist.length} lagu)`}`;
     }
     const drawer = document.getElementById('songsPlaylistQueue') || document.getElementById('cloudPlaylistQueue');
     if (drawer) drawer.style.display = 'block';
-    showToast(`✓ Ditambahkan ${addedCount} lagu ke playlist (Total: ${songsPlaylist.length})`, 'success');
+    showToast((window.i18n && window.i18n.t) ? window.i18n.t('toastAddedSongsToQueue', { count: addedCount, total: songsPlaylist.length }) : `✓ Ditambahkan ${addedCount} lagu ke playlist (Total: ${songsPlaylist.length})`, 'success');
   }
   window.populateAllSongsToPlaylist = populateAllSongsToPlaylist;
 
@@ -2768,7 +2889,7 @@ async function initApp() {
     const nowText = document.getElementById('songsPlaylistNowText');
 
     if (trackTitle) trackTitle.textContent = song.title;
-    if (trackArtist) trackArtist.textContent = `${song.artist || (song.source === 'custom_host' ? 'PHP Hosting' : 'Penyimpanan HP')} • Lagu ${idx + 1} dari ${songsPlaylist.length}`;
+    if (trackArtist) trackArtist.textContent = `${formatArtistDisplay(song.artist) || (song.source === 'custom_host' ? 'PHP Hosting' : 'Penyimpanan HP')} • Lagu ${idx + 1} dari ${songsPlaylist.length}`;
     if (nowText) nowText.textContent = `Memutar: ${song.title} (${idx + 1}/${songsPlaylist.length})`;
 
     try {

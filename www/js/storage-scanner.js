@@ -257,7 +257,7 @@ class StorageScanner {
 
       // Determine clean Title & Artist
       let title = audioFile.name.replace(/\.[^/.]+$/, '');
-      let artist = "Artis Lokal";
+      let artist = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('defaultLocalArtist') : "Artis Lokal";
 
       if (matchedLrc && matchedLrc.title) {
         title = matchedLrc.title;

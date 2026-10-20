@@ -23,6 +23,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
@@ -244,6 +245,11 @@ public class MainActivity extends BridgeActivity {
             MainActivity.this.runOnUiThread(MainActivity.this::requestAppPermissions);
         }
 
+        @JavascriptInterface
+        public void exitApp() {
+            MainActivity.this.runOnUiThread(MainActivity.this::finish);
+        }
+
         private void showToastOnUiThread(final String message) {
             MainActivity.this.runOnUiThread(() -> Toast.makeText(context, message, Toast.LENGTH_LONG).show());
         }
@@ -252,9 +258,26 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Intercept Android navbar / gesture back button to navigate tabs sequentially in WebView
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                try {
+                    WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+                    if (webView != null) {
+                        webView.evaluateJavascript("if (window.handleAppBackButton) { window.handleAppBackButton(); }", null);
+                    } else {
+                        finish();
+                    }
+                } catch (Exception e) {
+                    finish();
+                }
+            }
+        });
         Window window = getWindow();
         if (window != null) {
-            WindowCompat.setDecorFitsSystemWindows(window, true);
+            window.getDecorView().setBackgroundColor(Color.parseColor("#07080d"));
             window.setStatusBarColor(Color.parseColor("#07080d"));
             window.setNavigationBarColor(Color.parseColor("#0a0c14"));
 
@@ -267,6 +290,15 @@ public class MainActivity extends BridgeActivity {
                 controller.show(WindowInsetsCompat.Type.navigationBars());
             }
         }
+
+        // Offsets root view to ensure UI never blocks statusbar icons or navbar (Android 15+ edge-to-edge guard)
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content), (view, windowInsets) -> {
+            androidx.core.graphics.Insets insets = windowInsets.getInsets(
+                WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
+            );
+            view.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+            return windowInsets;
+        });
 
         // Optimize Android AudioManager for lowest hardware latency audio
         try {

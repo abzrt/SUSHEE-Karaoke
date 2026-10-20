@@ -76,6 +76,21 @@
         }
       };
 
+      // Early fail-safe back button handler
+      window.handleAppBackButton = function() {
+        var openModal = document.querySelector('.modal-overlay.open');
+        if (openModal) { openModal.classList.remove('open'); return true; }
+        var activeView = document.querySelector('.app-view.active');
+        var currentViewId = activeView ? activeView.id : 'viewSongs';
+        var order = ['viewSongs', 'viewKaraoke', 'viewRecordings', 'viewSettings'];
+        var idx = order.indexOf(currentViewId);
+        if (idx > 0 && typeof window.switchTab === 'function') {
+          window.switchTab(order[idx - 1]);
+          return true;
+        }
+        return false;
+      };
+
       // Global fail-safe studio subtab switcher (vocalFX, pitch & speed, latency sync)
             // Global fail-safe playlist toggle bridge
       window.toggleSongsPlaylist = function(songOrId, showToast, event) {
@@ -283,7 +298,7 @@
 
           <!-- Playback Mode Buttons: Berurut, Acak, Ulangi 1 Lagu -->
           <div class="playlist-mode-row">
-            <span class="playlist-mode-label">Mode Putar:</span>
+            <span class="playlist-mode-label" data-i18n="playlistModeLabel">Mode Putar:</span>
             <div class="playlist-mode-buttons">
               <button type="button" class="btn-mode-pill active" id="btnModeSequential" data-mode="sequential" onclick="window.setPlaylistMode && window.setPlaylistMode('sequential')" title="Putar Berurut" data-i18n-title="modeSequential" aria-label="Putar Berurut">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
@@ -3201,9 +3216,9 @@
                     </div>
                     <input type="range" class="custom-range" id="musicPitchSlider" min="-6" max="6" step="1" value="0">
                     <div class="slider-scale-row">
-                      <span>-6 (♭ Rendah)</span>
-                      <span style="color: var(--color-cyan); font-weight: 700;">0 (Asli)</span>
-                      <span>+6 (♯ Tinggi)</span>
+                      <span data-i18n="pitchScaleLow">-6 (♭ Rendah)</span>
+                      <span data-i18n="pitchScaleNormal" style="color: var(--color-cyan); font-weight: 700;">0 (Asli)</span>
+                      <span data-i18n="pitchScaleHigh">+6 (♯ Tinggi)</span>
                     </div>
                   </div>
 
@@ -3229,9 +3244,9 @@
                     </div>
                     <input type="range" class="custom-range" id="musicSpeedSlider" min="0.75" max="1.25" step="0.05" value="1.0">
                     <div class="slider-scale-row">
-                      <span>0.75x (Lambat)</span>
-                      <span style="color: var(--color-cyan); font-weight: 700;">1.00x (Normal)</span>
-                      <span>1.25x (Cepat)</span>
+                      <span data-i18n="speedScaleSlow">0.75x (Lambat)</span>
+                      <span data-i18n="speedScaleNormal" style="color: var(--color-cyan); font-weight: 700;">1.00x (Normal)</span>
+                      <span data-i18n="speedScaleFast">1.25x (Cepat)</span>
                     </div>
                   </div>
 
@@ -3406,13 +3421,13 @@
           <!-- System Diagnostics & Self-Test Link -->
           <div class="form-group" style="margin-top: 18px; padding: 14px; background: rgba(0, 242, 254, 0.05); border: 1px solid rgba(0, 242, 254, 0.2); border-radius: var(--border-radius-sm);">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-              <label class="form-label" style="margin-bottom: 0; color: var(--color-cyan);">🧪 Uji Diagnostik Sistem (Self-Test)</label>
-              <span class="badge" style="background: rgba(0, 242, 254, 0.2); color: var(--color-cyan);">Otomatis</span>
+              <label class="form-label" style="margin-bottom: 0; color: var(--color-cyan);" data-i18n="diagSelfTestTitle">🧪 Uji Diagnostik Sistem (Self-Test)</label>
+              <span class="badge" style="background: rgba(0, 242, 254, 0.2); color: var(--color-cyan);" data-i18n="badgeAuto">Otomatis</span>
             </div>
-            <p class="switch-desc" style="margin-bottom: 10px;">Jalankan pengujian menyeluruh (Storage, Audio DSP, Mic, LRC Sync, dan Reopen Lifecycle) untuk memastikan semua fitur berjalan normal.</p>
+            <p class="switch-desc" style="margin-bottom: 10px;" data-i18n="diagSelfTestDesc">Jalankan pengujian menyeluruh (Storage, Audio DSP, Mic, LRC Sync, dan Reopen Lifecycle) untuk memastikan semua fitur berjalan normal.</p>
             <a href="diagnostics.html" class="btn btn-primary" style="width: 100%; text-decoration: none; justify-content: center; gap: 8px;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-              <span>Buka Halaman Uji Diagnostik</span>
+              <span data-i18n="btnOpenDiagnostics">Buka Halaman Uji Diagnostik</span>
             </a>
           </div>
 
