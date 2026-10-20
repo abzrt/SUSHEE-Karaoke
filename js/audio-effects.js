@@ -177,7 +177,7 @@ class AudioEffectsEngine {
     this.masterSpeakerGain.connect(this.masterSpeakerLimiter);
     this.masterSpeakerLimiter.connect(this.audioCtx.destination);
 
-    // 2. Master Recording Destination with Brickwall Anti-Clipping Limiter
+    // 2. Master Recording Destination with Brickwall Anti-Clipping Limiter & Dual-Track Channel Separation
     this.masterRecordGain = this.audioCtx.createGain();
     this.masterRecordGain.gain.value = 1.0;
 
@@ -188,8 +188,15 @@ class AudioEffectsEngine {
     this.masterRecordLimiter.attack.value = 0.001;
     this.masterRecordLimiter.release.value = 0.05;
 
-    this.masterRecordGain.connect(this.masterRecordLimiter);
-    this.masterRecordLimiter.connect(this.destinationNode);
+    // Dual-track merger: Channel 0 = Vocal, Channel 1 = Backing Music for Latency Compensation
+    if (typeof this.audioCtx.createChannelMerger === 'function') {
+      this.recordMerger = this.audioCtx.createChannelMerger(2);
+      this.recordMerger.connect(this.masterRecordLimiter);
+      this.masterRecordLimiter.connect(this.destinationNode);
+    } else {
+      this.masterRecordGain.connect(this.masterRecordLimiter);
+      this.masterRecordLimiter.connect(this.destinationNode);
+    }
   }
 
   setupMusicChain() {
@@ -246,8 +253,10 @@ class AudioEffectsEngine {
         this.musicMixGain.connect(this.audioCtx.destination);
       }
       
-      // Route to Master Record Destination (Protected by limiter)
-      if (this.masterRecordGain) {
+      // Route to Master Record Destination (Protected by limiter, channel 1 for music)
+      if (this.recordMerger) {
+        this.musicMixGain.connect(this.recordMerger, 0, 1);
+      } else if (this.masterRecordGain) {
         this.musicMixGain.connect(this.masterRecordGain);
       } else {
         this.musicMixGain.connect(this.destinationNode);
@@ -375,7 +384,9 @@ class AudioEffectsEngine {
       this.monitorGain.connect(this.audioCtx.destination);
     }
 
-    if (this.masterRecordGain) {
+    if (this.recordMerger) {
+      this.vocalMixGain.connect(this.recordMerger, 0, 0);
+    } else if (this.masterRecordGain) {
       this.vocalMixGain.connect(this.masterRecordGain);
     } else {
       this.vocalMixGain.connect(this.destinationNode);
@@ -887,6 +898,19 @@ class AudioEffectsEngine {
 
   getMixedStream() {
     return this.destinationNode ? this.destinationNode.stream : null;
+  }
+
+  /**
+   * Returns current hardware and driver buffer latency in seconds for latency compensation
+   */
+  getBufferLatency() {
+    if (!this.audioCtx) return 0.08;
+    const base = this.audioCtx.baseLatency || 0;
+    const output = this.audioCtx.outputLatency || 0;
+    const hw = base + output;
+    const effectiveHw = hw > 0 ? hw : 0.08;
+    const manual = (this.latencyOffsetMs || 0) / 1000;
+    return Math.max(0, effectiveHw + manual);
   }
 }
 

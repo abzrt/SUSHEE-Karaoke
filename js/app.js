@@ -1012,6 +1012,12 @@ async function initApp() {
       isKaraokePlaying = false;
       if (visualizer) visualizer.stop();
 
+      // Reset lagu dan lirik kembali ke awal lagu (00:00)
+      resetAudioAndLyricsToStart();
+
+      // Pastikan tetap berada di tab Karaoke
+      switchTab('viewKaraoke');
+
       // Release wake lock and stop mic so screen can turn off normally and battery is conserved
       await releaseScreenWakeLock();
       if (audioEngine && typeof audioEngine.stopMicrophone === 'function') {
@@ -1021,18 +1027,23 @@ async function initApp() {
       // Stop recording instantaneously without heavy conversion lag
       const recordingResult = await recorder.stopRecording();
       updateKaraokeUIState(false);
+      updateMusicPlayButtonUI(false);
 
       if (recordingResult && recordingResult.duration >= 3) {
-        showToast(window.i18n.t('toastConvertingMp3') || 'Menyimpan & memproses rekaman...', 'info');
-        const savedItem = await recorder.saveCurrentRecording(
+        showToast(window.i18n.t('toastConvertingMp3') || 'Menyimpan & memproses rekaman di background...', 'info');
+        recorder.saveCurrentRecording(
           currentSong.title,
           currentSong.artist,
           audioEngine.currentPreset,
           recordingResult.duration
-        );
-        renderRecordingsList();
-        showRecordingModal(savedItem);
-        showToast(window.i18n.t('toastRecordingSaved'), 'success');
+        ).then(savedItem => {
+          if (savedItem) {
+            renderRecordingsList();
+            showToast(window.i18n.t('toastRecordingSaved'), 'success');
+          }
+        }).catch(err => {
+          console.error("Background recording processing error:", err);
+        });
       } else {
         showToast(window.i18n.t('toastRecordingTooShort'), 'info');
       }
@@ -1220,6 +1231,29 @@ async function initApp() {
     if (window.AndroidStorage && typeof window.AndroidStorage.setBackgroundAudioActive === 'function') {
       try { window.AndroidStorage.setBackgroundAudioActive(false); } catch (e) {}
     }
+
+    if (recorder && recorder.isRecording) {
+      if (audioEngine && typeof audioEngine.stopMicrophone === 'function') {
+        audioEngine.stopMicrophone();
+      }
+      recorder.stopRecording().then(recordingResult => {
+        if (recordingResult && recordingResult.duration >= 3) {
+          showToast(window.i18n.t('toastConvertingMp3') || 'Menyimpan & memproses rekaman di background...', 'info');
+          recorder.saveCurrentRecording(
+            currentSong ? currentSong.title : 'Karaoke',
+            currentSong ? currentSong.artist : 'Singer',
+            audioEngine.currentPreset,
+            recordingResult.duration
+          ).then(savedItem => {
+            if (savedItem) {
+              renderRecordingsList();
+              showToast(window.i18n.t('toastRecordingSaved'), 'success');
+            }
+          }).catch(err => console.error("Background recording processing error:", err));
+        }
+      }).catch(err => console.warn(err));
+    }
+
     if ((typeof isSongsPlaylistMode !== 'undefined' && isSongsPlaylistMode) || (typeof isCloudPlaylistMode !== 'undefined' && isCloudPlaylistMode)) {
       if (typeof playlistPlaybackMode !== 'undefined' && playlistPlaybackMode === 'repeat_one') {
         // Repeat one single song indefinitely
@@ -1233,6 +1267,10 @@ async function initApp() {
       } else {
         nextSongsPlaylistSong();
       }
+    } else {
+      // In Karaoke mode: stay on Karaoke tab and position song at the beginning (00:00)
+      resetAudioAndLyricsToStart();
+      switchTab('viewKaraoke');
     }
   });
 
@@ -1417,15 +1455,8 @@ async function initApp() {
   };
   window.toggleStudioSettingsDrawer = toggleStudioSettingsDrawer;
 
-  if (btnToggleStudioSettings) {
-    const savedState = localStorage.getItem('sushee_studio_settings_open');
-    if (savedState === '1') {
-      setStudioDrawerState(true, false);
-    }
-  }
-
   // Subtab navigation inside combined studio drawer
-  const switchStudioSubtab = (tabName) => {
+  function switchStudioSubtab(tabName) {
     if (!tabName) return;
     try {
       localStorage.setItem('sushee_active_studio_subtab', tabName);
@@ -1456,8 +1487,15 @@ async function initApp() {
       paneSync.style.display = tabName === 'syncTab' ? 'block' : 'none';
       if (tabName === 'syncTab') paneSync.classList.add('active'); else paneSync.classList.remove('active');
     }
-  };
+  }
   window.switchStudioSubtab = switchStudioSubtab;
+
+  if (btnToggleStudioSettings) {
+    const savedState = localStorage.getItem('sushee_studio_settings_open');
+    if (savedState === '1') {
+      setStudioDrawerState(true, false);
+    }
+  }
 
   // Direct and delegated click and touch handler for subtab buttons to ensure 100% responsiveness on mobile
   const handleSubtabTrigger = (e) => {

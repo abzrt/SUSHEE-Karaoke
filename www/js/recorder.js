@@ -163,6 +163,24 @@ class KaraokeRecorder {
     this.recordingStartTime = Date.now();
   }
 
+  /**
+   * Returns current hardware and driver buffer latency in seconds for latency compensation
+   */
+  getDeviceBufferLatency() {
+    if (this.audioEngine && typeof this.audioEngine.getBufferLatency === 'function') {
+      return this.audioEngine.getBufferLatency();
+    }
+    if (this.audioEngine && this.audioEngine.audioCtx) {
+      const base = this.audioEngine.audioCtx.baseLatency || 0;
+      const output = this.audioEngine.audioCtx.outputLatency || 0;
+      const hw = base + output;
+      const effectiveHw = hw > 0 ? hw : 0.08;
+      const manual = (this.audioEngine.latencyOffsetMs || 0) / 1000;
+      return Math.max(0, effectiveHw + manual);
+    }
+    return 0.08;
+  }
+
   async convertToMp3(rawBlob, kbps = 320) {
     if (!window.lamejs || typeof window.lamejs.Mp3Encoder !== 'function') {
       console.warn("lamejs Mp3Encoder not available. Returning raw blob.");
@@ -175,38 +193,64 @@ class KaraokeRecorder {
       const tempCtx = new AudioCtxClass();
       const audioBuffer = await tempCtx.decodeAudioData(arrayBuffer);
 
-      const numChannels = Math.min(2, audioBuffer.numberOfChannels);
+      const numChannels = audioBuffer.numberOfChannels;
       const sampleRate = audioBuffer.sampleRate;
       const targetKbps = kbps || 320;
-      const encoder = new window.lamejs.Mp3Encoder(numChannels, sampleRate, targetKbps);
+      const numSamples = audioBuffer.length;
 
-      const leftFloat = audioBuffer.getChannelData(0);
-      const rightFloat = numChannels > 1 ? audioBuffer.getChannelData(1) : leftFloat;
-      const numSamples = leftFloat.length;
+      // Latency Compensation: Shift vocal track forward by hardware buffer delay during final mixing
+      const bufferLatencySec = this.getDeviceBufferLatency();
+      const shiftSamples = Math.round(bufferLatencySec * sampleRate);
+
+      const ch0 = audioBuffer.getChannelData(0);
+      const ch1 = numChannels > 1 ? audioBuffer.getChannelData(1) : null;
 
       const left = new Int16Array(numSamples);
       const right = new Int16Array(numSamples);
 
       for (let i = 0; i < numSamples; i++) {
-        const l = Math.max(-1, Math.min(1, leftFloat[i]));
-        left[i] = l < 0 ? l * 0x8000 : l * 0x7FFF;
+        let sampleL = 0;
+        let sampleR = 0;
 
-        const r = Math.max(-1, Math.min(1, rightFloat[i]));
-        right[i] = r < 0 ? r * 0x8000 : r * 0x7FFF;
+        if (ch1) {
+          // Dual-track: ch0 is Vocal, ch1 is Backing Music.
+          // Shift vocal forward to cancel out device buffer delay during final mixing
+          const vocalSample = (i + shiftSamples < numSamples) ? ch0[i + shiftSamples] : 0;
+          const musicSample = ch1[i];
+          const mixed = Math.max(-1, Math.min(1, vocalSample + musicSample));
+          sampleL = mixed;
+          sampleR = mixed;
+        } else {
+          sampleL = Math.max(-1, Math.min(1, ch0[i]));
+          sampleR = sampleL;
+        }
+
+        left[i] = sampleL < 0 ? sampleL * 0x8000 : sampleL * 0x7FFF;
+        right[i] = sampleR < 0 ? sampleR * 0x8000 : sampleR * 0x7FFF;
+
+        if (i % 200000 === 0 && i > 0) {
+          await new Promise(r => setTimeout(r, 0));
+        }
       }
 
+      const encoder = new window.lamejs.Mp3Encoder(2, sampleRate, targetKbps);
       const mp3Data = [];
       const sampleBlockSize = 1152;
+      let blockCount = 0;
 
       for (let i = 0; i < numSamples; i += sampleBlockSize) {
         const leftChunk = left.subarray(i, i + sampleBlockSize);
-        const rightChunk = numChannels > 1 ? right.subarray(i, i + sampleBlockSize) : leftChunk;
-        const mp3buf = numChannels > 1
-          ? encoder.encodeBuffer(leftChunk, rightChunk)
-          : encoder.encodeBuffer(leftChunk);
+        const rightChunk = right.subarray(i, i + sampleBlockSize);
+        const mp3buf = encoder.encodeBuffer(leftChunk, rightChunk);
 
         if (mp3buf && mp3buf.length > 0) {
           mp3Data.push(new Int8Array(mp3buf));
+        }
+
+        blockCount++;
+        // Non-blocking yield: yield every 25 blocks to keep UI thread 100% fluid in background without freeze
+        if (blockCount % 25 === 0) {
+          await new Promise(r => setTimeout(r, 0));
         }
       }
 
@@ -220,7 +264,7 @@ class KaraokeRecorder {
       }
 
       const mp3Blob = new Blob(mp3Data, { type: 'audio/mp3' });
-      console.log(`✓ MP3 ${targetKbps} Kbps conversion complete. Size: ${(mp3Blob.size / 1024).toFixed(1)} KB`);
+      console.log(`✓ MP3 ${targetKbps} Kbps conversion complete with Latency Compensation (${(bufferLatencySec * 1000).toFixed(1)}ms shifted). Size: ${(mp3Blob.size / 1024).toFixed(1)} KB`);
       return mp3Blob;
     } catch (err) {
       console.error("Failed to convert audio to MP3 320kbps:", err);
@@ -267,13 +311,14 @@ class KaraokeRecorder {
   }
 
   audioBufferToWavBlob(audioBuffer) {
-    const numChannels = Math.min(2, audioBuffer.numberOfChannels);
+    const numChannels = 2; // Always stereo output
     const sampleRate = audioBuffer.sampleRate;
     const format = 1; // 1 = PCM uncompressed
     const bitDepth = 16;
     const bytesPerSample = bitDepth / 8;
     const blockAlign = numChannels * bytesPerSample;
-    const length = audioBuffer.length * blockAlign;
+    const numSamples = audioBuffer.length;
+    const length = numSamples * blockAlign;
     const buffer = new ArrayBuffer(44 + length);
     const view = new DataView(buffer);
 
@@ -297,19 +342,26 @@ class KaraokeRecorder {
     writeString(view, 36, 'data');
     view.setUint32(40, length, true);
 
-    const channels = [];
-    for (let i = 0; i < numChannels; i++) {
-      channels.push(audioBuffer.getChannelData(i));
-    }
+    const bufferLatencySec = this.getDeviceBufferLatency();
+    const shiftSamples = Math.round(bufferLatencySec * sampleRate);
+
+    const ch0 = typeof audioBuffer.getChannelData === 'function' ? audioBuffer.getChannelData(0) : [];
+    const ch1 = (audioBuffer.numberOfChannels > 1 && typeof audioBuffer.getChannelData === 'function') ? audioBuffer.getChannelData(1) : null;
 
     let offset = 44;
-    for (let i = 0; i < audioBuffer.length; i++) {
-      for (let ch = 0; ch < numChannels; ch++) {
-        let sample = Math.max(-1, Math.min(1, channels[ch][i]));
-        sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
-        view.setInt16(offset, sample, true);
-        offset += 2;
+    for (let i = 0; i < numSamples; i++) {
+      let mixed = 0;
+      if (ch1) {
+        const vocalSample = (i + shiftSamples < numSamples) ? ch0[i + shiftSamples] : 0;
+        const musicSample = ch1[i];
+        mixed = Math.max(-1, Math.min(1, vocalSample + musicSample));
+      } else {
+        mixed = Math.max(-1, Math.min(1, ch0[i] || 0));
       }
+      let sample = mixed < 0 ? mixed * 0x8000 : mixed * 0x7FFF;
+      view.setInt16(offset, sample, true);
+      view.setInt16(offset + 2, sample, true);
+      offset += 4;
     }
 
     return new Blob([view], { type: 'audio/wav' });
@@ -366,15 +418,17 @@ class KaraokeRecorder {
       mime = 'audio/wav';
       bitrateLabel = 'Lossless PCM';
     } else if (targetFormat === 'm4a') {
-      formatName = 'M4A';
-      ext = 'm4a';
-      mime = 'audio/mp4';
-      bitrateLabel = 'AAC 256 kbps';
+      finalBlob = await this.convertToMp3(rawBlob, this.recordingBitrate);
+      formatName = 'MP3';
+      ext = 'mp3';
+      mime = 'audio/mp3';
+      bitrateLabel = `${this.recordingBitrate} kbps`;
     } else if (targetFormat === 'webm') {
-      formatName = 'WEBM';
-      ext = 'webm';
-      mime = 'audio/webm';
-      bitrateLabel = 'Opus High-Fi';
+      finalBlob = await this.convertToMp3(rawBlob, this.recordingBitrate);
+      formatName = 'MP3';
+      ext = 'mp3';
+      mime = 'audio/mp3';
+      bitrateLabel = `${this.recordingBitrate} kbps`;
     } else {
       // Default: MP3 with user selected bitrate (128, 192, 256, 320 kbps)
       finalBlob = await this.convertToMp3(rawBlob, this.recordingBitrate);
@@ -385,6 +439,8 @@ class KaraokeRecorder {
     }
 
     const finalUrl = URL.createObjectURL(finalBlob);
+    this.currentRecordingBlob = finalBlob;
+    this.currentRecordingUrl = finalUrl;
 
     const recItem = {
       id: 'rec_' + Date.now(),
