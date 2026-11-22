@@ -140,10 +140,12 @@ class AudioEffectsEngine {
     if (!this.micAnalyser) {
       this.micAnalyser = this.audioCtx.createAnalyser();
       this.micAnalyser.fftSize = 128;
+      this.micAnalyser.smoothingTimeConstant = 0.45;
     }
     if (!this.musicAnalyser) {
       this.musicAnalyser = this.audioCtx.createAnalyser();
       this.musicAnalyser.fftSize = 128;
+      this.musicAnalyser.smoothingTimeConstant = 0.45;
     }
 
     // Setup Music Audio Chain
