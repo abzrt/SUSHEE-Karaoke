@@ -3139,7 +3139,7 @@ async function initApp() {
         </div>
       `;
       updateServerStatusUI(hostingService.isConnected, 0);
-    } else if (!cloudListContainer.children || cloudListContainer.children.length === 0) {
+    } else if (!cloudListContainer.querySelector('.song-card:not(.skeleton-card)')) {
       const gObj = (typeof window !== 'undefined') ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
       const bundled = (gObj && Array.isArray(gObj.SUSHEE_DEFAULT_CLOUD_CATALOG)) ? gObj.SUSHEE_DEFAULT_CLOUD_CATALOG : [];
       if (bundled.length > 0) {

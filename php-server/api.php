@@ -94,6 +94,33 @@ function parseLrcMetadata($content) {
     return ['title' => $title, 'artist' => $artist];
 }
 
+// 1b. Cache hasil scan: signature dibangun dari nama + waktu ubah + ukuran file (tanpa membaca isi file)
+$includeLyrics = isset($_GET['lyrics']) && $_GET['lyrics'] === '1';
+$queryKey = isset($_GET['q']) ? strtolower(trim($_GET['q'])) : '';
+$sigParts = [@filemtime(__FILE__), $protocol . $host . $encodedDir, $queryKey, $includeLyrics ? 'L' : '-'];
+foreach ($scanDirs as $target) {
+    $entries = @scandir($target['path']);
+    if (!$entries) continue;
+    foreach ($entries as $entry) {
+        if (!preg_match('/\.(mp3|m4a|wav|ogg|flac|lrc)$/i', $entry)) continue;
+        $p = $target['path'] . $entry;
+        $sigParts[] = $entry . '|' . @filemtime($p) . '|' . @filesize($p);
+    }
+}
+$signature = md5(implode("\n", $sigParts));
+$etag = '"' . $signature . '"';
+header('ETag: ' . $etag);
+header('Cache-Control: no-cache');
+if (isset($_SERVER['HTTP_IF_NONE_MATCH']) && trim($_SERVER['HTTP_IF_NONE_MATCH']) === $etag) {
+    http_response_code(304);
+    exit;
+}
+$cacheFile = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'sushee_api_' . $signature . '.json';
+if (is_file($cacheFile)) {
+    readfile($cacheFile);
+    exit;
+}
+
 // 2. Kumpulkan dan indeks seluruh file .lrc terlebih dahulu
 $allLrcFiles = [];
 $lrcIndex = [];
@@ -303,7 +330,7 @@ foreach ($scanDirs as $target) {
 
         $hasLyrics = ($matchedLrc !== null);
 
-        $catalog[] = [
+        $item = [
             'id' => 'host_' . substr(md5($file), 0, 10),
             'title' => $cleanTitle,
             'artist' => $cleanArtist,
@@ -313,9 +340,13 @@ foreach ($scanDirs as $target) {
             'audioUrl' => $audioUrl,
             'hasLyrics' => $hasLyrics,
             'lrcUrl' => $hasLyrics ? $matchedLrc['url'] : null,
-            'lrcContent' => $hasLyrics ? $matchedLrc['content'] : null,
             'fileSize' => @filesize($fullPath) ?: 0
         ];
+        // Isi lirik hanya dikirim jika diminta (?lyrics=1); aplikasi mengunduh lirik via lrcUrl saat lagu dipilih
+        if ($includeLyrics) {
+            $item['lrcContent'] = $hasLyrics ? $matchedLrc['content'] : null;
+        }
+        $catalog[] = $item;
     }
 }
 
@@ -324,9 +355,17 @@ usort($catalog, function($a, $b) {
     return strcasecmp($a['title'], $b['title']);
 });
 
-echo json_encode([
+$output = json_encode([
     'status' => 'success',
     'server' => 'SUSHEE PHP Hosting Server',
     'total' => count($catalog),
     'songs' => $catalog
-], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+], JSON_UNESCAPED_SLASHES);
+
+// Simpan cache (abaikan jika folder temp tidak bisa ditulis) dan bersihkan cache lama
+if (@file_put_contents($cacheFile, $output) !== false) {
+    foreach ((array) @glob(rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'sushee_api_*.json') as $old) {
+        if ($old !== $cacheFile && @filemtime($old) < time() - 86400) @unlink($old);
+    }
+}
+echo $output;

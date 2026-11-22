@@ -30,3 +30,6 @@ scratch/
 # Environment
 .env
 .env.local
+
+# Generated web bundle (rebuilt by prepare-www.js during build:apk)
+www/

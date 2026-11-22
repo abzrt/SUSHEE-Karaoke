@@ -31,11 +31,16 @@ targets.forEach(targetDir => {
   if (!fs.existsSync(targetDir)) {
     fs.mkdirSync(targetDir, { recursive: true });
   }
-  ['index.html', 'diagnostics.html', 'manifest.json', 'css', 'js', 'assets'].forEach(item => {
+  ['index.html', 'manifest.json', 'css', 'js', 'assets'].forEach(item => {
     const itemPath = path.join(srcDir, item);
     if (fs.existsSync(itemPath)) {
       copyRecursive(itemPath, path.join(targetDir, item));
     }
+  });
+  // Remove leftovers that must not ship inside the APK
+  ['diagnostics.html', 'test.html', path.join('js', 'default-cloud-catalog.json')].forEach(item => {
+    const stale = path.join(targetDir, item);
+    if (fs.existsSync(stale)) fs.rmSync(stale, { force: true });
   });
 });
 

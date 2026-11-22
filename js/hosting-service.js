@@ -54,36 +54,6 @@ class HostingServerService {
       this.isConnected = true;
     }
 
-    // DOM Pre-rendered Fallback: Extract from static HTML if JS loaded afterwards
-    if (this.cachedSongs.length === 0 && typeof document !== 'undefined') {
-      const cards = document.querySelectorAll('#cloudSongList .song-card, #songsList .song-card[data-song-id^="host_"]');
-      if (cards.length > 0) {
-        const domList = [];
-        cards.forEach(card => {
-          const id = card.getAttribute('data-cloud-id') || card.getAttribute('data-song-id');
-          if (id && !domList.some(s => s.id === id)) {
-            const title = card.querySelector('.song-card-title')?.textContent?.trim() || '';
-            const artist = card.querySelector('.song-card-artist')?.textContent?.trim() || '';
-            const hasLyrics = Boolean(card.querySelector('.badge-lyrics'));
-            domList.push({
-              id,
-              title,
-              artist,
-              format: '.MP3',
-              source: 'custom_host',
-              audioUrl: `https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SONGS/${encodeURIComponent(title)}.mp3`,
-              hasLyrics,
-              lrcUrl: hasLyrics ? `https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SONGS/${encodeURIComponent(title)}.lrc` : null
-            });
-          }
-        });
-        if (domList.length > 0) {
-          this.cachedSongs = domList.map(s => this.cleanSongMetadata(s));
-          this.isConnected = true;
-        }
-      }
-    }
-
     if (this.cachedSongs.length > 0) {
       this.cachedSongs = this.cachedSongs.map(s => this.cleanSongMetadata(s));
     }
@@ -183,40 +153,13 @@ class HostingServerService {
   getFilteredCache(query = '') {
     const q = (query || '').toLowerCase().trim();
 
-    // Self-healing: if cachedSongs is empty, attempt immediate recharge from global catalog or DOM
+    // Self-healing: if cachedSongs is empty, attempt immediate recharge from bundled catalog
     if (this.cachedSongs.length === 0) {
       const gObj = (typeof window !== 'undefined') ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
       const bundled = (gObj && Array.isArray(gObj.SUSHEE_DEFAULT_CLOUD_CATALOG)) ? gObj.SUSHEE_DEFAULT_CLOUD_CATALOG : [];
       if (bundled.length > 0) {
         this.cachedSongs = [...bundled];
         this.isConnected = true;
-      } else if (typeof document !== 'undefined') {
-        const cards = document.querySelectorAll('#cloudSongList .song-card, #songsList .song-card[data-song-id^="host_"]');
-        if (cards.length > 0) {
-          const domList = [];
-          cards.forEach(card => {
-            const id = card.getAttribute('data-cloud-id') || card.getAttribute('data-song-id');
-            if (id && !domList.some(s => s.id === id)) {
-              const title = card.querySelector('.song-card-title')?.textContent?.trim() || '';
-              const artist = card.querySelector('.song-card-artist')?.textContent?.trim() || '';
-              const hasLyrics = Boolean(card.querySelector('.badge-lyrics'));
-              domList.push({
-                id,
-                title,
-                artist,
-                format: '.MP3',
-                source: 'custom_host',
-                audioUrl: `https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SONGS/${encodeURIComponent(title)}.mp3`,
-                hasLyrics,
-                lrcUrl: hasLyrics ? `https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SONGS/${encodeURIComponent(title)}.lrc` : null
-              });
-            }
-          });
-          if (domList.length > 0) {
-            this.cachedSongs = domList;
-            this.isConnected = true;
-          }
-        }
       }
     }
 
