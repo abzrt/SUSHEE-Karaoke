@@ -120,6 +120,91 @@ async function initApp() {
   const offlineManager = (typeof OfflineSongManager === 'function') ? new OfflineSongManager() : null;
   window.offlineManager = offlineManager;
 
+  // --- STAGE 3: VOCAL SCORER, PARTY QUEUE BANNER & SHARE RECORDING ---
+  const vocalScorer = (typeof VocalScorer === 'function')
+    ? new VocalScorer(audioEngine, () => Boolean(lrcParser && lrcParser.lines && lrcParser.lines.length > 0 && activeLyricIndex >= 0 && lrcParser.lines[activeLyricIndex] && lrcParser.lines[activeLyricIndex].text && lrcParser.lines[activeLyricIndex].text.trim().length > 0))
+    : null;
+  window.vocalScorer = vocalScorer;
+
+  function startVocalScoringUI() {
+    if (!vocalScorer) return;
+    const pill = document.getElementById('liveScorePill');
+    const gradeEl = document.getElementById('liveScoreGrade');
+    const valEl = document.getElementById('liveScoreVal');
+    if (pill) pill.style.display = 'inline-flex';
+    if (gradeEl) gradeEl.textContent = '-';
+    if (valEl) valEl.textContent = '0';
+    vocalScorer.start((snap) => {
+      if (gradeEl) gradeEl.textContent = snap.grade;
+      if (valEl) valEl.textContent = String(snap.score);
+    });
+  }
+
+  function stopVocalScoringUI(showSummary = true) {
+    if (!vocalScorer || !vocalScorer.isRunning) return null;
+    const finalSnap = vocalScorer.stop();
+    const pill = document.getElementById('liveScorePill');
+    if (showSummary && finalSnap && finalSnap.sungFrames >= 10) {
+      showToast(`🏆 Skor Karaoke: ${finalSnap.score} (Grade ${finalSnap.grade}) • Nada ${finalSnap.pitchScore}% | Tempo ${finalSnap.timingScore}%`, 'success');
+    } else if (pill) {
+      pill.style.display = 'none';
+    }
+    return finalSnap;
+  }
+
+  let upNextBannerTimer = null;
+  function showPartyUpNextBanner(song) {
+    const banner = document.getElementById('partyUpNextBanner');
+    const textEl = document.getElementById('partyUpNextText');
+    if (!banner || !textEl || !song) return;
+    const singer = song.singerName ? `🎤 Giliran ${song.singerName}: ` : '🎵 Berikutnya: ';
+    textEl.textContent = `${singer}${song.title}`;
+    banner.style.display = 'block';
+    if (upNextBannerTimer) clearTimeout(upNextBannerTimer);
+    upNextBannerTimer = setTimeout(() => {
+      banner.style.display = 'none';
+    }, 4500);
+  }
+  window.showPartyUpNextBanner = showPartyUpNextBanner;
+
+  async function shareRecording(rec) {
+    if (!rec) return;
+    const safeTitle = (rec.title || 'SUSHEE Karaoke').replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'SUSHEE_Karaoke';
+    const ext = (rec.mimeType && rec.mimeType.includes('wav')) ? 'wav' : 'mp3';
+    const fileName = `${safeTitle}.${ext}`;
+    const shareText = `🎤 Dengarkan rekaman karaoke "${rec.title}" (${rec.artist || 'SUSHEE'}) yang direkam di SUSHEE Karaoke!`;
+
+    try {
+      let blob = rec.blob || null;
+      if (!blob && rec.url) {
+        const resp = await fetch(rec.url);
+        blob = await resp.blob();
+      }
+      if (blob && typeof File !== 'undefined' && navigator.share) {
+        const file = new File([blob], fileName, { type: blob.type || (ext === 'wav' ? 'audio/wav' : 'audio/mpeg') });
+        if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+          await navigator.share({ title: rec.title || 'SUSHEE Karaoke', text: shareText, files: [file] });
+          showToast('✅ Rekaman berhasil dibagikan!', 'success');
+          return;
+        }
+      }
+      if (navigator.share) {
+        await navigator.share({ title: rec.title || 'SUSHEE Karaoke', text: shareText });
+        return;
+      }
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;
+      console.warn('Web Share fallback triggered:', err);
+    }
+
+    // Fallback when Web Share API is unavailable (e.g. desktop HTTP): download file so user can share it
+    if (recorder && typeof recorder.downloadRecording === 'function') {
+      recorder.downloadRecording(rec);
+      showToast('📤 File diunduh — siap dibagikan ke WhatsApp/IG!', 'info');
+    }
+  }
+  window.shareRecording = shareRecording;
+
   // Register Service Worker for true offline PWA/Capacitor shell caching
   if ('serviceWorker' in navigator && window.location && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     window.addEventListener('load', () => {
@@ -1226,6 +1311,7 @@ async function initApp() {
         if (micStarted) {
           try {
             recorder.startRecording();
+            startVocalScoringUI();
             await requestScreenWakeLock(); // Screen keep-awake ONLY while recording!
           } catch (recErr) {
             console.warn("Recorder start error:", recErr);
@@ -1278,6 +1364,7 @@ async function initApp() {
       }
 
       // Stop recording instantaneously without heavy conversion lag
+      stopVocalScoringUI(true);
       const recordingResult = await recorder.stopRecording();
       updateKaraokeUIState(false);
       updateMusicPlayButtonUI(false);
@@ -1486,6 +1573,7 @@ async function initApp() {
     }
 
     if (recorder && recorder.isRecording) {
+      stopVocalScoringUI(true);
       if (audioEngine && typeof audioEngine.stopMicrophone === 'function') {
         audioEngine.stopMicrophone();
       }
@@ -2454,6 +2542,10 @@ async function initApp() {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             <span class="btn-rec-label">${(window.i18n && window.i18n.t) ? window.i18n.t('btnDownloadRecording') : 'Simpan'}</span>
           </button>
+          <button type="button" class="btn-rec-action btn-share-rec" data-rec-id="${rec.id}" title="Bagikan Rekaman" aria-label="Bagikan Rekaman">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            <span class="btn-rec-label">Bagikan</span>
+          </button>
           <button type="button" class="btn-rec-action btn-del-rec" data-rec-id="${rec.id}" title="${(window.i18n && window.i18n.t) ? window.i18n.t('btnDeleteRecording') : 'Hapus'}" aria-label="${(window.i18n && window.i18n.t) ? window.i18n.t('btnDeleteRecording') : 'Hapus'}">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
             <span class="btn-rec-label">${(window.i18n && window.i18n.t) ? window.i18n.t('btnDeleteRecording') : 'Hapus'}</span>
@@ -2465,7 +2557,7 @@ async function initApp() {
     // Attach card click listener to preview recording directly
     recordingsListContainer.querySelectorAll('.recording-card').forEach(card => {
       card.addEventListener('click', (e) => {
-        if (e.target.closest('.btn-dl-rec') || e.target.closest('.btn-del-rec')) return;
+        if (e.target.closest('.btn-dl-rec') || e.target.closest('.btn-share-rec') || e.target.closest('.btn-del-rec')) return;
         const id = card.getAttribute('data-rec-id');
         const rec = recorder.recordings.find(r => r.id === id);
         if (rec) showRecordingModal(rec);
@@ -2488,6 +2580,15 @@ async function initApp() {
         const id = btn.getAttribute('data-rec-id');
         const rec = recorder.recordings.find(r => r.id === id);
         if (rec) recorder.downloadRecording(rec);
+      });
+    });
+
+    recordingsListContainer.querySelectorAll('.btn-share-rec').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-rec-id');
+        const rec = recorder.recordings.find(r => r.id === id);
+        if (rec) shareRecording(rec);
       });
     });
 
@@ -2634,6 +2735,15 @@ async function initApp() {
     btnDownloadRec.addEventListener('click', () => {
       if (currentModalRecording) {
         recorder.downloadRecording(currentModalRecording);
+      }
+    });
+  }
+
+  const btnShareRec = document.getElementById('btnShareRec');
+  if (btnShareRec) {
+    btnShareRec.addEventListener('click', () => {
+      if (currentModalRecording) {
+        shareRecording(currentModalRecording);
       }
     });
   }
@@ -2930,7 +3040,7 @@ async function initApp() {
     container.innerHTML = songsPlaylist.map((s, idx) => `
       <div class="queue-item ${songsPlaylistIndex === idx ? 'active' : ''}" data-queue-idx="${idx}">
         <div class="queue-item-info">
-          <span class="queue-item-title">${idx + 1}. ${s.title}</span>
+          <span class="queue-item-title">${idx + 1}. ${s.title}${s.singerName ? `<span class="queue-singer-badge">🎤 ${escapeHtml(s.singerName)}</span>` : ''}</span>
           <span class="queue-item-artist">${formatArtistDisplay(s.artist) || (s.source === 'custom_host' ? 'PHP Hosting' : 'Penyimpanan HP')}</span>
         </div>
         <button type="button" class="queue-item-remove" data-remove-idx="${idx}" title="Hapus">
@@ -3027,10 +3137,13 @@ async function initApp() {
 
     let inPlaylist = false;
     if (existsIdx === -1) {
-      songsPlaylist.push(song);
+      const singerInput = document.getElementById('partySingerInput');
+      const singerName = singerInput ? singerInput.value.trim() : '';
+      songsPlaylist.push(singerName ? { ...song, singerName } : { ...song });
       inPlaylist = true;
       if (showToastNotice) {
-        showToast(`✓ ${song.title} ${(window.i18n && window.i18n.t) ? window.i18n.t('btnAddedToPlaylist') : 'ditambahkan ke Playlist'}`, 'success');
+        const singerTag = singerName ? ` (🎤 ${singerName})` : '';
+        showToast(`✓ ${song.title}${singerTag} ${(window.i18n && window.i18n.t) ? window.i18n.t('btnAddedToPlaylist') : 'ditambahkan ke Playlist'}`, 'success');
       }
       // When first song is added or playlist was idle, update the controller preview
       if (songsPlaylistIndex === -1 && songsPlaylist.length > 0) {
@@ -3198,9 +3311,10 @@ async function initApp() {
     const trackArtist = document.getElementById('songsPlaylistTrackArtist');
     const nowText = document.getElementById('songsPlaylistNowText');
 
-    if (trackTitle) trackTitle.textContent = song.title;
+    if (trackTitle) trackTitle.textContent = song.singerName ? `🎤 ${song.singerName} — ${song.title}` : song.title;
     if (trackArtist) trackArtist.textContent = `${formatArtistDisplay(song.artist) || (song.source === 'custom_host' ? 'PHP Hosting' : 'Penyimpanan HP')} • Lagu ${idx + 1} dari ${songsPlaylist.length}`;
     if (nowText) nowText.textContent = `Memutar: ${song.title} (${idx + 1}/${songsPlaylist.length})`;
+    showPartyUpNextBanner(song);
 
     try {
       if (audioEngine) {

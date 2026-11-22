@@ -3,7 +3,7 @@
  * - App shell: Network-first with cache fallback (ensures fresh updates when online, full boot when offline)
  * - Downloaded songs & lyrics: Served from offline cache when available
  */
-const APP_SHELL_CACHE = 'sushee-shell-v2';
+const APP_SHELL_CACHE = 'sushee-shell-v3';
 const OFFLINE_SONGS_CACHE = 'sushee-offline-songs-v1';
 
 const APP_SHELL_ASSETS = [
@@ -20,6 +20,7 @@ const APP_SHELL_ASSETS = [
   './js/cloud-catalog.js',
   './js/hosting-service.js',
   './js/offline-manager.js',
+  './js/vocal-scorer.js',
   './js/app.js',
   './assets/icon.jpg',
   './assets/icon-192.png',

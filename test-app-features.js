@@ -409,10 +409,27 @@ assert(freshAppJsContent.includes('window.toggleOfflineSong = toggleOfflineSong;
 assert(freshAppJsContent.includes("navigator.serviceWorker.register('./sw.js')"), 'app.js registers Service Worker sw.js');
 assert(freshStyleCssContent.includes('.lyric-sync-card') && freshStyleCssContent.includes('.btn-offline-dl') && freshStyleCssContent.includes('.bt-tap-pad'), 'style.css defines Stage 2 UI classes');
 
+// ======================================================
+// TEST SUITE 16: Stage 3 (Vocal Scorer, Party Queue Singer & Share Recording)
+// ======================================================
+console.log('\n=== TEST SUITE 16: Stage 3 Vocal Scoring, Party Queue & Share Recording ===');
+assert(fs.existsSync('js/vocal-scorer.js'), 'js/vocal-scorer.js exists');
+const vocalScorerContent = fs.readFileSync('js/vocal-scorer.js', 'utf8');
+assert(vocalScorerContent.includes('class VocalScorer') && vocalScorerContent.includes('detectPitch('), 'vocal-scorer.js defines VocalScorer with autocorrelation detectPitch');
+const scorerSandbox = { window: {} };
+new Function('window', vocalScorerContent)(scorerSandbox.window);
+const VS = scorerSandbox.window.VocalScorer;
+assert(VS.computeGrade(96) === 'S+' && VS.computeGrade(90) === 'S' && VS.computeGrade(80) === 'A', 'VocalScorer.computeGrade returns expected grades');
+assert(VS.freqToNoteInfo(440).note === 'A4' && VS.freqToNoteInfo(440).centsOff < 0.1, 'VocalScorer.freqToNoteInfo accurately identifies A4 (440 Hz)');
+assert(indexHtml.includes('src="js/vocal-scorer.js') && indexHtml.includes('id="liveScorePill"'), 'index.html loads vocal-scorer.js and renders #liveScorePill');
+assert(indexHtml.includes('id="partySingerInput"') && indexHtml.includes('id="partyUpNextBanner"'), 'index.html has Party Mode singer input & up-next banner');
+assert(indexHtml.includes('id="btnShareRec"'), 'index.html has Share Recording button in modal');
+assert(freshAppJsContent.includes('window.shareRecording = shareRecording;') && freshAppJsContent.includes('window.showPartyUpNextBanner = showPartyUpNextBanner;'), 'app.js exposes shareRecording and showPartyUpNextBanner');
+
 console.log('\n======================================================');
 console.log(`TOTAL TESTS: ${testsPassed + testsFailed} | PASSED: ${testsPassed} | FAILED: ${testsFailed}`);
 if (testsFailed === 0) {
-  console.log('🎉 ALL 15 TEST SUITES OPERATIONAL WITH ZERO ERRORS!');
+  console.log('🎉 ALL 16 TEST SUITES OPERATIONAL WITH ZERO ERRORS!');
 } else {
   console.error('⚠️ SOME TESTS FAILED. PLEASE INVESTIGATE!');
   process.exit(1);
