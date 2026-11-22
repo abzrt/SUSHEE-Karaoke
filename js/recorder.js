@@ -181,7 +181,40 @@ class KaraokeRecorder {
     return 0.08;
   }
 
+  ensureLameLoaded() {
+    if (typeof window !== 'undefined' && window.lamejs && typeof window.lamejs.Mp3Encoder === 'function') {
+      return Promise.resolve(true);
+    }
+    if (this._lameLoadPromise) return this._lameLoadPromise;
+    if (typeof document === 'undefined') return Promise.resolve(false);
+
+    this._lameLoadPromise = new Promise((resolve) => {
+      const existing = document.querySelector('script[data-lazy-lame="true"]');
+      if (existing) {
+        existing.addEventListener('load', () => resolve(Boolean(window.lamejs && window.lamejs.Mp3Encoder)), { once: true });
+        existing.addEventListener('error', () => resolve(false), { once: true });
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'js/lame.min.js';
+      script.async = true;
+      script.setAttribute('data-lazy-lame', 'true');
+      const timer = setTimeout(() => resolve(false), 10000);
+      script.onload = () => {
+        clearTimeout(timer);
+        resolve(Boolean(window.lamejs && typeof window.lamejs.Mp3Encoder === 'function'));
+      };
+      script.onerror = () => {
+        clearTimeout(timer);
+        resolve(false);
+      };
+      document.head.appendChild(script);
+    });
+    return this._lameLoadPromise;
+  }
+
   async convertToMp3(rawBlob, kbps = 320) {
+    await this.ensureLameLoaded();
     if (!window.lamejs || typeof window.lamejs.Mp3Encoder !== 'function') {
       console.warn("lamejs Mp3Encoder not available. Returning raw blob.");
       return rawBlob;

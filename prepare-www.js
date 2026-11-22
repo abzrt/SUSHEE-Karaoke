@@ -44,4 +44,14 @@ targets.forEach(targetDir => {
   });
 });
 
-console.log('✓ Successfully prepared www and android assets for Android build');
+// Auto-stamp cache-busting build version into bundled index.html
+const buildStamp = 'build_' + Date.now();
+targets.forEach(targetDir => {
+  const htmlPath = path.join(targetDir, 'index.html');
+  if (fs.existsSync(htmlPath)) {
+    const stamped = fs.readFileSync(htmlPath, 'utf8').replace(/\?v=touch_fix_v3_\d+/g, '?v=' + buildStamp);
+    fs.writeFileSync(htmlPath, stamped, 'utf8');
+  }
+});
+
+console.log(`✓ Successfully prepared www and android assets for Android build (${buildStamp})`);

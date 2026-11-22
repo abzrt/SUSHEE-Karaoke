@@ -59,8 +59,8 @@ class VocalScorer {
     const minLag = Math.floor(sampleRate / 900);
     const maxLag = Math.min(Math.floor(sampleRate / 85), Math.floor(size / 2));
 
-    let bestLag = -1;
-    let bestCorr = 0;
+    const corrs = new Float32Array(maxLag + 1);
+    let globalMax = 0;
 
     for (let lag = minLag; lag <= maxLag; lag++) {
       let sum = 0;
@@ -75,13 +75,23 @@ class VocalScorer {
       }
       const denom = Math.sqrt(normA * normB);
       const corr = denom > 0 ? sum / denom : 0;
-      if (corr > bestCorr) {
-        bestCorr = corr;
+      corrs[lag] = corr;
+      if (corr > globalMax) globalMax = corr;
+    }
+
+    if (globalMax < 0.62) return { rms, freq: 0 };
+
+    // Pick the FIRST local peak >= 88% of globalMax to avoid sub-harmonic octave errors (e.g. 110Hz instead of 440Hz)
+    const threshold = Math.max(0.62, globalMax * 0.88);
+    let bestLag = -1;
+    for (let lag = minLag + 1; lag < maxLag; lag++) {
+      if (corrs[lag] >= threshold && corrs[lag] >= corrs[lag - 1] && corrs[lag] >= corrs[lag + 1]) {
         bestLag = lag;
+        break;
       }
     }
 
-    if (bestLag > 0 && bestCorr >= 0.62) {
+    if (bestLag > 0) {
       return { rms, freq: sampleRate / bestLag };
     }
     return { rms, freq: 0 };

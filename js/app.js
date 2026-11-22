@@ -168,39 +168,11 @@ async function initApp() {
   window.showPartyUpNextBanner = showPartyUpNextBanner;
 
   async function shareRecording(rec) {
-    if (!rec) return;
-    const safeTitle = (rec.title || 'SUSHEE Karaoke').replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'SUSHEE_Karaoke';
-    const ext = (rec.mimeType && rec.mimeType.includes('wav')) ? 'wav' : 'mp3';
-    const fileName = `${safeTitle}.${ext}`;
-    const shareText = `🎤 Dengarkan rekaman karaoke "${rec.title}" (${rec.artist || 'SUSHEE'}) yang direkam di SUSHEE Karaoke!`;
-
-    try {
-      let blob = rec.blob || null;
-      if (!blob && rec.url) {
-        const resp = await fetch(rec.url);
-        blob = await resp.blob();
-      }
-      if (blob && typeof File !== 'undefined' && navigator.share) {
-        const file = new File([blob], fileName, { type: blob.type || (ext === 'wav' ? 'audio/wav' : 'audio/mpeg') });
-        if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-          await navigator.share({ title: rec.title || 'SUSHEE Karaoke', text: shareText, files: [file] });
-          showToast('✅ Rekaman berhasil dibagikan!', 'success');
-          return;
-        }
-      }
-      if (navigator.share) {
-        await navigator.share({ title: rec.title || 'SUSHEE Karaoke', text: shareText });
-        return;
-      }
-    } catch (err) {
-      if (err && err.name === 'AbortError') return;
-      console.warn('Web Share fallback triggered:', err);
+    if (typeof ShareManager !== 'undefined' && typeof ShareManager.shareRecording === 'function') {
+      return ShareManager.shareRecording(rec, { recorder, showToast });
     }
-
-    // Fallback when Web Share API is unavailable (e.g. desktop HTTP): download file so user can share it
     if (recorder && typeof recorder.downloadRecording === 'function') {
       recorder.downloadRecording(rec);
-      showToast('📤 File diunduh — siap dibagikan ke WhatsApp/IG!', 'info');
     }
   }
   window.shareRecording = shareRecording;
@@ -212,59 +184,34 @@ async function initApp() {
     });
   }
 
-  // --- PER-SONG LYRICS SYNC OFFSET (STAGE 2) ---
-  const LYRIC_OFFSETS_KEY = 'sushee_lyric_offsets';
+  // --- PER-SONG LYRICS SYNC OFFSET (Delegated to LyricSyncManager) ---
+  const lyricSyncManager = (typeof LyricSyncManager === 'function') ? new LyricSyncManager() : null;
+  window.lyricSyncManager = lyricSyncManager;
   let currentLyricOffsetMs = 0;
 
-  function loadLyricOffsetsMap() {
-    try {
-      const raw = localStorage.getItem(LYRIC_OFFSETS_KEY);
-      const parsed = raw ? JSON.parse(raw) : {};
-      return (parsed && typeof parsed === 'object') ? parsed : {};
-    } catch (e) {
-      return {};
-    }
-  }
-
   function getLyricOffset(songId) {
-    if (!songId) return 0;
-    const map = loadLyricOffsetsMap();
-    const val = parseInt(map[songId], 10);
-    return isNaN(val) ? 0 : Math.max(-5000, Math.min(5000, val));
-  }
-
-  function saveLyricOffset(songId, offsetMs) {
-    if (!songId) return;
-    try {
-      const map = loadLyricOffsetsMap();
-      if (offsetMs === 0) delete map[songId];
-      else map[songId] = offsetMs;
-      localStorage.setItem(LYRIC_OFFSETS_KEY, JSON.stringify(map));
-    } catch (e) {}
+    return lyricSyncManager ? lyricSyncManager.selectSong(songId) : 0;
   }
 
   function updateLyricSyncUI() {
     const el = document.getElementById('lyricSyncDisplayVal');
     if (el) {
-      el.textContent = (currentLyricOffsetMs > 0 ? '+' : '') + currentLyricOffsetMs + ' ms';
+      el.textContent = lyricSyncManager ? lyricSyncManager.formatDisplay(currentLyricOffsetMs) : ((currentLyricOffsetMs > 0 ? '+' : '') + currentLyricOffsetMs + ' ms');
     }
   }
 
   function stepLyricOffset(deltaMs) {
-    const next = Math.max(-5000, Math.min(5000, currentLyricOffsetMs + (parseInt(deltaMs, 10) || 0)));
-    currentLyricOffsetMs = next;
-    if (currentSong && currentSong.id) saveLyricOffset(currentSong.id, next);
+    currentLyricOffsetMs = lyricSyncManager ? lyricSyncManager.step(deltaMs) : Math.max(-5000, Math.min(5000, currentLyricOffsetMs + (parseInt(deltaMs, 10) || 0)));
     updateLyricSyncUI();
     if (audioElement && !isNaN(audioElement.currentTime)) {
       activeLyricIndex = -2;
       updateLyricSync(audioElement.currentTime);
     }
-    showToast(`⏱️ Offset lirik: ${(next > 0 ? '+' : '') + next} ms`, 'info');
+    showToast(`⏱️ Offset lirik: ${(currentLyricOffsetMs > 0 ? '+' : '') + currentLyricOffsetMs} ms`, 'info');
   }
 
   function resetLyricOffset() {
-    currentLyricOffsetMs = 0;
-    if (currentSong && currentSong.id) saveLyricOffset(currentSong.id, 0);
+    currentLyricOffsetMs = lyricSyncManager ? lyricSyncManager.reset() : 0;
     updateLyricSyncUI();
     if (audioElement && !isNaN(audioElement.currentTime)) {
       activeLyricIndex = -2;
