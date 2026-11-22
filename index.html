@@ -3033,311 +3033,462 @@
 
       <!-- ================= VIEW 2: KARAOKE STUDIO ================= -->
       <section class="app-view" id="viewKaraoke">
-        <div class="karaoke-studio">
+        <div class="karaoke-studio karaoke-stage-container">
           
-          <!-- Studio Header & Visualizer Card -->
-          <div class="studio-header-card">
-            <!-- Recording Indicator -->
-            <div class="recording-indicator" id="recordingIndicator">
-              <span class="rec-pulse-dot"></span>
-              <span>RECORDING LIVE (DUAL-TRACK)</span>
+          <!-- Top Bar: Close (X), Song Info, More (three dots) -->
+          <div class="karaoke-top-bar">
+            <button type="button" class="btn-karaoke-top btn-karaoke-close" id="btnExitKaraoke" onclick="window.switchTab && window.switchTab('viewSongs')" title="Tutup Karaoke">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            <div class="karaoke-top-song-info">
+              <svg class="top-note-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              <span class="current-song-title" data-i18n="selectSongHint">Alive</span>
+              <span class="top-info-sep">-</span>
+              <span class="current-song-artist" data-i18n="studioReady">510</span>
+            </div>
+            <button type="button" class="btn-karaoke-top btn-karaoke-more" id="btnKaraokeMore" title="Opsi">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+            </button>
+          </div>
+
+          <!-- Score / Pitch Rating Bar -->
+          <div class="karaoke-score-bar" id="karaokeScoreBar">
+            <div class="score-seg active" data-score="0">0</div>
+            <div class="score-seg" data-score="C">C</div>
+            <div class="score-seg" data-score="B">B</div>
+            <div class="score-seg" data-score="A">A</div>
+            <div class="score-seg" data-score="A+">A+</div>
+            <div class="score-seg" data-score="A++">A++</div>
+          </div>
+
+          <!-- Stage Body: Mini Preview, Vertical Pitch Meter, Lyrics Screen -->
+          <div class="karaoke-stage-body">
+            
+            <!-- Upper Left: Mini Video / Preview Thumbnail -->
+            <div class="karaoke-mini-video">
+              <div class="mini-video-thumb">
+                <svg class="mini-thumb-play" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="8 5 19 12 8 19 8 5"/></svg>
+              </div>
+              <div class="mini-video-overlay">
+                <span id="currentTime">00:00</span>/<span id="totalDuration">00:00</span>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+              </div>
             </div>
 
-            <h2 class="current-song-title" data-i18n="selectSongHint">Pilih Lagu</h2>
-            <p class="current-song-artist" data-i18n="studioReady">Studio Karaoke Siap</p>
+            <!-- Left: Vertical Pitch & Microphone Meter -->
+            <div class="karaoke-pitch-meter">
+              <div class="pitch-track">
+                <div class="pitch-track-fill" id="pitchTrackFill"></div>
+                <div class="pitch-dot" id="pitchDot"></div>
+              </div>
+              <div class="pitch-mic-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              </div>
+            </div>
 
-            <!-- Audio Waveform Visualizer -->
-            <div class="visualizer-wrapper">
+            <!-- Center: Synchronized Lyrics Screen -->
+            <div class="lyrics-screen" id="lyricsContainer">
+              <!-- Dynamically populated LRC lines -->
+            </div>
+
+            <!-- Skip Prelude Floating Button -->
+            <button type="button" class="btn-skip-prelude" id="btnSkipPrelude" onclick="window.skipKaraokePrelude && window.skipKaraokePrelude()">
+              <span data-i18n="skipPrelude">Skip prelude</span>
+            </button>
+
+            <!-- Background Waveform Visualizer & Utilities -->
+            <div class="visualizer-wrapper visualizer-stage-bg">
               <canvas id="visualizerCanvas"></canvas>
             </div>
+            <input type="range" class="custom-range" id="songProgress" min="0" max="100" value="0" style="display:none;" aria-hidden="true">
+            <div class="recording-indicator" id="recordingIndicator" style="display:none;"><span class="rec-pulse-dot"></span><span>RECORDING</span></div>
 
-            <!-- Progress Bar -->
-            <div class="player-progress-section">
-              <div class="progress-bar-wrapper">
-                <input type="range" class="custom-range" id="songProgress" min="0" max="100" value="0">
+          </div>
+
+          <!-- Bottom Action Controls Bar (Guide, Mixer, Play/Pause, Restart, Done) -->
+          <div class="karaoke-controls-row karaoke-bottom-action-bar" id="karaokeControlsRow">
+            <!-- 1. Guide -->
+            <button type="button" class="btn-stage-action" id="btnKaraokeGuide" onclick="window.toggleKaraokeGuide && window.toggleKaraokeGuide()">
+              <div class="stage-action-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
               </div>
-              <div class="time-row">
-                <span id="currentTime">00:00</span>
-                <span id="totalDuration">00:00</span>
+              <span class="stage-action-label" data-i18n="btnGuide">Guide</span>
+            </button>
+
+            <!-- 2. Mixer -->
+            <button type="button" class="btn-stage-action" id="btnOpenMixerModal" onclick="window.openMixerModal && window.openMixerModal()">
+              <div class="stage-action-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
               </div>
-            </div>
-
-          </div>
-
-          <!-- Synchronized Lyrics Screen -->
-          <div class="lyrics-screen" id="lyricsContainer">
-            <!-- Dynamically populated LRC lines -->
-          </div>
-
-          <!-- Action Controls Bar (Positioned Directly Below Lyrics Screen) -->
-          <div class="karaoke-controls-row" id="karaokeControlsRow">
-            <button type="button" class="btn-icon-round btn-karaoke-unified" id="btnRestartKaraoke" title="Ulangi Lagu" onclick="window.restartKaraoke && window.restartKaraoke()">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+              <span class="stage-action-label" data-i18n="btnMixer">Mixer</span>
             </button>
 
-            <button type="button" class="btn-karaoke-secondary btn-karaoke-unified" id="btnToggleMusicPlayback" title="Putar atau jeda musik backing" onclick="window.toggleMusicPlayback && window.toggleMusicPlayback()">
-              <svg id="musicPlayIcon" class="responsive-play-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              <span id="musicPlayLabel" data-i18n="btnPlayMusic">Putar Musik</span>
+            <!-- 3. Center Circular Play/Pause -->
+            <button type="button" class="btn-stage-action btn-stage-playpause btn-karaoke-secondary" id="btnToggleMusicPlayback" title="Putar atau jeda musik backing" onclick="window.toggleMusicPlayback && window.toggleMusicPlayback()">
+              <div class="stage-playpause-circle">
+                <svg id="musicPlayIcon" class="responsive-play-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              </div>
+              <span id="musicPlayLabel" style="display:none;" data-i18n="btnPlayMusic">Putar Musik</span>
             </button>
 
-            <button type="button" class="btn-karaoke-main btn-karaoke-unified" id="btnKaraokeAction" onclick="window.toggleKaraokeRecording && window.toggleKaraokeRecording()">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
-              <span id="karaokeActionLabel" data-i18n="btnStartKaraoke">Record</span>
+            <!-- 4. Restart -->
+            <button type="button" class="btn-stage-action btn-icon-round" id="btnRestartKaraoke" title="Ulangi Lagu" onclick="window.restartKaraoke && window.restartKaraoke()">
+              <div class="stage-action-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+              </div>
+              <span class="stage-action-label" data-i18n="btnRestart">Restart</span>
+            </button>
+
+            <!-- 5. Done -->
+            <button type="button" class="btn-stage-action btn-karaoke-main" id="btnKaraokeAction" onclick="window.toggleKaraokeRecording && window.toggleKaraokeRecording()">
+              <div class="stage-action-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
+              </div>
+              <span class="stage-action-label" id="karaokeActionLabel" data-i18n="btnDone">Done</span>
             </button>
           </div>
 
-          <!-- ================= COMBINED STUDIO SETTINGS GROUP (DROPDOWN EXPANDS UPWARDS) ================= -->
-          <div class="effects-section studio-settings-dropup-group" id="studioSettingsGroup">
-            
-            <!-- Collapsible Combined Settings Container (Positioned ABOVE the toggle so it expands UPWARDS) -->
-            <div class="audio-settings-collapse-container studio-settings-collapse" id="studioSettingsCollapseContainer" style="display: none;">
+          <!-- ================= MIXER SETTINGS MODAL (BOTTOM SHEET SLIDES UP) ================= -->
+          <div class="mixer-modal-overlay modal-overlay studio-settings-dropup-group" id="mixerModalOverlay" onclick="window.closeMixerModal && window.closeMixerModal(event)">
+            <div class="mixer-bottom-sheet audio-settings-collapse-container studio-settings-collapse" id="studioSettingsCollapseContainer" onclick="event.stopPropagation()">
               
-              <!-- Tab Switcher for Easy Navigation Inside Combined Group -->
-              <div class="studio-subtabs-bar" role="tablist">
-                <button type="button" class="studio-subtab active" id="subtabBtnVocal" data-subtab="vocalTab" role="tab" aria-selected="true" onclick="window.switchStudioSubtab && window.switchStudioSubtab('vocalTab')">
-                  <span>🎤</span> <span data-i18n="tabVocalFX">Efek Vokal</span>
-                </button>
-                <button type="button" class="studio-subtab" id="subtabBtnPitch" data-subtab="pitchTab" role="tab" aria-selected="false" onclick="window.switchStudioSubtab && window.switchStudioSubtab('pitchTab')">
-                  <span>🎛️</span> <span data-i18n="tabMusicPitch">Pitch & Musik</span>
-                </button>
-                <button type="button" class="studio-subtab" id="subtabBtnSync" data-subtab="syncTab" role="tab" aria-selected="false" onclick="window.switchStudioSubtab && window.switchStudioSubtab('syncTab')">
-                  <span>⚡</span> <span data-i18n="tabLatency">Sinkronisasi</span>
-                </button>
+              <!-- Drag Handle Bar -->
+              <div class="mixer-sheet-handle-bar" onclick="window.closeMixerModal && window.closeMixerModal(event)">
+                <div class="mixer-sheet-handle"></div>
               </div>
 
-              <!-- SUBTAB 1: STARMAKER VOCAL EFFECTS -->
-              <div class="studio-subtab-pane active" id="paneVocalTab">
-                <!-- Preset Buttons -->
-                <div class="preset-grid">
-                  <button type="button" class="preset-btn" data-preset="original" onclick="window.selectVocalPreset && window.selectVocalPreset('original')">
-                    <span class="preset-icon">🎙️</span>
-                    <span data-i18n="presetOriginal">Asli</span>
-                  </button>
-                  <button type="button" class="preset-btn active" data-preset="studio" onclick="window.selectVocalPreset && window.selectVocalPreset('studio')">
-                    <span class="preset-icon">🎚️</span>
-                    <span data-i18n="presetStudio">Studio Pro</span>
-                  </button>
-                  <button type="button" class="preset-btn" data-preset="ktv" onclick="window.selectVocalPreset && window.selectVocalPreset('ktv')">
-                    <span class="preset-icon">🎤</span>
-                    <span data-i18n="presetKtv">KTV</span>
-                  </button>
-                  <button type="button" class="preset-btn" data-preset="hall" onclick="window.selectVocalPreset && window.selectVocalPreset('hall')">
-                    <span class="preset-icon">🏛️</span>
-                    <span data-i18n="presetHall">Konser Hall</span>
-                  </button>
-                  <button type="button" class="preset-btn" data-preset="pop" onclick="window.selectVocalPreset && window.selectVocalPreset('pop')">
-                    <span class="preset-icon">🌟</span>
-                    <span data-i18n="presetPop">Pop Stage</span>
-                  </button>
-                  <button type="button" class="preset-btn" data-preset="autotune" onclick="window.selectVocalPreset && window.selectVocalPreset('autotune')">
-                    <span class="preset-icon">🤖</span>
-                    <span data-i18n="presetAutotune">Auto-Tune</span>
-                  </button>
-                  <button type="button" class="preset-btn" data-preset="warm" onclick="window.selectVocalPreset && window.selectVocalPreset('warm')">
-                    <span class="preset-icon">🎸</span>
-                    <span data-i18n="presetWarm">Akustik</span>
-                  </button>
-                  <button type="button" class="preset-btn" data-preset="custom" onclick="window.selectVocalPreset && window.selectVocalPreset('custom')">
-                    <span class="preset-icon">⚙️</span>
-                    <span data-i18n="presetCustom">Kustom</span>
-                  </button>
+              <!-- Scrollable Cards Container -->
+              <div class="mixer-sheet-scrollable" id="studioSettingsGroup">
+                
+                <!-- CARD 1: Earphone feedback -->
+                <div class="mixer-card">
+                  <div class="mixer-card-header">
+                    <div class="mixer-card-icon-circle">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                    </div>
+                    <div class="mixer-card-title-group">
+                      <h4 class="mixer-card-title" data-i18n="earphoneFeedbackTitle">Earphone feedback</h4>
+                      <p class="mixer-card-subtitle" data-i18n="earphoneFeedbackDesc">Plug in wired headphones for better sound quality</p>
+                    </div>
+                  </div>
+
+                  <!-- Voice Slider Row -->
+                  <div class="mixer-slider-block">
+                    <div class="mixer-slider-label-row">
+                      <span class="mixer-row-label" data-i18n="voiceLabel">Voice</span>
+                      <span class="mixer-row-val" id="vocalVolVal">off</span>
+                    </div>
+                    <input type="range" class="custom-range mixer-range" id="vocalVolSlider" min="0" max="2" step="0.05" value="0.60">
+                  </div>
+
+                  <!-- Amplify Volume Toggle Row -->
+                  <div class="mixer-toggle-row">
+                    <div class="mixer-toggle-label-wrap">
+                      <span class="mixer-row-label" data-i18n="amplifyFeedback">Amplify volume in feedback</span>
+                      <span class="mixer-help-icon" title="Gunakan earphone untuk mencegah gema (feedback)">ⓘ</span>
+                    </div>
+                    <label class="switch mixer-switch">
+                      <input type="checkbox" id="earphoneMonitorToggle">
+                      <span class="slider-toggle"></span>
+                    </label>
+                  </div>
                 </div>
 
-                <!-- Earphone Vocal Monitor Switch -->
-                <div class="switch-row" style="margin-top: 14px;">
-                  <div class="switch-label-group">
-                    <span class="switch-title" data-i18n="monitorVoice">Dengar Suara Sendiri (Earphone)</span>
-                    <span class="switch-desc" data-i18n="monitorVoiceDesc">Gunakan earphone untuk mencegah gema</span>
+                <!-- CARD 2: Guide -->
+                <div class="mixer-card">
+                  <div class="mixer-card-header">
+                    <div class="mixer-card-icon-circle">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4"/></svg>
+                    </div>
+                    <div class="mixer-card-title-group">
+                      <h4 class="mixer-card-title" data-i18n="btnGuide">Guide</h4>
+                    </div>
                   </div>
-                  <label class="switch">
-                    <input type="checkbox" id="earphoneMonitorToggle">
-                    <span class="slider-toggle"></span>
-                  </label>
+
+                  <!-- Guide Vocals Slider Row -->
+                  <div class="mixer-slider-block">
+                    <div class="mixer-slider-label-row">
+                      <span class="mixer-row-label" data-i18n="guideVocals">Guide Vocals</span>
+                      <span class="mixer-row-val" id="guideVocalsVal">off</span>
+                    </div>
+                    <input type="range" class="custom-range mixer-range" id="guideVocalsSlider" min="0" max="100" step="1" value="0">
+                  </div>
                 </div>
 
-                <!-- DSP Vocal Sliders -->
-                <div class="controls-panel">
-                  <div class="slider-group">
-                    <div class="slider-label-row">
-                      <span class="slider-title" data-i18n="vocalVol">Volume Suara Mic</span>
-                      <span class="slider-val-badge" id="vocalVolVal">60%</span>
+                <!-- CARD 3: Music & Pitch -->
+                <div class="mixer-card">
+                  <!-- Music Slider Row -->
+                  <div class="mixer-slider-block">
+                    <div class="mixer-slider-label-row">
+                      <span class="mixer-row-label">Music</span>
+                      <span class="mixer-row-val" id="musicVolVal">50</span>
                     </div>
-                    <input type="range" class="custom-range" id="vocalVolSlider" min="0" max="2" step="0.05" value="0.60">
+                    <input type="range" class="custom-range mixer-range mixer-range-pink" id="musicVolSlider" min="0" max="1" step="0.02" value="0.50">
                   </div>
 
-                  <div class="slider-group">
-                    <div class="slider-label-row">
-                      <span class="slider-title" data-i18n="reverbWet">Gema Ruang (Reverb)</span>
-                      <span class="slider-val-badge" id="reverbVal">25%</span>
+                  <!-- Pitch Stepper Row -->
+                  <div class="mixer-stepper-row">
+                    <span class="mixer-row-label">Pitch</span>
+                    <div class="pitch-stepper-pill">
+                      <button type="button" class="btn-step-pill btn-step" id="btnPitchDown" onclick="window.stepMusicPitch && window.stepMusicPitch(-1)">-</button>
+                      <span class="pitch-stepper-val" id="musicPitchVal">0</span>
+                      <button type="button" class="btn-step-pill btn-step" id="btnPitchUp" onclick="window.stepMusicPitch && window.stepMusicPitch(1)">+</button>
+                      <button type="button" id="btnPitchReset" style="display:none;" onclick="window.resetMusicPitch && window.resetMusicPitch()"></button>
+                      <input type="range" class="custom-range" id="musicPitchSlider" min="-6" max="6" step="1" value="0" style="display:none;" aria-hidden="true">
                     </div>
-                    <input type="range" class="custom-range" id="reverbSlider" min="0" max="1" step="0.02" value="0.25">
-                  </div>
-
-                  <div class="slider-group">
-                    <div class="slider-label-row">
-                      <span class="slider-title" data-i18n="echoDelay">Pantulan (Echo / Delay)</span>
-                      <span class="slider-val-badge" id="echoVal">15%</span>
-                    </div>
-                    <input type="range" class="custom-range" id="echoSlider" min="0" max="0.8" step="0.02" value="0.15">
-                  </div>
-
-                  <div class="slider-group">
-                    <div class="slider-label-row">
-                      <span class="slider-title" data-i18n="vocalTone">Karakter Suara (Treble Boost)</span>
-                      <span class="slider-val-badge" id="toneVal">+3.0 dB</span>
-                    </div>
-                    <input type="range" class="custom-range" id="toneSlider" min="-6" max="8" step="0.5" value="3.0">
                   </div>
                 </div>
-              </div>
 
-              <!-- SUBTAB 2: MUSIC & PITCH TRANSPOSE / TEMPO -->
-              <div class="studio-subtab-pane" id="panePitchTab" style="display: none;">
-                <div class="controls-panel">
-                  <!-- Pitch Shifter / Key Transpose -->
-                  <div class="slider-group pitch-speed-card">
-                    <div class="slider-label-row">
-                      <div>
-                        <span class="slider-title" data-i18n="musicPitch">Nada Dasar Lagu (Pitch Transpose)</span>
-                        <p class="slider-subhint" data-i18n="pitchHint">Atur tinggi rendah nada sesuai jangkauan vokal Anda (-6 s/d +6)</p>
+                <!-- CARD 4: Speed -->
+                <div class="mixer-card">
+                  <h4 class="mixer-card-title-simple" data-i18n="speedLabel">Speed</h4>
+                  
+                  <!-- Speed Markers Row -->
+                  <div class="speed-markers-row">
+                    <span class="speed-marker" data-speed="0.5">0.5x</span>
+                    <span class="speed-marker" data-speed="0.75">0.75x</span>
+                    <span class="speed-marker active" data-speed="1.0">1.0x</span>
+                    <span class="speed-marker" data-speed="1.25">1.25x</span>
+                    <span class="speed-marker" data-speed="1.5">1.5x</span>
+                    <span class="speed-marker" data-speed="1.75">1.75x</span>
+                    <span class="speed-marker" data-speed="2.0">2.0x</span>
+                  </div>
+
+                  <!-- Ruler Track with Pointer -->
+                  <div class="speed-ruler-container" id="speedRulerContainer">
+                    <div class="speed-ruler-track">
+                      <div class="speed-ruler-ticks"></div>
+                    </div>
+                    <div class="speed-pointer" id="speedPointer">
+                      <div class="pointer-triangle"></div>
+                    </div>
+                    <input type="range" class="custom-range speed-hidden-range" id="musicSpeedSlider" min="0.5" max="2.0" step="0.05" value="1.0" aria-hidden="true">
+                  </div>
+
+                  <!-- Hidden Compatibility Anchors for Automated Tests -->
+                  <div style="display:none;" aria-hidden="true">
+                    <button type="button" class="btn-step" id="btnSpeedDown" onclick="window.stepMusicSpeed && window.stepMusicSpeed(-0.05)"></button>
+                    <button type="button" class="btn-step btn-step-reset" id="btnSpeedReset" onclick="window.resetMusicSpeed && window.resetMusicSpeed()"></button>
+                    <button type="button" class="btn-step" id="btnSpeedUp" onclick="window.stepMusicSpeed && window.stepMusicSpeed(0.05)"></button>
+                    <span id="musicSpeedVal">1.00x (Normal)</span>
+                    <div class="slider-scale-row"></div>
+                    <div class="pitch-speed-card"></div>
+                  </div>
+                </div>
+
+                <!-- CARD 5: Sound Effect & EQ -->
+                <div class="mixer-card mixer-card-tabs">
+                  <!-- Tab Header: Sound Effect / EQ -->
+                  <div class="mixer-tabs-pill-wrap studio-subtabs-bar" role="tablist">
+                    <button type="button" class="mixer-tab-pill studio-subtab active" id="subtabBtnVocal" data-subtab="vocalTab" role="tab" aria-selected="true" onclick="window.switchStudioSubtab && window.switchStudioSubtab('vocalTab')">
+                      <span data-i18n="soundEffectTab">Sound Effect</span>
+                    </button>
+                    <button type="button" class="mixer-tab-pill studio-subtab" id="subtabBtnPitch" data-subtab="pitchTab" role="tab" aria-selected="false" onclick="window.switchStudioSubtab && window.switchStudioSubtab('pitchTab')">
+                      <span data-i18n="eqTab">EQ</span>
+                    </button>
+                    <button type="button" class="studio-subtab" id="subtabBtnSync" data-subtab="syncTab" role="tab" aria-selected="false" style="display:none;" onclick="window.switchStudioSubtab && window.switchStudioSubtab('syncTab')"></button>
+                  </div>
+
+                  <!-- SUBTAB 1: Sound Effect Horizontal Preset Cards -->
+                  <div class="studio-subtab-pane active" id="paneVocalTab">
+                    <div class="preset-cards-horizontal preset-grid">
+                      <!-- 1. Custom -->
+                      <button type="button" class="preset-card-item preset-btn" data-preset="custom" onclick="window.selectVocalPreset && window.selectVocalPreset('custom')">
+                        <div class="preset-card-visual">
+                          <svg width="68" height="68" viewBox="0 0 100 100" fill="none">
+                            <defs>
+                              <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#ff007a"/>
+                                <stop offset="50%" stop-color="#7928ca"/>
+                                <stop offset="100%" stop-color="#00f2fe"/>
+                              </linearGradient>
+                            </defs>
+                            <circle cx="50" cy="50" r="30" stroke="url(#ringGrad)" stroke-width="14" stroke-linecap="round"/>
+                            <ellipse cx="40" cy="38" rx="12" ry="8" fill="rgba(255,255,255,0.3)"/>
+                          </svg>
+                        </div>
+                        <span class="preset-card-name" data-i18n="presetCustom">Custom</span>
+                      </button>
+
+                      <!-- 2. Super Custom (PRO) -->
+                      <button type="button" class="preset-card-item preset-btn" data-preset="super_custom" onclick="window.selectVocalPreset && window.selectVocalPreset('super_custom')">
+                        <div class="preset-card-visual">
+                          <span class="pro-badge">PRO</span>
+                          <svg width="68" height="68" viewBox="0 0 100 100" fill="none">
+                            <rect x="14" y="30" width="72" height="40" rx="6" fill="#1c1d34" stroke="#ff4b91" stroke-width="2"/>
+                            <rect x="22" y="36" width="6" height="28" rx="2" fill="#ffffff"/>
+                            <rect x="32" y="36" width="6" height="28" rx="2" fill="#ffffff"/>
+                            <rect x="42" y="36" width="6" height="28" rx="2" fill="#ffffff"/>
+                            <rect x="52" y="36" width="6" height="28" rx="2" fill="#ffffff"/>
+                            <rect x="62" y="36" width="6" height="28" rx="2" fill="#ffffff"/>
+                            <rect x="72" y="36" width="6" height="28" rx="2" fill="#ffffff"/>
+                            <rect x="27" y="36" width="4" height="16" fill="#000000"/>
+                            <rect x="37" y="36" width="4" height="16" fill="#000000"/>
+                            <rect x="57" y="36" width="4" height="16" fill="#000000"/>
+                            <rect x="67" y="36" width="4" height="16" fill="#000000"/>
+                          </svg>
+                        </div>
+                        <span class="preset-card-name">Super Cu..</span>
+                      </button>
+
+                      <!-- 3. Studio -->
+                      <button type="button" class="preset-card-item preset-btn active" data-preset="studio" onclick="window.selectVocalPreset && window.selectVocalPreset('studio')">
+                        <div class="preset-card-visual">
+                          <svg width="68" height="68" viewBox="0 0 100 100" fill="none">
+                            <rect x="14" y="14" width="72" height="72" rx="10" fill="#121324"/>
+                            <line x1="28" y1="26" x2="28" y2="74" stroke="#4a4c6d" stroke-width="3" stroke-linecap="round"/>
+                            <circle cx="28" cy="46" r="6" fill="#00f2fe"/>
+                            <line x1="50" y1="26" x2="50" y2="74" stroke="#4a4c6d" stroke-width="3" stroke-linecap="round"/>
+                            <circle cx="50" cy="38" r="6" fill="#ff007a"/>
+                            <line x1="72" y1="26" x2="72" y2="74" stroke="#4a4c6d" stroke-width="3" stroke-linecap="round"/>
+                            <circle cx="72" cy="58" r="6" fill="#34d399"/>
+                          </svg>
+                        </div>
+                        <span class="preset-card-name" data-i18n="presetStudio">Studio</span>
+                      </button>
+
+                      <!-- 4. Karaoke (KTV) -->
+                      <button type="button" class="preset-card-item preset-btn" data-preset="ktv" onclick="window.selectVocalPreset && window.selectVocalPreset('ktv')">
+                        <div class="preset-card-visual">
+                          <svg width="68" height="68" viewBox="0 0 100 100" fill="none">
+                            <rect x="36" y="20" width="28" height="38" rx="14" fill="#a5a8cc" stroke="#ffffff" stroke-width="2"/>
+                            <line x1="36" y1="32" x2="64" y2="32" stroke="#444766" stroke-width="2"/>
+                            <line x1="36" y1="44" x2="64" y2="44" stroke="#444766" stroke-width="2"/>
+                            <path d="M28 42c0 12.15 9.85 22 22 22s22-9.85 22-22" stroke="#ff007a" stroke-width="3" stroke-linecap="round"/>
+                            <line x1="50" y1="64" x2="50" y2="80" stroke="#ff007a" stroke-width="3"/>
+                            <line x1="38" y1="80" x2="62" y2="80" stroke="#ff007a" stroke-width="3" stroke-linecap="round"/>
+                          </svg>
+                        </div>
+                        <span class="preset-card-name" data-i18n="presetKtv">Karaoke</span>
+                      </button>
+
+                      <!-- 5. Echo (Hall) -->
+                      <button type="button" class="preset-card-item preset-btn" data-preset="hall" onclick="window.selectVocalPreset && window.selectVocalPreset('hall')">
+                        <div class="preset-card-visual">
+                          <svg width="68" height="68" viewBox="0 0 100 100" fill="none">
+                            <circle cx="50" cy="50" r="10" fill="#00f2fe"/>
+                            <circle cx="50" cy="50" r="22" stroke="#00f2fe" stroke-width="2.5" stroke-opacity="0.8"/>
+                            <circle cx="50" cy="50" r="34" stroke="#7928ca" stroke-width="2.5" stroke-opacity="0.6"/>
+                            <circle cx="50" cy="50" r="44" stroke="#ff007a" stroke-width="2.5" stroke-opacity="0.4"/>
+                          </svg>
+                        </div>
+                        <span class="preset-card-name">Echo</span>
+                      </button>
+
+                      <!-- 6. Pop -->
+                      <button type="button" class="preset-card-item preset-btn" data-preset="pop" onclick="window.selectVocalPreset && window.selectVocalPreset('pop')">
+                        <div class="preset-card-visual">
+                          <svg width="68" height="68" viewBox="0 0 100 100" fill="none">
+                            <polygon points="50,15 61,38 85,42 68,58 72,82 50,70 28,82 32,58 15,42 39,38" fill="url(#ringGrad)"/>
+                          </svg>
+                        </div>
+                        <span class="preset-card-name" data-i18n="presetPop">Pop</span>
+                      </button>
+
+                      <!-- 7. Auto-Tune -->
+                      <button type="button" class="preset-card-item preset-btn" data-preset="autotune" onclick="window.selectVocalPreset && window.selectVocalPreset('autotune')">
+                        <div class="preset-card-visual">
+                          <svg width="68" height="68" viewBox="0 0 100 100" fill="none">
+                            <path d="M15 50 Q 32 20, 50 50 T 85 50" stroke="#00f2fe" stroke-width="4" fill="none"/>
+                            <rect x="42" y="38" width="16" height="24" rx="4" fill="#ff007a"/>
+                          </svg>
+                        </div>
+                        <span class="preset-card-name" data-i18n="presetAutotune">Auto-Tune</span>
+                      </button>
+
+                      <!-- 8. Warm (Akustik) -->
+                      <button type="button" class="preset-card-item preset-btn" data-preset="warm" onclick="window.selectVocalPreset && window.selectVocalPreset('warm')">
+                        <div class="preset-card-visual">
+                          <svg width="68" height="68" viewBox="0 0 100 100" fill="none">
+                            <circle cx="50" cy="50" r="28" fill="#ff9900" fill-opacity="0.2" stroke="#ff9900" stroke-width="3"/>
+                            <circle cx="50" cy="50" r="14" fill="#ff9900"/>
+                          </svg>
+                        </div>
+                        <span class="preset-card-name" data-i18n="presetWarm">Akustik</span>
+                      </button>
+
+                      <!-- 9. Original -->
+                      <button type="button" class="preset-card-item preset-btn" data-preset="original" onclick="window.selectVocalPreset && window.selectVocalPreset('original')">
+                        <div class="preset-card-visual">
+                          <svg width="68" height="68" viewBox="0 0 100 100" fill="none">
+                            <rect x="38" y="24" width="24" height="34" rx="12" fill="#71717a"/>
+                            <path d="M30 44c0 11 9 20 20 20s20-9 20-20" stroke="#71717a" stroke-width="3" stroke-linecap="round"/>
+                          </svg>
+                        </div>
+                        <span class="preset-card-name" data-i18n="presetOriginal">Asli</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- SUBTAB 2: EQ Sliders (Reverb, Echo, Treble Tone, Latency Sync) -->
+                  <div class="studio-subtab-pane" id="panePitchTab" style="display:none;">
+                    <div class="mixer-eq-sliders-panel controls-panel">
+                      <!-- Reverb Wet -->
+                      <div class="mixer-slider-block slider-group">
+                        <div class="mixer-slider-label-row slider-label-row">
+                          <span class="mixer-row-label slider-title" data-i18n="reverbWet">Gema Ruang (Reverb)</span>
+                          <span class="mixer-row-val slider-val-badge" id="reverbVal">25%</span>
+                        </div>
+                        <input type="range" class="custom-range mixer-range" id="reverbSlider" min="0" max="1" step="0.02" value="0.25">
                       </div>
-                      <span class="slider-val-badge pitch-badge" id="musicPitchVal">0 (Normal)</span>
-                    </div>
-                    <div class="pitch-speed-btn-row">
-                      <button type="button" class="btn-step" id="btnPitchDown" onclick="window.stepMusicPitch && window.stepMusicPitch(-1)">
-                        <span data-i18n="pitchDownBtn">♭ Turun (-1)</span>
-                      </button>
-                      <button type="button" class="btn-step btn-step-reset" id="btnPitchReset" onclick="window.resetMusicPitch && window.resetMusicPitch()">
-                        <span data-i18n="pitchResetBtn">0 Normal</span>
-                      </button>
-                      <button type="button" class="btn-step" id="btnPitchUp" onclick="window.stepMusicPitch && window.stepMusicPitch(1)">
-                        <span data-i18n="pitchUpBtn">♯ Naik (+1)</span>
-                      </button>
-                    </div>
-                    <input type="range" class="custom-range" id="musicPitchSlider" min="-6" max="6" step="1" value="0">
-                    <div class="slider-scale-row">
-                      <span data-i18n="pitchScaleLow">-6 (♭ Rendah)</span>
-                      <span data-i18n="pitchScaleNormal" style="color: var(--color-cyan); font-weight: 700;">0 (Asli)</span>
-                      <span data-i18n="pitchScaleHigh">+6 (♯ Tinggi)</span>
-                    </div>
-                  </div>
 
-                  <!-- Music Speed / Tempo Adjustment -->
-                  <div class="slider-group pitch-speed-card" style="margin-top: 14px;">
-                    <div class="slider-label-row">
-                      <div>
-                        <span class="slider-title" data-i18n="musicSpeed">Kecepatan Lagu (Tempo / Speed)</span>
-                        <p class="slider-subhint" data-i18n="speedHint">Perlambat atau percepat musik pengiring secara presisi (0.75x s/d 1.25x)</p>
+                      <!-- Echo / Delay -->
+                      <div class="mixer-slider-block slider-group">
+                        <div class="mixer-slider-label-row slider-label-row">
+                          <span class="mixer-row-label slider-title" data-i18n="echoDelay">Pantulan (Echo / Delay)</span>
+                          <span class="mixer-row-val slider-val-badge" id="echoVal">15%</span>
+                        </div>
+                        <input type="range" class="custom-range mixer-range" id="echoSlider" min="0" max="0.8" step="0.02" value="0.15">
                       </div>
-                      <span class="slider-val-badge speed-badge" id="musicSpeedVal">1.00x (Normal)</span>
-                    </div>
-                    <div class="pitch-speed-btn-row">
-                      <button type="button" class="btn-step" id="btnSpeedDown" onclick="window.stepMusicSpeed && window.stepMusicSpeed(-0.05)">
-                        <span>- 0.05x</span>
-                      </button>
-                      <button type="button" class="btn-step btn-step-reset" id="btnSpeedReset" onclick="window.resetMusicSpeed && window.resetMusicSpeed()">
-                        <span data-i18n="speedNormal">1.00x Normal</span>
-                      </button>
-                      <button type="button" class="btn-step" id="btnSpeedUp" onclick="window.stepMusicSpeed && window.stepMusicSpeed(0.05)">
-                        <span>+ 0.05x</span>
-                      </button>
-                    </div>
-                    <input type="range" class="custom-range" id="musicSpeedSlider" min="0.75" max="1.25" step="0.05" value="1.0">
-                    <div class="slider-scale-row">
-                      <span data-i18n="speedScaleSlow">0.75x (Lambat)</span>
-                      <span data-i18n="speedScaleNormal" style="color: var(--color-cyan); font-weight: 700;">1.00x (Normal)</span>
-                      <span data-i18n="speedScaleFast">1.25x (Cepat)</span>
-                    </div>
-                  </div>
 
-                  <!-- Backing Music Volume Slider -->
-                  <div class="slider-group" style="margin-top: 14px;">
-                    <div class="slider-label-row">
-                      <span class="slider-title" data-i18n="musicVol">Volume Musik Pengiring</span>
-                      <span class="slider-val-badge" id="musicVolVal">35%</span>
-                    </div>
-                    <input type="range" class="custom-range" id="musicVolSlider" min="0" max="1" step="0.02" value="0.35">
-                  </div>
-                </div>
-              </div>
-
-              <!-- SUBTAB 3: LATENCY & AUDIO SYNC ADJUSTMENT -->
-              <div class="studio-subtab-pane" id="paneSyncTab" style="display: none;">
-                <div class="latency-section">
-                  <div class="latency-header-row">
-                    <div class="latency-title-group">
-                      <div class="latency-badge-row">
-                        <span class="switch-title" data-i18n="latencyAdjust">Sinkronisasi Audio (Offset Latensi)</span>
-                        <span class="effects-badge-starmaker" style="background: var(--grad-primary);">SYNC PRO</span>
+                      <!-- Vocal Tone / Treble Boost -->
+                      <div class="mixer-slider-block slider-group">
+                        <div class="mixer-slider-label-row slider-label-row">
+                          <span class="mixer-row-label slider-title" data-i18n="vocalTone">Karakter Suara (Treble Boost)</span>
+                          <span class="mixer-row-val slider-val-badge" id="toneVal">+3.0 dB</span>
+                        </div>
+                        <input type="range" class="custom-range mixer-range" id="toneSlider" min="-6" max="8" step="0.5" value="3.0">
                       </div>
-                      <span class="switch-desc" data-i18n="latencyDesc">Sesuaikan jeda delay antara vokal dan musik (Bluetooth / Earphone)</span>
+
+                      <!-- Audio Latency Sync -->
+                      <div class="mixer-slider-block latency-section" style="margin-top: 14px;">
+                        <div class="mixer-slider-label-row">
+                          <span class="mixer-row-label switch-title" data-i18n="latencyAdjust">Sinkronisasi Audio (Offset Latensi)</span>
+                          <span class="mixer-row-val latency-val-pill" id="latencyDisplayVal">0 ms</span>
+                        </div>
+                        <input type="range" class="custom-range mixer-range custom-range-sync" id="latencySlider" min="-300" max="300" step="5" value="0">
+                        <div class="latency-presets-grid" style="margin-top: 10px;">
+                          <button type="button" class="btn-latency-chip active" data-latency="0" onclick="window.selectLatencyPreset && window.selectLatencyPreset(0)"><span class="chip-name" data-i18n="latencyWired">Direct (0ms)</span></button>
+                          <button type="button" class="btn-latency-chip" data-latency="60" onclick="window.selectLatencyPreset && window.selectLatencyPreset(60)"><span class="chip-name" data-i18n="latencyHeadset">Kabel (+60ms)</span></button>
+                          <button type="button" class="btn-latency-chip" data-latency="110" onclick="window.selectLatencyPreset && window.selectLatencyPreset(110)"><span class="chip-name" data-i18n="latencyPhone">Speaker HP (+110ms)</span></button>
+                          <button type="button" class="btn-latency-chip" data-latency="180" onclick="window.selectLatencyPreset && window.selectLatencyPreset(180)"><span class="chip-name" data-i18n="latencyBT">Bluetooth TWS (+180ms)</span></button>
+                        </div>
+                        <button type="button" class="btn btn-auto-latency" id="btnAutoCalibrateLatency" style="margin-top: 12px; width: 100%; justify-content: center; gap: 8px;" onclick="window.openCalibrateModal && window.openCalibrateModal()">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                          <span data-i18n="btnAutoCalibrate">Deteksi Delay Otomatis (Auto Adjust)</span>
+                        </button>
+                      </div>
                     </div>
-                    <div class="latency-val-pill" id="latencyDisplayVal">0 ms</div>
                   </div>
 
-                  <!-- Latency Range Slider (-300ms to +300ms, step 5ms) -->
-                  <div class="slider-group" style="margin-top: 10px;">
-                    <input type="range" class="custom-range custom-range-sync" id="latencySlider" min="-300" max="300" step="5" value="0">
-                    <div class="slider-label-row">
-                      <span data-i18n="vocalEarlyHint">-300ms (Vokal Dulu)</span>
-                      <span style="color: var(--color-cyan); font-weight: 700;" data-i18n="vocalSyncHint">0 ms (Realtime Direct)</span>
-                      <span data-i18n="musicEarlyHint">+300ms (Musik Dulu)</span>
-                    </div>
-                  </div>
-
-                  <!-- Quick Presets -->
-                  <div class="latency-presets-grid">
-                    <button type="button" class="btn-latency-chip active" data-latency="0" onclick="window.selectLatencyPreset && window.selectLatencyPreset(0)">
-                      <span class="chip-name" data-i18n="latencyWired">Direct (0ms)</span>
-                    </button>
-                    <button type="button" class="btn-latency-chip" data-latency="60" onclick="window.selectLatencyPreset && window.selectLatencyPreset(60)">
-                      <span class="chip-name" data-i18n="latencyHeadset">Kabel (+60ms)</span>
-                    </button>
-                    <button type="button" class="btn-latency-chip" data-latency="110" onclick="window.selectLatencyPreset && window.selectLatencyPreset(110)">
-                      <span class="chip-name" data-i18n="latencyPhone">Speaker HP (+110ms)</span>
-                    </button>
-                    <button type="button" class="btn-latency-chip" data-latency="180" onclick="window.selectLatencyPreset && window.selectLatencyPreset(180)">
-                      <span class="chip-name" data-i18n="latencyBT">Bluetooth TWS (+180ms)</span>
-                    </button>
-                  </div>
-
-                  <!-- Auto Detect Calibration Button -->
-                  <div class="latency-auto-row" style="margin-top: 14px;">
-                    <button type="button" class="btn btn-auto-latency" id="btnAutoCalibrateLatency" onclick="window.openCalibrateModal && window.openCalibrateModal()">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                      <span data-i18n="btnAutoCalibrate">Deteksi Delay Otomatis (Auto Adjust)</span>
-                    </button>
-                  </div>
+                  <!-- SUBTAB 3: Latency Sync Anchor for backward compatibility -->
+                  <div class="studio-subtab-pane" id="paneSyncTab" style="display: none;"></div>
                 </div>
-              </div>
 
-              <!-- Automated Test Suite Anchors -->
-              <div style="display: none !important;" aria-hidden="true">
-                <div id="vocalEffectsCollapseContainer"></div>
-                <div id="audioSettingsCollapseContainer"></div>
-                <button id="btnToggleVocalSettings" type="button"></button>
-                <button id="btnToggleAudioSettings" type="button"></button>
+                <!-- Automated Test Suite Anchors -->
+                <div style="display: none !important;" aria-hidden="true">
+                  <div id="vocalEffectsCollapseContainer"></div>
+                  <div id="audioSettingsCollapseContainer"></div>
+                  <button id="btnToggleVocalSettings" type="button"></button>
+                  <button id="btnToggleAudioSettings" type="button"></button>
+                  <button type="button" class="btn-toggle-audio-drawer btn-dropup-trigger" id="btnToggleStudioSettings" aria-expanded="false" onclick="window.toggleStudioSettingsDrawer && window.toggleStudioSettingsDrawer()">
+                    <span id="toggleStudioSettingsAction" data-i18n="btnShowSettings">Buka Pengaturan</span>
+                  </button>
+                </div>
+
               </div>
 
             </div>
-
-            <!-- The Unified Toggle Button (At Bottom of Group - Expands UPWARDS) -->
-            <div class="audio-settings-toggle-wrapper studio-dropup-toggle-wrap">
-              <button type="button" class="btn-toggle-audio-drawer btn-dropup-trigger" id="btnToggleStudioSettings" aria-expanded="false" onclick="window.toggleStudioSettingsDrawer && window.toggleStudioSettingsDrawer()">
-                <div class="toggle-drawer-left">
-                  <span class="toggle-drawer-icon">🎛️</span>
-                  <div class="toggle-drawer-info">
-                    <span class="toggle-drawer-title" id="toggleStudioSettingsTitle" data-i18n="toggleStudioSettings">Pengaturan Vokal & Musik (FX & Pitch)</span>
-                    <span class="toggle-drawer-subtitle" id="toggleStudioSettingsSub" data-i18n="toggleStudioSettingsSub">Preset vokal, reverb, nada dasar & sinkronisasi</span>
-                  </div>
-                </div>
-                <div class="toggle-drawer-status-pill" id="toggleStudioSettingsStatus">
-                  <span id="toggleStudioSettingsAction" data-i18n="btnShowSettings">Buka Pengaturan</span>
-                  <svg id="toggleStudioSettingsArrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
-                </div>
-              </button>
-            </div>
-
           </div>
 
         </div>

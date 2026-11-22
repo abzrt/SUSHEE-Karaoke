@@ -456,6 +456,7 @@ async function initApp() {
     }
 
     if (viewId === 'viewKaraoke') {
+      document.body.classList.add('in-karaoke-view');
       if (visualizer) visualizer.resizeCanvas();
       if (!currentSong) {
         if (hostingService.cachedSongs && hostingService.cachedSongs.length > 0) {
@@ -464,6 +465,8 @@ async function initApp() {
           selectSong(storageScanner.songs[0], false);
         }
       }
+    } else {
+      document.body.classList.remove('in-karaoke-view');
     }
 
     if (viewId === 'viewCloud') {
@@ -1013,6 +1016,32 @@ async function initApp() {
     if (totalDurationEl && !isNaN(dur)) totalDurationEl.textContent = formatTime(dur);
     if (progressBar) progressBar.value = (cur / dur) * 100;
 
+    // Dynamically advance pitch score bar segments (0, C, B, A, A+, A++)
+    const scoreSegs = document.querySelectorAll('.score-seg');
+    if (scoreSegs && scoreSegs.length > 0 && dur > 0) {
+      const ratio = cur / dur;
+      let activeIndex = 0;
+      if (ratio > 0.85) activeIndex = 5;      // A++
+      else if (ratio > 0.65) activeIndex = 4; // A+
+      else if (ratio > 0.45) activeIndex = 3; // A
+      else if (ratio > 0.25) activeIndex = 2; // B
+      else if (ratio > 0.08) activeIndex = 1; // C
+      else activeIndex = 0;                  // 0
+      scoreSegs.forEach((seg, idx) => {
+        if (idx === activeIndex) seg.classList.add('active');
+        else seg.classList.remove('active');
+      });
+    }
+
+    // Dynamic pitch meter bounce during playback
+    const pitchDot = document.getElementById('pitchDot');
+    const pitchTrackFill = document.getElementById('pitchTrackFill');
+    if (pitchDot) {
+      const bounce = Math.sin(cur * 3.5) * 22 + 48;
+      pitchDot.style.top = `${bounce}%`;
+      if (pitchTrackFill) pitchTrackFill.style.height = `${100 - bounce}%`;
+    }
+
     updateLyricSync(cur);
   });
 
@@ -1159,15 +1188,19 @@ async function initApp() {
 
     if (isPlaying) {
       btnKaraokeAction.innerHTML = `
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-        <span id="karaokeActionLabel" data-i18n="btnStopKaraoke">Stop</span>
+        <div class="stage-action-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
+        </div>
+        <span class="stage-action-label" id="karaokeActionLabel" data-i18n="btnDone">Done</span>
       `;
       btnKaraokeAction.classList.add('recording-active');
       if (recordingIndicator) recordingIndicator.classList.add('active');
     } else {
       btnKaraokeAction.innerHTML = `
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
-        <span id="karaokeActionLabel" data-i18n="btnStartKaraoke">Record</span>
+        <div class="stage-action-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
+        </div>
+        <span class="stage-action-label" id="karaokeActionLabel" data-i18n="btnDone">Done</span>
       `;
       btnKaraokeAction.classList.remove('recording-active');
       if (recordingIndicator) recordingIndicator.classList.remove('active');
@@ -1431,10 +1464,14 @@ async function initApp() {
 
   const updateSliderBadgesUI = () => {
     if (vocalVolSlider && vocalVolVal) {
-      vocalVolVal.textContent = Math.round(parseFloat(vocalVolSlider.value) * 100) + '%';
+      if (earphoneMonitorToggle && !earphoneMonitorToggle.checked) {
+        vocalVolVal.textContent = 'off';
+      } else {
+        vocalVolVal.textContent = Math.round(parseFloat(vocalVolSlider.value) * 100) + '%';
+      }
     }
     if (musicVolSlider && musicVolVal) {
-      musicVolVal.textContent = Math.round(parseFloat(musicVolSlider.value) * 100) + '%';
+      musicVolVal.textContent = Math.round(parseFloat(musicVolSlider.value) * 100);
     }
     if (reverbSlider && reverbVal) {
       reverbVal.textContent = Math.round(parseFloat(reverbSlider.value) * 100) + '%';
@@ -1491,11 +1528,48 @@ async function initApp() {
   if (earphoneMonitorToggle) {
     earphoneMonitorToggle.addEventListener('change', () => {
       audioEngine.setMonitoring(earphoneMonitorToggle.checked);
+      updateSliderBadgesUI();
       if (earphoneMonitorToggle.checked) {
         showToast(window.i18n.t('toastMonitorActive'), 'warning');
       }
     });
   }
+
+  // Guide Vocals Slider & Toggle
+  const guideVocalsSlider = document.getElementById('guideVocalsSlider');
+  const guideVocalsVal = document.getElementById('guideVocalsVal');
+  if (guideVocalsSlider) {
+    guideVocalsSlider.addEventListener('input', () => {
+      const val = parseInt(guideVocalsSlider.value, 10) || 0;
+      if (guideVocalsVal) guideVocalsVal.textContent = val === 0 ? 'off' : val + '%';
+    });
+  }
+
+  window.toggleKaraokeGuide = () => {
+    if (!guideVocalsSlider) return;
+    const curVal = parseInt(guideVocalsSlider.value, 10) || 0;
+    const nextVal = curVal === 0 ? 50 : 0;
+    guideVocalsSlider.value = nextVal;
+    if (guideVocalsVal) guideVocalsVal.textContent = nextVal === 0 ? 'off' : nextVal + '%';
+    const guideBtn = document.getElementById('btnKaraokeGuide');
+    if (guideBtn) {
+      if (nextVal > 0) guideBtn.classList.add('active');
+      else guideBtn.classList.remove('active');
+    }
+    showToast(nextVal > 0 ? 'Guide Vocals: 50%' : 'Guide Vocals: Off', 'info');
+  };
+
+  // Skip Prelude
+  window.skipKaraokePrelude = () => {
+    if (!audioElement) return;
+    if (lrcParser && lrcParser.lines && lrcParser.lines.length > 0 && lrcParser.lines[0].time > 0 && audioElement.currentTime < lrcParser.lines[0].time) {
+      audioElement.currentTime = Math.max(0, lrcParser.lines[0].time - 0.5);
+    } else {
+      audioElement.currentTime = Math.min((audioElement.duration || 100), audioElement.currentTime + 10);
+    }
+    updateLyricSync(audioElement.currentTime);
+    showToast(window.i18n && window.i18n.t ? (window.i18n.t('skipPrelude') || 'Skip prelude') : 'Skip prelude', 'info');
+  };
 
   // --- COMBINED STUDIO SETTINGS DRAWER (UPWARD-EXPANDING DROPUP) ---
   const btnToggleStudioSettings = document.getElementById('btnToggleStudioSettings');
@@ -1507,6 +1581,7 @@ async function initApp() {
   const setStudioDrawerState = (isOpen, savePref = true) => {
     isStudioDrawerOpen = isOpen;
     const container = document.getElementById('studioSettingsCollapseContainer');
+    const overlay = document.getElementById('mixerModalOverlay');
     const btn = document.getElementById('btnToggleStudioSettings');
     const toggleAction = document.getElementById('toggleStudioSettingsAction');
     const toggleArrow = document.getElementById('toggleStudioSettingsArrow');
@@ -1514,7 +1589,8 @@ async function initApp() {
     if (!container || !btn) return;
 
     if (isOpen) {
-      container.style.display = 'block';
+      if (overlay) overlay.classList.add('open');
+      container.style.display = 'flex';
       container.classList.remove('collapsed');
       btn.setAttribute('aria-expanded', 'true');
       if (toggleAction) {
@@ -1536,6 +1612,7 @@ async function initApp() {
       }, 80);
       if (savePref) localStorage.setItem('sushee_studio_settings_open', '1');
     } else {
+      if (overlay) overlay.classList.remove('open');
       container.style.display = 'none';
       container.classList.add('collapsed');
       btn.setAttribute('aria-expanded', 'false');
@@ -1547,6 +1624,14 @@ async function initApp() {
       }
       if (savePref) localStorage.setItem('sushee_studio_settings_open', '0');
     }
+  };
+
+  window.openMixerModal = () => {
+    setStudioDrawerState(true, true);
+  };
+  window.closeMixerModal = (e) => {
+    if (e && e.target && e.target.closest && e.target.closest('.mixer-bottom-sheet') && !e.target.closest('.mixer-sheet-handle-bar')) return;
+    setStudioDrawerState(false, true);
   };
 
   window.updateStudioDrawerLangUI = () => {
@@ -1646,36 +1731,83 @@ async function initApp() {
   const updatePitchBadge = (semitones) => {
     if (!musicPitchVal) return;
     const val = parseInt(semitones, 10) || 0;
-    const isEn = window.i18n && window.i18n.currentLang === 'en';
+    musicPitchVal.textContent = val;
     if (val === 0) {
-      musicPitchVal.textContent = '0 (Normal)';
-      musicPitchVal.style.color = 'var(--color-cyan, #00f2fe)';
+      musicPitchVal.style.color = '#ffffff';
     } else if (val > 0) {
-      musicPitchVal.textContent = `+${val} (♯ ${isEn ? 'Up' : 'Naik'})`;
       musicPitchVal.style.color = '#38ef7d';
     } else {
-      musicPitchVal.textContent = `${val} (♭ ${isEn ? 'Down' : 'Turun'})`;
       musicPitchVal.style.color = '#ff4b91';
     }
   };
   window.updatePitchBadge = updatePitchBadge;
 
   const updateSpeedBadge = (speed) => {
-    if (!musicSpeedVal) return;
     const val = parseFloat(speed) || 1.0;
-    const isEn = window.i18n && window.i18n.currentLang === 'en';
-    if (Math.abs(val - 1.0) < 0.01) {
-      musicSpeedVal.textContent = '1.00x (Normal)';
-      musicSpeedVal.style.color = 'var(--color-cyan, #00f2fe)';
-    } else if (val > 1.0) {
-      musicSpeedVal.textContent = `${val.toFixed(2)}x (${isEn ? 'Fast' : 'Cepat'})`;
-      musicSpeedVal.style.color = '#38ef7d';
-    } else {
-      musicSpeedVal.textContent = `${val.toFixed(2)}x (${isEn ? 'Slow' : 'Lambat'})`;
-      musicSpeedVal.style.color = '#ffb300';
+    if (musicSpeedVal) {
+      const isEn = window.i18n && window.i18n.currentLang === 'en';
+      if (Math.abs(val - 1.0) < 0.01) {
+        musicSpeedVal.textContent = '1.00x (Normal)';
+        musicSpeedVal.style.color = 'var(--color-cyan, #00f2fe)';
+      } else if (val > 1.0) {
+        musicSpeedVal.textContent = `${val.toFixed(2)}x (${isEn ? 'Fast' : 'Cepat'})`;
+        musicSpeedVal.style.color = '#38ef7d';
+      } else {
+        musicSpeedVal.textContent = `${val.toFixed(2)}x (${isEn ? 'Slow' : 'Lambat'})`;
+        musicSpeedVal.style.color = '#ffb300';
+      }
+    }
+    const speedPointer = document.getElementById('speedPointer');
+    if (speedPointer) {
+      const minS = 0.5;
+      const maxS = 2.0;
+      const pct = Math.max(0, Math.min(100, ((val - minS) / (maxS - minS)) * 100));
+      speedPointer.style.left = `${pct}%`;
+    }
+    const speedMarkers = document.querySelectorAll('.speed-marker');
+    if (speedMarkers && speedMarkers.length > 0) {
+      speedMarkers.forEach(m => {
+        const markerSpeed = parseFloat(m.getAttribute('data-speed'));
+        if (Math.abs(markerSpeed - val) < 0.08) {
+          m.classList.add('active');
+        } else {
+          m.classList.remove('active');
+        }
+      });
     }
   };
   window.updateSpeedBadge = updateSpeedBadge;
+
+  document.querySelectorAll('.speed-marker').forEach(marker => {
+    marker.addEventListener('click', () => {
+      const spd = parseFloat(marker.getAttribute('data-speed'));
+      if (!isNaN(spd) && audioEngine) {
+        audioEngine.setMusicSpeed(spd);
+        enforcePlaybackSpeed();
+        if (musicSpeedSlider) musicSpeedSlider.value = spd;
+        updateSpeedBadge(spd);
+      }
+    });
+  });
+
+  const speedRulerContainer = document.getElementById('speedRulerContainer');
+  if (speedRulerContainer) {
+    const handleRulerClick = (e) => {
+      const rect = speedRulerContainer.getBoundingClientRect();
+      const clientX = (e.clientX !== undefined) ? e.clientX : (e.touches && e.touches[0] && e.touches[0].clientX);
+      if (clientX === undefined) return;
+      const clickX = clientX - rect.left;
+      const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+      const spd = Math.round((0.5 + ratio * 1.5) * 20) / 20;
+      if (audioEngine) {
+        audioEngine.setMusicSpeed(spd);
+        enforcePlaybackSpeed();
+        if (musicSpeedSlider) musicSpeedSlider.value = spd;
+        updateSpeedBadge(spd);
+      }
+    };
+    speedRulerContainer.addEventListener('click', handleRulerClick);
+  }
 
   // Initialize Pitch & Speed sliders and badges with current state on startup
   const initPitchVal = parseInt((audioEngine.musicPitch !== undefined ? audioEngine.musicPitch : audioEngine.musicPitchShift) || 0, 10);

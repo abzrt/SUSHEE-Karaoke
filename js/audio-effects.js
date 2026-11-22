@@ -592,6 +592,7 @@ class AudioEffectsEngine {
         break;
 
       case 'custom':
+      case 'super_custom':
         // Retains user custom sliders
         break;
     }
@@ -700,7 +701,7 @@ class AudioEffectsEngine {
   }
 
   setMusicSpeed(speed) {
-    const s = Math.max(0.75, Math.min(1.25, parseFloat(speed) || 1.0));
+    const s = Math.max(0.5, Math.min(2.0, parseFloat(speed) || 1.0));
     // Round to nearest 0.05
     const rounded = Math.round(s * 20) / 20;
     this.musicSpeed = rounded;
