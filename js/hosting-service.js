@@ -78,14 +78,103 @@ class HostingServerService {
           }
         });
         if (domList.length > 0) {
-          this.cachedSongs = domList;
+          this.cachedSongs = domList.map(s => this.cleanSongMetadata(s));
           this.isConnected = true;
         }
       }
     }
 
+    if (this.cachedSongs.length > 0) {
+      this.cachedSongs = this.cachedSongs.map(s => this.cleanSongMetadata(s));
+    }
+
     this._activeSearchPromise = null;
     this._activeSearchQuery = null;
+  }
+
+  /**
+   * Intelligently clean AI stem artifacts (roformer, bs_roformer, mt_81, other) and extract artist/title
+   */
+  cleanSongMetadata(song) {
+    if (!song) return song;
+    let title = (song.title || '').trim();
+    let artist = (song.artist || '').trim();
+    const rawFile = (song.filename || '').trim();
+
+    const stemPattern = /(_+(bs_roformer|roformer|mel_band|mdx|demucs|mt_\d+|mt\s*\d+|demon[-_]voices|other|vocals[-_]back|vocals|instrumental|karaoke|drums|bass|lead|backing|stem)[^.]*)/gi;
+    const titleStemPattern = /\b(bs\s+roformer(\s+mt\s*\d+)?|roformer|other|vocals\s+back|instrumental|karaoke\s+track)\b/gi;
+
+    const needsCleaning = (artist === 'Karaoke Track' || !artist) || titleStemPattern.test(title) || stemPattern.test(rawFile);
+
+    if (needsCleaning) {
+      let base = rawFile ? rawFile.replace(/\.[^/.]+$/, '') : title;
+      base = base.replace(stemPattern, '');
+      base = base.replace(/(_+other|_vocals-back|_vocals|_instrumental|_karaoke|-karaoke|\(karaoke\)|\(instrumental\)|\(\d+\))$/gi, '');
+
+      if (base.includes(' - ')) {
+        const parts = base.split(' - ');
+        title = parts[0].trim();
+        artist = parts[1].trim();
+      } else {
+        const words = base.replace(/[-_]+/g, ' ').trim();
+        const lower = words.toLowerCase();
+        const knownArtists = [
+          'muse', 'paramore', 'seventeen', 'sideline', 'wind walkers', 'evanescence',
+          'charlie puth', 'bad omens', 'dark sarah', 'harra', 'ira green', 'karmin',
+          'ophidian rite', 'rain division', 'scary pockets', 'shadow of intent',
+          'the pretty wild', 'within temptation', 'xandria', 'zhiend', 'last goal! party',
+          'dayseeker', 'lifehouse', 'overgrown', 'the offspring', 'keenan te', 'gwen stefani',
+          'hoobastank', 'incubus', 'i prevail', 'hindia', 'maroon 5', 'daughtry', 'benson boone',
+          'pierce the veil', 'bruno mars', '311', 'kilms', 'putri ariani', 'spoon',
+          'thousand below', 'padi', 'hailee steinfeld', 'alien ant farm', 'red hot chilli peppers',
+          'michelle branch', 'garbage', 'dua lipa', 'bernadya', 'naff', 'bring me the horizon'
+        ];
+
+        let foundArtist = null;
+        let remainingTitle = words;
+
+        for (const art of knownArtists) {
+          if (lower.startsWith(art + ' ')) {
+            foundArtist = words.slice(0, art.length);
+            remainingTitle = words.slice(art.length).trim();
+            break;
+          } else if (lower.endsWith(' ' + art)) {
+            foundArtist = words.slice(words.length - art.length);
+            remainingTitle = words.slice(0, words.length - art.length).trim();
+            break;
+          } else if (lower.includes(' ' + art + ' ')) {
+            const idx = lower.indexOf(art);
+            foundArtist = words.slice(idx, idx + art.length);
+            const before = words.slice(0, idx).trim();
+            const after = words.slice(idx + art.length).replace(/\b(epic|orchestral|cover|band|version)\b/gi, '').trim();
+            remainingTitle = (before + ' ' + after).trim();
+            break;
+          }
+        }
+
+        if (!foundArtist && base.includes('-')) {
+          const p = base.split('-');
+          foundArtist = p[0].trim();
+          remainingTitle = p.slice(1).join(' ').trim();
+        }
+
+        const uc = s => (s || '').split(' ').filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+
+        if (foundArtist) {
+          artist = uc(foundArtist);
+          title = uc(remainingTitle.replace(titleStemPattern, '').trim());
+        } else {
+          title = uc(words.replace(titleStemPattern, '').trim());
+          if (!artist || artist === 'Karaoke Track') artist = 'Karaoke Track';
+        }
+      }
+    }
+
+    return {
+      ...song,
+      title: title || song.title,
+      artist: (artist && artist !== 'Karaoke Track') ? artist : (song.artist || 'Karaoke Track')
+    };
   }
 
   /**
@@ -247,7 +336,8 @@ class HostingServerService {
 
       const data = await resp.json();
       if (data && (data.status === 'success' || Array.isArray(data.songs))) {
-        const songsList = Array.isArray(data.songs) ? data.songs : [];
+        const rawList = Array.isArray(data.songs) ? data.songs : [];
+        const songsList = rawList.map(s => this.cleanSongMetadata(s));
         this.isConnected = true;
         this.cachedSongs = songsList;
         this.saveServerUrl(target);
@@ -311,7 +401,8 @@ class HostingServerService {
         if (resp && resp.ok) {
           const data = await resp.json();
           if (data && (data.status === 'success' || Array.isArray(data.songs))) {
-            const list = Array.isArray(data.songs) ? data.songs : [];
+            const rawList = Array.isArray(data.songs) ? data.songs : [];
+            const list = rawList.map(s => this.cleanSongMetadata(s));
             this.isConnected = true;
             if (!q && list.length > 0) {
               this.cachedSongs = list;

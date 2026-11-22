@@ -66,12 +66,14 @@ $scanDirs[] = [
 // Helper: Tokenisasi string untuk fuzzy matching cerdas
 function getTokens($str) {
     $str = strtolower($str);
-    // Hapus suffix umum seperti _vocals-back, _instrumental, dsb
-    $str = preg_replace('/(_vocals-back|_vocals|_instrumental|_karaoke|-karaoke|\(karaoke\)|\(instrumental\)|\(\d+\))/i', '', $str);
+    // Hapus suffix umum dan tag AI separation (bs_roformer, mt_81, other, dsb)
+    $str = preg_replace('/(_+(bs_roformer|roformer|mel_band|mdx|demucs|mt_\d+|mt\s*\d+|demon[-_]voices|other|vocals[-_]back|vocals|instrumental|karaoke|drums|bass|lead|backing|stem)[^.]*)/i', '', $str);
+    $str = preg_replace('/(_+other|_vocals-back|_vocals|_instrumental|_karaoke|-karaoke|\(karaoke\)|\(instrumental\)|\(\d+\))/i', '', $str);
     preg_match_all('/[a-z0-9]+/i', $str, $matches);
     $tokens = !empty($matches[0]) ? $matches[0] : [];
-    $filtered = array_filter($tokens, function($t) {
-        return strlen($t) >= 2 || is_numeric($t);
+    $stopwords = ['bs', 'roformer', 'mt', '81', 'other', 'vocals', 'instrumental', 'karaoke', 'back', 'stem'];
+    $filtered = array_filter($tokens, function($t) use ($stopwords) {
+        return (strlen($t) >= 2 || is_numeric($t)) && !in_array($t, $stopwords);
     });
     sort($filtered);
     return array_values(array_unique($filtered));
@@ -178,9 +180,10 @@ foreach ($scanDirs as $target) {
             $matchedLrc = $lrcIndex[$lowerBase];
         }
 
-        // Cek 2: Bersihkan suffix umum (_vocals-back, _vocals, dsb)
+        // Cek 2: Bersihkan suffix umum dan stem noise AI (_vocals-back, _other, _bs_roformer, dsb)
         if (!$matchedLrc) {
-            $cleanSuffix = preg_replace('/(_vocals-back|_vocals|_instrumental|_karaoke|-karaoke|\(karaoke\)|\(instrumental\))$/i', '', $basename);
+            $cleanSuffix = preg_replace('/(_+(bs_roformer|roformer|mel_band|mdx|demucs|mt_\d+|mt\s*\d+|demon[-_]voices|other|vocals[-_]back|vocals|instrumental|karaoke|drums|bass|lead|backing|stem)[^.]*)/i', '', $basename);
+            $cleanSuffix = preg_replace('/(_+other|_vocals-back|_vocals|_instrumental|_karaoke|-karaoke|\(karaoke\)|\(instrumental\)|\(\d+\))$/i', '', $cleanSuffix);
             $lowerClean = strtolower($cleanSuffix);
             if (isset($lrcIndex[$lowerClean])) {
                 $matchedLrc = $lrcIndex[$lowerClean];
@@ -201,7 +204,19 @@ foreach ($scanDirs as $target) {
                     }
                 }
 
-                // Cek Jaccard similarity >= 0.6
+                // Cek subset containment: jika seluruh token file LRC ada dalam token file audio
+                if (!$matchedLrc) {
+                    foreach ($allLrcFiles as $lrc) {
+                        if (empty($lrc['tokens'])) continue;
+                        $intersectCount = count(array_intersect($lrc['tokens'], $audioTokens));
+                        if ($intersectCount === count($lrc['tokens']) && $intersectCount >= 2) {
+                            $matchedLrc = $lrc;
+                            break;
+                        }
+                    }
+                }
+
+                // Cek Jaccard similarity >= 0.5
                 if (!$matchedLrc) {
                     $bestScore = 0;
                     $bestCandidate = null;
@@ -209,7 +224,7 @@ foreach ($scanDirs as $target) {
                         $intersect = count(array_intersect($audioTokens, $lrc['tokens']));
                         $union = count(array_unique(array_merge($audioTokens, $lrc['tokens'])));
                         $sim = $union > 0 ? ($intersect / $union) : 0;
-                        if ($sim >= 0.6 && $sim > $bestScore) {
+                        if ($sim >= 0.5 && $sim > $bestScore) {
                             $bestScore = $sim;
                             $bestCandidate = $lrc;
                         }
@@ -233,15 +248,53 @@ foreach ($scanDirs as $target) {
             $title = trim($parts[0]);
             $artist = trim($parts[1]);
         } else {
-            $cleanName = preg_replace('/(_vocals-back|_vocals|_instrumental|_karaoke|-karaoke|\(karaoke\)|\(instrumental\))$/i', '', $basename);
+            $cleanName = preg_replace('/(_+(bs_roformer|roformer|mel_band|mdx|demucs|mt_\d+|mt\s*\d+|demon[-_]voices|other|vocals[-_]back|vocals|instrumental|karaoke|drums|bass|lead|backing|stem)[^.]*)/i', '', $basename);
+            $cleanName = preg_replace('/(_+other|_vocals-back|_vocals|_instrumental|_karaoke|-karaoke|\(karaoke\)|\(instrumental\))$/i', '', $cleanName);
             if (strpos($cleanName, ' - ') !== false) {
                 $parts = explode(' - ', $cleanName, 2);
                 $artist = trim($parts[0]);
                 $title = trim($parts[1]);
             } else {
-                $cleanName = str_replace(['_', '-'], ' ', $cleanName);
-                $title = $cleanName;
-                $artist = 'Karaoke Track';
+                $words = trim(preg_replace('/[-_]+/', ' ', $cleanName));
+                $lowerWords = strtolower($words);
+                $knownArtists = [
+                    'muse', 'paramore', 'seventeen', 'sideline', 'wind walkers', 'evanescence',
+                    'charlie puth', 'bad omens', 'dark sarah', 'harra', 'ira green', 'karmin',
+                    'ophidian rite', 'rain division', 'scary pockets', 'shadow of intent',
+                    'the pretty wild', 'within temptation', 'xandria', 'zhiend', 'last goal! party',
+                    'dayseeker', 'lifehouse', 'overgrown', 'the offspring', 'keenan te', 'gwen stefani',
+                    'hoobastank', 'incubus', 'i prevail', 'hindia', 'maroon 5', 'daughtry', 'benson boone',
+                    'pierce the veil', 'bruno mars', '311', 'kilms', 'putri ariani', 'spoon',
+                    'thousand below', 'padi', 'hailee steinfeld', 'alien ant farm', 'red hot chilli peppers',
+                    'michelle branch', 'garbage', 'dua lipa', 'bernadya', 'naff', 'bring me the horizon'
+                ];
+                $detectedArtist = null;
+                $detectedTitle = $words;
+                foreach ($knownArtists as $art) {
+                    if (strpos($lowerWords, $art . ' ') === 0) {
+                        $detectedArtist = substr($words, 0, strlen($art));
+                        $detectedTitle = trim(substr($words, strlen($art)));
+                        break;
+                    } elseif (substr($lowerWords, -strlen(' ' . $art)) === ' ' . $art) {
+                        $detectedArtist = substr($words, -strlen($art));
+                        $detectedTitle = trim(substr($words, 0, strlen($words) - strlen($art)));
+                        break;
+                    } elseif (strpos($lowerWords, ' ' . $art . ' ') !== false) {
+                        $idx = strpos($lowerWords, $art);
+                        $detectedArtist = substr($words, $idx, strlen($art));
+                        $before = trim(substr($words, 0, $idx));
+                        $after = trim(preg_replace('/\b(epic|orchestral|cover|band|version)\b/i', '', substr($words, $idx + strlen($art))));
+                        $detectedTitle = trim($before . ' ' . $after);
+                        break;
+                    }
+                }
+                if (!$detectedArtist && strpos($cleanName, '-') !== false) {
+                    $parts = explode('-', $cleanName, 2);
+                    $detectedArtist = trim($parts[0]);
+                    $detectedTitle = trim($parts[1]);
+                }
+                $title = $detectedTitle ?: $words;
+                $artist = $detectedArtist ?: 'Karaoke Track';
             }
         }
 
