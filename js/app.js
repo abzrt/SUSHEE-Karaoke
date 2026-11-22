@@ -117,6 +117,132 @@ async function initApp() {
   }
   const storageScanner = new StorageScanner();
   window.storageScanner = storageScanner;
+  const offlineManager = (typeof OfflineSongManager === 'function') ? new OfflineSongManager() : null;
+  window.offlineManager = offlineManager;
+
+  // Register Service Worker for true offline PWA/Capacitor shell caching
+  if ('serviceWorker' in navigator && window.location && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW registration skipped:', err));
+    });
+  }
+
+  // --- PER-SONG LYRICS SYNC OFFSET (STAGE 2) ---
+  const LYRIC_OFFSETS_KEY = 'sushee_lyric_offsets';
+  let currentLyricOffsetMs = 0;
+
+  function loadLyricOffsetsMap() {
+    try {
+      const raw = localStorage.getItem(LYRIC_OFFSETS_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return (parsed && typeof parsed === 'object') ? parsed : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function getLyricOffset(songId) {
+    if (!songId) return 0;
+    const map = loadLyricOffsetsMap();
+    const val = parseInt(map[songId], 10);
+    return isNaN(val) ? 0 : Math.max(-5000, Math.min(5000, val));
+  }
+
+  function saveLyricOffset(songId, offsetMs) {
+    if (!songId) return;
+    try {
+      const map = loadLyricOffsetsMap();
+      if (offsetMs === 0) delete map[songId];
+      else map[songId] = offsetMs;
+      localStorage.setItem(LYRIC_OFFSETS_KEY, JSON.stringify(map));
+    } catch (e) {}
+  }
+
+  function updateLyricSyncUI() {
+    const el = document.getElementById('lyricSyncDisplayVal');
+    if (el) {
+      el.textContent = (currentLyricOffsetMs > 0 ? '+' : '') + currentLyricOffsetMs + ' ms';
+    }
+  }
+
+  function stepLyricOffset(deltaMs) {
+    const next = Math.max(-5000, Math.min(5000, currentLyricOffsetMs + (parseInt(deltaMs, 10) || 0)));
+    currentLyricOffsetMs = next;
+    if (currentSong && currentSong.id) saveLyricOffset(currentSong.id, next);
+    updateLyricSyncUI();
+    if (audioElement && !isNaN(audioElement.currentTime)) {
+      activeLyricIndex = -2;
+      updateLyricSync(audioElement.currentTime);
+    }
+    showToast(`⏱️ Offset lirik: ${(next > 0 ? '+' : '') + next} ms`, 'info');
+  }
+
+  function resetLyricOffset() {
+    currentLyricOffsetMs = 0;
+    if (currentSong && currentSong.id) saveLyricOffset(currentSong.id, 0);
+    updateLyricSyncUI();
+    if (audioElement && !isNaN(audioElement.currentTime)) {
+      activeLyricIndex = -2;
+      updateLyricSync(audioElement.currentTime);
+    }
+    showToast('⏱️ Offset lirik direset ke 0 ms', 'info');
+  }
+
+  window.stepLyricOffset = stepLyricOffset;
+  window.resetLyricOffset = resetLyricOffset;
+
+  // --- OFFLINE SONG DOWNLOAD TOGGLE (STAGE 2) ---
+  async function toggleOfflineSong(songId, evt) {
+    if (evt) {
+      evt.preventDefault();
+      evt.stopPropagation();
+    }
+    if (!offlineManager) {
+      showToast('Fitur offline belum siap di browser ini.', 'error');
+      return;
+    }
+    const song = findSongById(songId);
+    if (!song) return;
+
+    if (offlineManager.isOffline(song.id)) {
+      await offlineManager.removeSong(song);
+      showToast(`🗑️ "${song.title}" dihapus dari penyimpanan offline`, 'info');
+      renderSongList();
+      if (typeof renderCloudSongList === 'function') renderCloudSongList();
+      return;
+    }
+
+    if (offlineManager.isDownloading(song.id)) return;
+    showToast(`⬇️ Mengunduh "${song.title}" untuk mode offline...`, 'info');
+
+    // Mark button loading immediately
+    document.querySelectorAll(`.btn-offline-dl[data-song-id="${song.id}"]`).forEach(b => b.classList.add('is-loading'));
+    try {
+      const res = await offlineManager.downloadSong(song);
+      if (res && res.ok) {
+        const mb = ((res.sizeBytes || 0) / (1024 * 1024)).toFixed(1);
+        showToast(`✅ "${song.title}" siap offline (${mb} MB)`, 'success');
+      }
+    } catch (err) {
+      console.warn('Offline download failed:', err);
+      showToast(`Gagal mengunduh "${song.title}": ${err.message || 'Cek koneksi internet'}`, 'error');
+    } finally {
+      renderSongList();
+      if (typeof renderCloudSongList === 'function') renderCloudSongList();
+    }
+  }
+  window.toggleOfflineSong = toggleOfflineSong;
+
+  function renderOfflineButtonHtml(song) {
+    if (!song || song.source !== 'custom_host' || !offlineManager) return '';
+    const isSaved = offlineManager.isOffline(song.id);
+    const isLoading = offlineManager.isDownloading(song.id);
+    const title = isSaved ? 'Tersimpan Offline (Ketuk untuk hapus)' : 'Unduh untuk mode offline';
+    const icon = isSaved
+      ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>'
+      : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+    return `<button type="button" class="btn-offline-dl ${isSaved ? 'is-offline' : ''} ${isLoading ? 'is-loading' : ''}" data-song-id="${song.id}" onclick="window.toggleOfflineSong && window.toggleOfflineSong('${song.id}', event)" title="${title}">${icon}</button>`;
+  }
   const recorder = new KaraokeRecorder(audioEngine);
   window.recorder = recorder;
   const hostingService = new HostingServerService();
@@ -762,9 +888,11 @@ async function initApp() {
               `<span class="badge badge-lyrics"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> ${window.i18n.t('badgeHasLyrics')}</span>` : 
               `<span class="badge badge-no-lyrics">${window.i18n.t('badgeNoLyrics')}</span>`
             }
+            ${(song.source === 'custom_host' && offlineManager && offlineManager.isOffline(song.id)) ? `<span class="badge badge-offline">✓ Offline</span>` : ''}
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
+          ${renderOfflineButtonHtml(song)}
           <button type="button" class="btn btn-sm btn-songs-playlist-add ${(typeof isSongInPlaylist === 'function' && isSongInPlaylist(song)) ? 'in-playlist' : ''}" data-song-id="${song.id}" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist('${song.id}', true, event)" title="${(typeof isSongInPlaylist === 'function' && isSongInPlaylist(song)) ? ((window.i18n && window.i18n.t) ? window.i18n.t('playlistRemoveHint') : 'Di Playlist (Ketuk untuk menghapus)') : ((window.i18n && window.i18n.t) ? window.i18n.t('btnAddToPlaylist') : '+ Playlist')}">
             ${(typeof isSongInPlaylist === 'function' && isSongInPlaylist(song)) ? ((window.i18n && window.i18n.t) ? window.i18n.t('btnAddedToPlaylist') : '✓ Di Playlist') : ((window.i18n && window.i18n.t) ? window.i18n.t('btnAddToPlaylist') : '+ Playlist')}
           </button>
@@ -799,6 +927,7 @@ async function initApp() {
   // Delegated click & touch listener ensuring all song cards are responsive immediately without duplicate events
   if (songsListContainer) {
     songsListContainer.addEventListener('click', (e) => {
+      if (e.target.closest('.btn-offline-dl')) return;
       // 1. + Playlist button clicked (Toggle add/remove with instant UI response)
       const playlistBtn = e.target.closest('.btn-songs-playlist-add') || e.target.closest('.btn-cloud-playlist-add');
       if (playlistBtn) {
@@ -857,49 +986,67 @@ async function initApp() {
     if (!song) return;
     currentSong = song;
 
+    // Load saved per-song lyrics sync offset
+    currentLyricOffsetMs = getLyricOffset(song.id);
+    updateLyricSyncUI();
+
     // Update Player Bar and Studio UI
     document.querySelectorAll('.current-song-title').forEach(el => el.textContent = song.title);
     document.querySelectorAll('.current-song-artist').forEach(el => el.textContent = formatArtistDisplay(song.artist));
 
-    // Audio element source: ensure CORS is set before src for remote hosting URLs
-    if (song.audioUrl && (song.audioUrl.startsWith('http://') || song.audioUrl.startsWith('https://'))) {
-      audioElement.crossOrigin = 'anonymous';
-    } else {
-      audioElement.removeAttribute('crossorigin');
-    }
-    audioElement.src = song.audioUrl;
-    audioElement.muted = false;
-    audioElement.load();
-    enforcePlaybackSpeed();
-
-    // Position audio and lyrics at the very beginning (00:00)
-    resetAudioAndLyricsToStart();
-
-    // Parse lyrics
-    if (song.hasLyrics && song.lrcContent) {
-      lrcParser.parse(song.lrcContent);
-      renderLyricsView();
+    const applyAudioAndLyrics = (resolvedAudioUrl, resolvedLrcText) => {
+      if (currentSong !== song) return; // user switched song while resolving offline blob
+      if (resolvedAudioUrl && (resolvedAudioUrl.startsWith('http://') || resolvedAudioUrl.startsWith('https://'))) {
+        audioElement.crossOrigin = 'anonymous';
+      } else {
+        audioElement.removeAttribute('crossorigin');
+      }
+      audioElement.src = resolvedAudioUrl;
+      audioElement.muted = false;
+      audioElement.load();
+      enforcePlaybackSpeed();
       resetAudioAndLyricsToStart();
-    } else if (song.hasLyrics && song.lrcUrl) {
-      showToast(window.i18n.t('toastDownloadingLyrics'), 'info');
-      hostingService.fetchLrcContent(song.lrcUrl).then(text => {
-        if (text) {
-          song.lrcContent = text;
-          lrcParser.parse(text);
-          renderLyricsView();
-          resetAudioAndLyricsToStart();
-        } else {
+
+      const lrcText = resolvedLrcText || song.lrcContent;
+      if (lrcText) {
+        song.lrcContent = lrcText;
+        lrcParser.parse(lrcText);
+        renderLyricsView();
+        resetAudioAndLyricsToStart();
+      } else if (song.hasLyrics && song.lrcUrl) {
+        showToast(window.i18n.t('toastDownloadingLyrics'), 'info');
+        hostingService.fetchLrcContent(song.lrcUrl).then(text => {
+          if (currentSong !== song) return;
+          if (text) {
+            song.lrcContent = text;
+            lrcParser.parse(text);
+            renderLyricsView();
+            resetAudioAndLyricsToStart();
+          } else {
+            lrcParser.lines = [];
+            renderEmptyLyricsView();
+          }
+        }).catch(err => {
+          console.warn('Gagal memuat LRC server:', err);
           lrcParser.lines = [];
           renderEmptyLyricsView();
-        }
-      }).catch(err => {
-        console.warn('Gagal memuat LRC server:', err);
+        });
+      } else {
         lrcParser.lines = [];
         renderEmptyLyricsView();
-      });
+      }
+    };
+
+    if (offlineManager && song.source === 'custom_host' && offlineManager.isOffline(song.id)) {
+      offlineManager.getOfflinePlaybackData(song).then(offlineData => {
+        if (offlineData && offlineData.audioUrl) {
+          applyAudioAndLyrics(offlineData.audioUrl, offlineData.lrcText);
+        } else {
+          applyAudioAndLyrics(song.audioUrl, null);
+        }
+      }).catch(() => applyAudioAndLyrics(song.audioUrl, null));
     } else {
-      lrcParser.lines = [];
-      renderEmptyLyricsView();
+      applyAudioAndLyrics(song.audioUrl, null);
     }
 
     // Update active highlight on cards in song lists
@@ -965,8 +1112,9 @@ async function initApp() {
       el.addEventListener('click', () => {
         const time = parseFloat(el.getAttribute('data-time'));
         if (!isNaN(time)) {
-          audioElement.currentTime = time;
-          updateLyricSync(time);
+          const targetTime = Math.max(0, time - (currentLyricOffsetMs / 1000));
+          audioElement.currentTime = targetTime;
+          updateLyricSync(targetTime);
         }
       });
     });
@@ -975,7 +1123,8 @@ async function initApp() {
   function updateLyricSync(currentTime) {
     if (lrcParser.lines.length === 0 || !lyricsContainer) return;
 
-    const newIndex = lrcParser.getCurrentIndex(currentTime);
+    const adjustedTime = Math.max(0, currentTime + (currentLyricOffsetMs / 1000));
+    const newIndex = lrcParser.getCurrentIndex(adjustedTime);
     if (newIndex !== activeLyricIndex) {
       activeLyricIndex = newIndex;
 
@@ -1895,6 +2044,10 @@ async function initApp() {
   const btnAutoCalibrateLatency = document.getElementById('btnAutoCalibrateLatency');
   const btnCloseCalibrateModal = document.getElementById('btnCloseCalibrateModal');
   const btnStartCalibrate = document.getElementById('btnStartCalibrate');
+  const btnStartTapCalibrate = document.getElementById('btnStartTapCalibrate');
+  const btTapCalibrateArea = document.getElementById('btTapCalibrateArea');
+  const btnTapBeat = document.getElementById('btnTapBeat');
+  const btTapCounter = document.getElementById('btTapCounter');
   const btnApplyCalibrate = document.getElementById('btnApplyCalibrate');
   const calibrateRadar = document.getElementById('calibrateRadar');
   const calibrateStatusTitle = document.getElementById('calibrateStatusTitle');
@@ -1904,8 +2057,21 @@ async function initApp() {
   const detectedLatencySub = document.getElementById('detectedLatencySub');
 
   let lastDetectedMs = 0;
+  let tapCalState = null;
+
+  function stopTapCalibration() {
+    if (tapCalState && tapCalState.timer) {
+      clearInterval(tapCalState.timer);
+    }
+    if (tapCalState && tapCalState.finishTimer) {
+      clearTimeout(tapCalState.finishTimer);
+    }
+    tapCalState = null;
+    if (btTapCalibrateArea) btTapCalibrateArea.style.display = 'none';
+  }
 
   function openCalibrateModal() {
+    stopTapCalibration();
     if (latencyCalibrateModal) {
       latencyCalibrateModal.classList.add('open');
       if (calibrateRadar) calibrateRadar.classList.remove('pulsing');
@@ -1915,12 +2081,17 @@ async function initApp() {
         btnStartCalibrate.style.display = 'inline-flex';
         btnStartCalibrate.disabled = false;
       }
+      if (btnStartTapCalibrate) {
+        btnStartTapCalibrate.style.display = 'inline-flex';
+        btnStartTapCalibrate.disabled = false;
+      }
       if (calibrateStatusTitle) calibrateStatusTitle.textContent = window.i18n.t('calibrateReadyTitle');
       if (calibrateStatusDesc) calibrateStatusDesc.textContent = window.i18n.t('calibrateReadyDesc');
     }
   }
 
   function closeCalibrateModal() {
+    stopTapCalibration();
     if (latencyCalibrateModal) {
       latencyCalibrateModal.classList.remove('open');
       if (calibrateRadar) calibrateRadar.classList.remove('pulsing');
@@ -1928,6 +2099,145 @@ async function initApp() {
   }
   window.openCalibrateModal = openCalibrateModal;
   window.closeCalibrateModal = closeCalibrateModal;
+
+  function playCalibrationClick(ctx, when) {
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(1100, when);
+      osc.frequency.exponentialRampToValueAtTime(420, when + 0.035);
+      gain.gain.setValueAtTime(0.001, when);
+      gain.gain.linearRampToValueAtTime(0.45, when + 0.004);
+      gain.gain.exponentialRampToValueAtTime(0.001, when + 0.045);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(when);
+      osc.stop(when + 0.05);
+    } catch (e) {}
+  }
+
+  function finishTapCalibration() {
+    if (!tapCalState) return;
+    const samples = tapCalState.deltas.slice();
+    stopTapCalibration();
+
+    if (calibrateRadar) calibrateRadar.classList.remove('pulsing');
+
+    if (samples.length < 2) {
+      if (calibrateStatusTitle) calibrateStatusTitle.textContent = 'Ketukan Belum Cukup';
+      if (calibrateStatusDesc) calibrateStatusDesc.textContent = 'Ketuk tombol minimal 3 kali mengikuti irama klik, lalu coba lagi.';
+      if (btnStartCalibrate) btnStartCalibrate.style.display = 'inline-flex';
+      if (btnStartTapCalibrate) btnStartTapCalibrate.style.display = 'inline-flex';
+      return;
+    }
+
+    // Use median to reject accidental early/late taps
+    samples.sort((a, b) => a - b);
+    const mid = Math.floor(samples.length / 2);
+    const medianMs = samples.length % 2 === 1 ? samples[mid] : (samples[mid - 1] + samples[mid]) / 2;
+    const clampedMs = Math.max(0, Math.min(300, Math.round(medianMs / 5) * 5));
+
+    lastDetectedMs = clampedMs;
+    if (calibrateStatusTitle) calibrateStatusTitle.textContent = 'Kalibrasi Bluetooth Selesai';
+    if (calibrateStatusDesc) calibrateStatusDesc.textContent = `Rata-rata delay terukur dari ${samples.length} ketukan irama.`;
+    if (detectedLatencyVal) detectedLatencyVal.textContent = (clampedMs > 0 ? '+' : '') + clampedMs + ' ms';
+    if (detectedLatencySub) detectedLatencySub.textContent = 'Mode Tap Bluetooth / Earphone TWS';
+    if (calibrateDetectedBox) calibrateDetectedBox.style.display = 'flex';
+    if (btnApplyCalibrate) btnApplyCalibrate.style.display = 'inline-flex';
+    if (btnStartTapCalibrate) btnStartTapCalibrate.style.display = 'inline-flex';
+
+    updateLatencyUI(clampedMs, true);
+    audioEngine.setLatencyOffset(clampedMs);
+    showToast(`🎧 Delay Bluetooth diatur: +${clampedMs} ms`, 'success');
+  }
+
+  if (btnStartTapCalibrate) {
+    btnStartTapCalibrate.addEventListener('click', async () => {
+      stopTapCalibration();
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const ctx = (audioEngine && audioEngine.audioCtx) ? audioEngine.audioCtx : new AudioCtx();
+      if (ctx.state === 'suspended') {
+        try { await ctx.resume(); } catch (e) {}
+      }
+
+      const TOTAL_BEATS = 6;
+      const INTERVAL_MS = 650;
+      const beatTimesMs = [];
+      const deltas = [];
+      let beatCount = 0;
+
+      tapCalState = { ctx, beatTimesMs, deltas, totalBeats: TOTAL_BEATS, timer: null, finishTimer: null };
+
+      if (calibrateRadar) calibrateRadar.classList.add('pulsing');
+      if (calibrateDetectedBox) calibrateDetectedBox.style.display = 'none';
+      if (btnStartCalibrate) btnStartCalibrate.style.display = 'none';
+      if (btnStartTapCalibrate) btnStartTapCalibrate.style.display = 'none';
+      if (btnApplyCalibrate) btnApplyCalibrate.style.display = 'none';
+      if (btTapCalibrateArea) btTapCalibrateArea.style.display = 'block';
+      if (calibrateStatusTitle) calibrateStatusTitle.textContent = 'Ikuti Bunyi Klik (Bluetooth)';
+      if (calibrateStatusDesc) calibrateStatusDesc.textContent = 'Dengarkan 6 bunyi klik berirama dan ketuk tombol biru tepat saat Anda mendengarnya.';
+      if (btTapCounter) btTapCounter.textContent = `0 / ${TOTAL_BEATS} ketukan`;
+
+      const fireBeat = () => {
+        if (!tapCalState) return;
+        const nowPerf = performance.now();
+        beatTimesMs.push(nowPerf);
+        playCalibrationClick(ctx, ctx.currentTime + 0.005);
+        beatCount++;
+        if (beatCount >= TOTAL_BEATS) {
+          clearInterval(tapCalState.timer);
+          tapCalState.timer = null;
+          tapCalState.finishTimer = setTimeout(finishTapCalibration, 800);
+        }
+      };
+
+      // First beat after short 450ms prep so user is ready
+      tapCalState.finishTimer = setTimeout(() => {
+        if (!tapCalState) return;
+        fireBeat();
+        tapCalState.timer = setInterval(fireBeat, INTERVAL_MS);
+      }, 450);
+    });
+  }
+
+  if (btnTapBeat) {
+    const handleTap = (e) => {
+      if (e) e.preventDefault();
+      if (!tapCalState || tapCalState.beatTimesMs.length === 0) return;
+      const tapNow = performance.now();
+
+      btnTapBeat.classList.add('tap-flash');
+      setTimeout(() => btnTapBeat.classList.remove('tap-flash'), 120);
+
+      // Find the most recent beat before (or closest to) this tap
+      const beats = tapCalState.beatTimesMs;
+      let nearestBeat = beats[beats.length - 1];
+      let bestAbs = Math.abs(tapNow - nearestBeat);
+      for (let i = beats.length - 2; i >= 0; i--) {
+        const diff = Math.abs(tapNow - beats[i]);
+        if (diff < bestAbs) {
+          bestAbs = diff;
+          nearestBeat = beats[i];
+        }
+      }
+      const beatIdx = beats.indexOf(nearestBeat);
+      const deltaMs = tapNow - nearestBeat;
+
+      // Ignore the 1st warm-up beat so the user locks into the rhythm
+      if (beatIdx >= 1 && deltaMs >= -50 && deltaMs <= 450) {
+        tapCalState.deltas.push(deltaMs);
+      }
+
+      const shownCount = Math.min(tapCalState.totalBeats, tapCalState.deltas.length + 1);
+      if (btTapCounter) btTapCounter.textContent = `${shownCount} / ${tapCalState.totalBeats} ketukan`;
+
+      if (tapCalState.deltas.length >= tapCalState.totalBeats - 1) {
+        finishTapCalibration();
+      }
+    };
+    btnTapBeat.addEventListener('pointerdown', handleTap);
+  }
 
   if (btnAutoCalibrateLatency) {
     btnAutoCalibrateLatency.addEventListener('click', openCalibrateModal);
@@ -3062,9 +3372,11 @@ async function initApp() {
                 `<span class="badge badge-lyrics"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> ${hasLyricsLabel}</span>` : 
                 `<span class="badge badge-no-lyrics">${noLyricsLabel}</span>`
               }
+              ${(offlineManager && offlineManager.isOffline(song.id)) ? `<span class="badge badge-offline">✓ Offline</span>` : ''}
             </div>
           </div>
           <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
+            ${renderOfflineButtonHtml(song)}
             <button class="btn btn-sm btn-cloud-playlist-add" data-song-id="${song.id}" title="Tambah ke Playlist Dengar" style="padding: 6px 10px; font-size: 0.74rem; background: ${isInPlaylist ? 'rgba(0, 242, 254, 0.2)' : 'rgba(255, 255, 255, 0.08)'}; color: ${isInPlaylist ? 'var(--color-cyan)' : 'var(--text-main)'}; border: 1px solid ${isInPlaylist ? 'rgba(0, 242, 254, 0.4)' : 'var(--border-subtle)'}; border-radius: 8px;">
               ${isInPlaylist ? '✓ In Queue' : '+ Playlist'}
             </button>
@@ -3081,6 +3393,7 @@ async function initApp() {
   // Delegated click listener for cloud list without duplicate events
   if (cloudListContainer) {
     cloudListContainer.addEventListener('click', (e) => {
+      if (e.target.closest('.btn-offline-dl')) return;
       const playlistBtn = e.target.closest('.btn-cloud-playlist-add');
       if (playlistBtn) {
         e.preventDefault();

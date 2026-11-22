@@ -391,10 +391,28 @@ assert(freshStyleCssContent.includes('.btn-transport-play'), 'style.css defines 
 // 6. i18n
 assert(freshI18nContent.includes('songsPlaylistTitle') && freshI18nContent.includes('modeSequential') && freshI18nContent.includes('modeShuffle') && freshI18nContent.includes('modeRepeatOne'), 'i18n.js has translations for all playlist modes and titles');
 
+// ======================================================
+// TEST SUITE 15: Stage 2 (Per-Song Lyric Sync, BT Tap Calibration, Offline SW & Downloads)
+// ======================================================
+console.log('\n=== TEST SUITE 15: Stage 2 Offline Mode, Lyric Offset & BT Tap Calibration ===');
+assert(fs.existsSync('sw.js'), 'sw.js Service Worker exists');
+assert(fs.existsSync('js/offline-manager.js'), 'js/offline-manager.js exists');
+const offlineMgrContent = fs.readFileSync('js/offline-manager.js', 'utf8');
+assert(offlineMgrContent.includes('class OfflineSongManager'), 'offline-manager.js defines OfflineSongManager');
+assert(offlineMgrContent.includes('downloadSong(song)') && offlineMgrContent.includes('getOfflinePlaybackData(song)'), 'OfflineSongManager implements downloadSong and getOfflinePlaybackData');
+assert(indexHtml.includes('src="js/offline-manager.js'), 'index.html loads js/offline-manager.js');
+assert(indexHtml.includes('id="lyricSyncDisplayVal"'), 'index.html has per-song lyric sync display');
+assert(indexHtml.includes('id="btnStartTapCalibrate"') && indexHtml.includes('id="btnTapBeat"'), 'index.html has Bluetooth tap calibration controls');
+assert(freshAppJsContent.includes('window.stepLyricOffset = stepLyricOffset;'), 'app.js exposes window.stepLyricOffset');
+assert(freshAppJsContent.includes('window.resetLyricOffset = resetLyricOffset;'), 'app.js exposes window.resetLyricOffset');
+assert(freshAppJsContent.includes('window.toggleOfflineSong = toggleOfflineSong;'), 'app.js exposes window.toggleOfflineSong');
+assert(freshAppJsContent.includes("navigator.serviceWorker.register('./sw.js')"), 'app.js registers Service Worker sw.js');
+assert(freshStyleCssContent.includes('.lyric-sync-card') && freshStyleCssContent.includes('.btn-offline-dl') && freshStyleCssContent.includes('.bt-tap-pad'), 'style.css defines Stage 2 UI classes');
+
 console.log('\n======================================================');
 console.log(`TOTAL TESTS: ${testsPassed + testsFailed} | PASSED: ${testsPassed} | FAILED: ${testsFailed}`);
 if (testsFailed === 0) {
-  console.log('🎉 ALL 14 TEST SUITES OPERATIONAL WITH ZERO ERRORS!');
+  console.log('🎉 ALL 15 TEST SUITES OPERATIONAL WITH ZERO ERRORS!');
 } else {
   console.error('⚠️ SOME TESTS FAILED. PLEASE INVESTIGATE!');
   process.exit(1);

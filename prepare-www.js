@@ -31,7 +31,7 @@ targets.forEach(targetDir => {
   if (!fs.existsSync(targetDir)) {
     fs.mkdirSync(targetDir, { recursive: true });
   }
-  ['index.html', 'manifest.json', 'css', 'js', 'assets'].forEach(item => {
+  ['index.html', 'manifest.json', 'sw.js', 'css', 'js', 'assets'].forEach(item => {
     const itemPath = path.join(srcDir, item);
     if (fs.existsSync(itemPath)) {
       copyRecursive(itemPath, path.join(targetDir, item));
