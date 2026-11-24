@@ -24,10 +24,10 @@ android {
     }
     signingConfigs {
         release {
-            storeFile file(keystoreProps.getProperty('storeFile', 'sushee-release.jks'))
-            storePassword keystoreProps.getProperty('storePassword', System.getenv('SUSHEE_STORE_PASSWORD') ?: '')
-            keyAlias keystoreProps.getProperty('keyAlias', 'sushee')
-            keyPassword keystoreProps.getProperty('keyPassword', System.getenv('SUSHEE_KEY_PASSWORD') ?: '')
+            storeFile file(keystoreProps.getProperty('storeFile', 'sushee-release.jks').trim())
+            storePassword (keystoreProps.getProperty('storePassword', System.getenv('SUSHEE_STORE_PASSWORD') ?: '')).trim()
+            keyAlias keystoreProps.getProperty('keyAlias', 'sushee').trim()
+            keyPassword (keystoreProps.getProperty('keyPassword', System.getenv('SUSHEE_KEY_PASSWORD') ?: '')).trim()
             v1SigningEnabled true
             v2SigningEnabled true
         }
