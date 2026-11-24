@@ -4025,3 +4025,282 @@ select.form-input:disabled {
   color: var(--color-cyan) !important;
   border-color: rgba(0, 242, 254, 0.35) !important;
 }
+
+/* v1.2.0 Pro UX: Karaoke Sweep, Ambient Glow, Countdown, Skip Prelude, Focus Mode, Duet, Favorites, Mini Player, Score Card & LRC Editor */
+.lyrics-stage-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+}
+.lyrics-screen.ambient-active {
+  background:
+    radial-gradient(ellipse at 25% 20%, rgba(0, 242, 254, 0.11), transparent 55%),
+    radial-gradient(ellipse at 80% 80%, rgba(139, 92, 246, 0.12), transparent 55%),
+    rgba(10, 13, 22, 0.90);
+  animation: ambientBreath 6s ease-in-out infinite alternate;
+}
+@keyframes ambientBreath {
+  0% { box-shadow: inset 0 0 28px rgba(0, 242, 254, 0.06); }
+  100% { box-shadow: inset 0 0 42px rgba(139, 92, 246, 0.12); }
+}
+
+/* Smooth left-to-right sweep fill on active lyric line (zero box/border) */
+.lyric-line.active.sweep-fill {
+  background-image: linear-gradient(90deg, #00f2fe 0%, #ffffff var(--sweep, 100%), rgba(255,255,255,0.45) var(--sweep, 100%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Duet Mode color coding */
+.duet-tag {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 999px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.lyric-line.duet-p1 .duet-tag { background: rgba(0, 242, 254, 0.22); color: #00f2fe; }
+.lyric-line.duet-p2 .duet-tag { background: rgba(244, 114, 182, 0.24); color: #f472b6; }
+.lyric-line.duet-both .duet-tag { background: rgba(250, 204, 21, 0.24); color: #facc15; }
+.lyric-line.duet-p2.active { text-shadow: 0 0 16px rgba(244, 114, 182, 0.85), 0 0 28px rgba(219, 39, 119, 0.55); }
+.lyric-line.duet-both.active { text-shadow: 0 0 16px rgba(250, 204, 21, 0.85), 0 0 28px rgba(234, 179, 8, 0.55); }
+
+.lyric-countdown-pill {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(7, 8, 13, 0.86);
+  border: 1px solid rgba(0, 242, 254, 0.45);
+  color: var(--color-cyan);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+.lyric-countdown-pill .cd-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+}
+.lyric-countdown-pill .cd-dot.lit {
+  background: #00f2fe;
+  box-shadow: 0 0 8px #00f2fe;
+}
+
+.btn-skip-prelude {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 242, 254, 0.5);
+  background: rgba(10, 14, 26, 0.88);
+  color: #e0f2fe;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+.btn-skip-prelude:active { transform: translateX(-50%) scale(0.95); }
+
+/* Fullscreen Lyrics Focus Mode (double-tap lyrics) */
+.karaoke-studio.karaoke-focus-mode .studio-header-card,
+.karaoke-studio.karaoke-focus-mode .karaoke-controls-row,
+.karaoke-studio.karaoke-focus-mode .studio-settings-dropup-group {
+  display: none !important;
+}
+.karaoke-studio.karaoke-focus-mode .lyrics-screen {
+  height: calc(100vh - 150px);
+  min-height: 72vh;
+}
+.btn-exit-focus {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 7;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(7, 8, 13, 0.85);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.studio-extra-tools-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.btn-studio-tool {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.btn-studio-tool.active {
+  background: rgba(244, 114, 182, 0.2);
+  border-color: rgba(244, 114, 182, 0.55);
+  color: #f9a8d4;
+}
+
+/* Favorite Heart Button on Song Cards */
+.btn-fav-song {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  touch-action: manipulation;
+  font-size: 0.85rem;
+}
+.btn-fav-song.is-fav {
+  background: rgba(244, 63, 94, 0.18);
+  border-color: rgba(244, 63, 94, 0.5);
+  color: #fb7185;
+}
+
+/* Floating Mini Player Bar */
+.floating-mini-player {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--bottom-nav-height) + var(--safe-bottom) + 8px);
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: rgba(13, 18, 34, 0.94);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(0, 242, 254, 0.38);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.mini-player-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+.mini-player-disc { font-size: 1.15rem; }
+.mini-player-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.mini-player-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mini-player-artist {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mini-player-play-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--grad-primary);
+  color: #07080d;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Score Card Modal */
+.score-card-body { text-align: center; padding-top: 4px; }
+.score-card-song { font-size: 1.05rem; font-weight: 800; color: #fff; }
+.score-card-artist { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 14px; }
+.score-grade-ring {
+  width: 132px;
+  height: 132px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  border: 3px solid var(--color-cyan);
+  background: radial-gradient(circle, rgba(0, 242, 254, 0.16), rgba(139, 92, 246, 0.08));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 24px rgba(0, 242, 254, 0.25);
+}
+.score-grade-big { font-size: 2.6rem; font-weight: 900; color: #facc15; line-height: 1; }
+.score-num-big { font-size: 0.8rem; color: #e2e8f0; margin-top: 4px; }
+.score-metrics-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.score-metric-box {
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+.score-metric-box strong { font-size: 1.05rem; color: var(--color-cyan); }
+
+/* LRC Tap-to-Sync Editor */
+.lrc-editor-textarea {
+  width: 100%;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+}
+.lrc-sync-preview {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  text-align: center;
+  margin-bottom: 12px;
+}
+.lrc-sync-progress { font-size: 0.72rem; color: var(--color-cyan); font-weight: 700; }
+.lrc-sync-current-line { font-size: 1.02rem; font-weight: 800; color: #fff; margin: 6px 0 4px; }
+.lrc-sync-next-line { font-size: 0.78rem; color: var(--text-secondary); }

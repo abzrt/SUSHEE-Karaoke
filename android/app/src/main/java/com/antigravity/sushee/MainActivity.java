@@ -39,6 +39,7 @@ public class MainActivity extends BridgeActivity {
     private static final String TAG = "SUSHEE_MAIN";
     private StorageBridge storageBridge;
     private volatile boolean backgroundAudioActive = false;
+    private android.content.BroadcastReceiver mediaCmdReceiver;
 
     public class StorageBridge {
         private final Context context;
@@ -233,6 +234,21 @@ public class MainActivity extends BridgeActivity {
             }
         }
 
+        @JavascriptInterface
+        public void updateMediaNotification(final String title, final String artist, final boolean isPlaying) {
+            try {
+                if (!backgroundAudioActive && !isPlaying) return;
+                android.content.Intent serviceIntent = new android.content.Intent(context, AudioPlaybackService.class);
+                serviceIntent.setAction(AudioPlaybackService.ACTION_UPDATE);
+                serviceIntent.putExtra(AudioPlaybackService.EXTRA_TITLE, title != null ? title : "SUSHEE Karaoke");
+                serviceIntent.putExtra(AudioPlaybackService.EXTRA_ARTIST, artist != null ? artist : "");
+                serviceIntent.putExtra(AudioPlaybackService.EXTRA_IS_PLAYING, isPlaying);
+                ContextCompat.startForegroundService(context, serviceIntent);
+            } catch (Exception e) {
+                Log.w(TAG, "Update media notification notice: " + e.getMessage());
+            }
+        }
+
         public void releaseWakeLock() {
             try {
                 if (wakeLock != null && wakeLock.isHeld()) {
@@ -308,6 +324,30 @@ public class MainActivity extends BridgeActivity {
         }
 
         configureWebViewSettings();
+
+        // Listen for Play/Pause & Next actions from the lockscreen/notification bar
+        mediaCmdReceiver = new android.content.BroadcastReceiver() {
+            @Override
+            public void onReceive(Context ctx, android.content.Intent intent) {
+                if (intent == null) return;
+                final String cmd = intent.getStringExtra(AudioPlaybackService.EXTRA_CMD);
+                if (cmd == null) return;
+                runOnUiThread(() -> {
+                    try {
+                        WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+                        if (webView != null) {
+                            webView.evaluateJavascript("if (window.handleMediaNotificationAction) { window.handleMediaNotificationAction('" + cmd + "'); }", null);
+                        }
+                    } catch (Exception ignored) {}
+                });
+            }
+        };
+        ContextCompat.registerReceiver(
+            this,
+            mediaCmdReceiver,
+            new android.content.IntentFilter(AudioPlaybackService.BROADCAST_MEDIA_CMD),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        );
 
         // Safely request permissions after window is rendered to prevent UI lockup
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::requestAppPermissions, 600);
@@ -473,6 +513,10 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onDestroy() {
         try {
+            if (mediaCmdReceiver != null) {
+                unregisterReceiver(mediaCmdReceiver);
+                mediaCmdReceiver = null;
+            }
             stopService(new android.content.Intent(this, AudioPlaybackService.class));
             if (storageBridge != null) {
                 storageBridge.releaseWakeLock();

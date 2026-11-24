@@ -119,6 +119,212 @@ async function initApp() {
   window.storageScanner = storageScanner;
   const offlineManager = (typeof OfflineSongManager === 'function') ? new OfflineSongManager() : null;
   window.offlineManager = offlineManager;
+  const libraryPrefs = (typeof LibraryPrefs === 'function') ? new LibraryPrefs() : null;
+  window.libraryPrefs = libraryPrefs;
+  const lrcEditor = (typeof LrcEditor === 'function') ? new LrcEditor() : null;
+  window.lrcEditor = lrcEditor;
+
+  let isDuetMode = false;
+  let lastScoreCardData = null;
+  let activeViewId = 'viewSongs';
+
+  function updateFloatingMiniPlayer() {
+    const bar = document.getElementById('floatingMiniPlayer');
+    if (!bar) return;
+    const isPlaying = Boolean(audioElement && !audioElement.paused && !audioElement.ended);
+    const shouldShow = Boolean(currentSong && activeViewId !== 'viewKaraoke' && (isPlaying || (audioElement && audioElement.currentTime > 0)));
+    bar.style.display = shouldShow ? 'flex' : 'none';
+    if (shouldShow) {
+      const tEl = document.getElementById('miniPlayerTitle');
+      const aEl = document.getElementById('miniPlayerArtist');
+      const iconEl = document.getElementById('miniPlayerPlayIcon');
+      if (tEl) tEl.textContent = currentSong.title || '-';
+      if (aEl) aEl.textContent = formatArtistDisplay(currentSong.artist);
+      if (iconEl) {
+        iconEl.innerHTML = isPlaying
+          ? '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>'
+          : '<polygon points="5 3 19 12 5 21 5 3"/>';
+      }
+    }
+  }
+  window.updateFloatingMiniPlayer = updateFloatingMiniPlayer;
+
+  function toggleFavoriteSong(songId, evt) {
+    if (evt) { evt.preventDefault(); evt.stopPropagation(); }
+    if (!libraryPrefs || !songId) return;
+    const added = libraryPrefs.toggleFavorite(songId);
+    showToast(added ? '❤️ Ditambahkan ke Favorit' : '💔 Dihapus dari Favorit', 'info');
+    renderSongList();
+    if (typeof renderCloudSongList === 'function') renderCloudSongList();
+  }
+  window.toggleFavoriteSong = toggleFavoriteSong;
+
+  function renderFavButtonHtml(song) {
+    if (!song || !libraryPrefs) return '';
+    const isFav = libraryPrefs.isFavorite(song.id);
+    return `<button type="button" class="btn-fav-song ${isFav ? 'is-fav' : ''}" data-song-id="${song.id}" onclick="window.toggleFavoriteSong && window.toggleFavoriteSong('${song.id}', event)" title="${isFav ? 'Hapus dari Favorit' : 'Tambah ke Favorit'}">${isFav ? '❤️' : '🤍'}</button>`;
+  }
+
+  function toggleKaraokeFocusMode(forceState) {
+    const studio = document.querySelector('.karaoke-studio');
+    const exitBtn = document.getElementById('btnExitFocusMode');
+    if (!studio) return;
+    const enable = typeof forceState === 'boolean' ? forceState : !studio.classList.contains('karaoke-focus-mode');
+    studio.classList.toggle('karaoke-focus-mode', enable);
+    if (exitBtn) exitBtn.style.display = enable ? 'inline-flex' : 'none';
+    if (enable) showToast('✨ Mode Fokus Lirik aktif (ketuk 2x untuk keluar)', 'info');
+  }
+  window.toggleKaraokeFocusMode = toggleKaraokeFocusMode;
+
+  function toggleDuetMode() {
+    isDuetMode = !isDuetMode;
+    const btn = document.getElementById('btnToggleDuetMode');
+    if (btn) {
+      btn.classList.toggle('active', isDuetMode);
+      btn.textContent = isDuetMode ? '🎭 Mode Duet: ON' : '🎭 Mode Duet: OFF';
+    }
+    renderLyricsView();
+    showToast(isDuetMode ? '🎭 Mode Duet aktif (P1 Cyan • P2 Pink • Bareng Emas)' : '🎭 Mode Duet dimatikan', 'info');
+  }
+  window.toggleDuetMode = toggleDuetMode;
+
+  function skipKaraokePrelude() {
+    if (!audioElement || !lrcParser || !lrcParser.lines || lrcParser.lines.length === 0) return;
+    const firstTime = lrcParser.lines[0].time;
+    const target = Math.max(0, firstTime - 3 - (currentLyricOffsetMs / 1000));
+    audioElement.currentTime = target;
+    updateLyricSync(target);
+    const btn = document.getElementById('btnSkipPrelude');
+    if (btn) btn.style.display = 'none';
+    showToast('⏩ Melompati intro...', 'info');
+  }
+  window.skipKaraokePrelude = skipKaraokePrelude;
+
+  function showScoreCardModal(snap) {
+    if (!snap || !currentSong) return;
+    lastScoreCardData = {
+      title: currentSong.title || 'Karaoke Track',
+      artist: formatArtistDisplay(currentSong.artist),
+      score: snap.score,
+      grade: snap.grade,
+      pitchScore: snap.pitchScore,
+      timingScore: snap.timingScore,
+      singerName: currentSong.singerName || ''
+    };
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    set('scoreCardSongTitle', lastScoreCardData.title);
+    set('scoreCardSongArtist', lastScoreCardData.artist);
+    set('scoreCardGrade', lastScoreCardData.grade);
+    set('scoreCardScore', String(lastScoreCardData.score));
+    set('scoreCardPitch', `${lastScoreCardData.pitchScore}%`);
+    set('scoreCardTiming', `${lastScoreCardData.timingScore}%`);
+    const modal = document.getElementById('scoreCardModal');
+    if (modal) modal.classList.add('open');
+  }
+
+  function shareCurrentScoreCard() {
+    if (!lastScoreCardData || typeof ScoreCardRenderer === 'undefined') return;
+    ScoreCardRenderer.shareCard(lastScoreCardData, showToast);
+  }
+  window.shareCurrentScoreCard = shareCurrentScoreCard;
+
+  // --- TAP-TO-SYNC LRC EDITOR MODAL ---
+  function updateLrcEditorTapUI() {
+    if (!lrcEditor) return;
+    const prog = document.getElementById('lrcSyncProgress');
+    const cur = document.getElementById('lrcSyncCurrentLine');
+    const nxt = document.getElementById('lrcSyncNextLine');
+    if (prog) prog.textContent = `Baris ${Math.min(lrcEditor.currentIndex + 1, lrcEditor.lines.length)} / ${lrcEditor.lines.length} (${lrcEditor.stamped.length} ditandai)`;
+    if (cur) cur.textContent = lrcEditor.lines[lrcEditor.currentIndex] || '🎉 Semua baris selesai! Tekan Simpan.';
+    if (nxt) nxt.textContent = lrcEditor.lines[lrcEditor.currentIndex + 1] ? `Berikutnya: ${lrcEditor.lines[lrcEditor.currentIndex + 1]}` : '';
+  }
+
+  function openLrcEditorModal() {
+    if (!currentSong) { showToast('Pilih lagu terlebih dahulu.', 'info'); return; }
+    const modal = document.getElementById('lrcEditorModal');
+    const stepPaste = document.getElementById('lrcEditorStepPaste');
+    const stepTap = document.getElementById('lrcEditorStepTap');
+    const ta = document.getElementById('lrcEditorTextarea');
+    if (stepPaste) stepPaste.style.display = 'block';
+    if (stepTap) stepTap.style.display = 'none';
+    if (ta && currentSong.lrcContent && !ta.value.trim()) {
+      ta.value = currentSong.lrcContent.replace(/^\[[^\]]+\]\s*/gm, '').trim();
+    }
+    if (modal) modal.classList.add('open');
+  }
+  window.openLrcEditorModal = openLrcEditorModal;
+
+  function closeLrcEditorModal() {
+    const modal = document.getElementById('lrcEditorModal');
+    if (modal) modal.classList.remove('open');
+  }
+  window.closeLrcEditorModal = closeLrcEditorModal;
+
+  function startLrcTapSync() {
+    if (!lrcEditor) return;
+    const ta = document.getElementById('lrcEditorTextarea');
+    const count = lrcEditor.loadPlainText(ta ? ta.value : '');
+    if (count === 0) { showToast('Tempel minimal 1 baris lirik terlebih dahulu.', 'error'); return; }
+    const stepPaste = document.getElementById('lrcEditorStepPaste');
+    const stepTap = document.getElementById('lrcEditorStepTap');
+    if (stepPaste) stepPaste.style.display = 'none';
+    if (stepTap) stepTap.style.display = 'block';
+    updateLrcEditorTapUI();
+    if (audioElement) {
+      audioElement.currentTime = 0;
+      audioElement.play().catch(() => {});
+    }
+  }
+  window.startLrcTapSync = startLrcTapSync;
+
+  function stampNextLrcLine() {
+    if (!lrcEditor) return;
+    const t = audioElement ? audioElement.currentTime : 0;
+    const entry = lrcEditor.stampNext(t);
+    const btn = document.getElementById('btnStampLrcLine');
+    if (btn) { btn.classList.add('tap-flash'); setTimeout(() => btn.classList.remove('tap-flash'), 100); }
+    updateLrcEditorTapUI();
+    if (!entry) showToast('Semua baris sudah ditandai! Klik Simpan.', 'success');
+  }
+  window.stampNextLrcLine = stampNextLrcLine;
+
+  function undoLastLrcStamp() {
+    if (!lrcEditor) return;
+    if (lrcEditor.undoLast()) {
+      updateLrcEditorTapUI();
+      showToast('↩️ Baris terakhir dibatalkan', 'info');
+    }
+  }
+  window.undoLastLrcStamp = undoLastLrcStamp;
+
+  function saveSyncedLrc(alsoDownload = false) {
+    if (!lrcEditor || !currentSong || lrcEditor.stamped.length === 0) {
+      showToast('Tandai minimal 1 baris lirik terlebih dahulu.', 'error');
+      return;
+    }
+    const lrcText = lrcEditor.buildLrcText(currentSong.title, currentSong.artist);
+    currentSong.lrcContent = lrcText;
+    currentSong.hasLyrics = true;
+    if (libraryPrefs) libraryPrefs.saveCustomLrc(currentSong.id, lrcText);
+    lrcParser.parse(lrcText);
+    renderLyricsView();
+    if (alsoDownload) {
+      lrcEditor.downloadLrc(`${currentSong.title} - ${currentSong.artist}.lrc`, lrcText);
+    }
+    closeLrcEditorModal();
+    renderSongList();
+    showToast('✅ Lirik sync tersimpan & langsung aktif!', 'success');
+  }
+  window.saveSyncedLrc = saveSyncedLrc;
+
+  // Bridge for Android MediaStyle Notification action buttons (Play/Pause & Next)
+  window.handleMediaNotificationAction = function(action) {
+    if (action === 'toggle') {
+      if (typeof window.toggleMusicPlayback === 'function') window.toggleMusicPlayback();
+    } else if (action === 'next') {
+      if (typeof window.nextSongsPlaylistSong === 'function') window.nextSongsPlaylistSong();
+    }
+  };
 
   // --- STAGE 3: VOCAL SCORER, PARTY QUEUE BANNER & SHARE RECORDING ---
   const vocalScorer = (typeof VocalScorer === 'function')
@@ -146,6 +352,7 @@ async function initApp() {
     const pill = document.getElementById('liveScorePill');
     if (showSummary && finalSnap && finalSnap.sungFrames >= 10) {
       showToast(`🏆 Skor Karaoke: ${finalSnap.score} (Grade ${finalSnap.grade}) • Nada ${finalSnap.pitchScore}% | Tempo ${finalSnap.timingScore}%`, 'success');
+      showScoreCardModal(finalSnap);
     } else if (pill) {
       pill.style.display = 'none';
     }
@@ -594,7 +801,10 @@ async function initApp() {
     }
     lastTabSwitchTime = now;
     lastTabSwitchedId = viewId;
+    activeViewId = viewId;
     lastExitToastTime = 0;
+    if (viewId !== 'viewKaraoke') toggleKaraokeFocusMode(false);
+    updateFloatingMiniPlayer();
     if (!viewId) return;
     const views = document.querySelectorAll('.app-view');
     const navButtons = document.querySelectorAll('.nav-item');
@@ -867,6 +1077,15 @@ async function initApp() {
       allSongs = cloudSongs;
     } else {
       allSongs = [...cloudSongs, ...localSongs];
+      if (currentFilter === 'favorites' && libraryPrefs) {
+        allSongs = allSongs.filter(s => libraryPrefs.isFavorite(s.id));
+      } else if (currentFilter === 'recent' && libraryPrefs) {
+        allSongs = allSongs.filter(s => libraryPrefs.isRecent(s.id)).sort((a, b) => libraryPrefs.getRecentRank(a.id) - libraryPrefs.getRecentRank(b.id));
+      } else if (currentFilter === 'offline' && offlineManager) {
+        allSongs = allSongs.filter(s => s.source === 'local' || offlineManager.isOffline(s.id));
+      } else if (currentFilter === 'lyrics') {
+        allSongs = allSongs.filter(s => s.hasLyrics || (libraryPrefs && libraryPrefs.hasCustomLrc(s.id)));
+      }
     }
 
     let filtered = allSongs.filter(song => {
@@ -924,6 +1143,7 @@ async function initApp() {
           </div>
         </div>
         <div class="song-card-actions" style="display: flex; gap: 6px; align-items: center;">
+          ${renderFavButtonHtml(song)}
           ${renderOfflineButtonHtml(song)}
           <button type="button" class="btn btn-sm btn-songs-playlist-add ${(typeof isSongInPlaylist === 'function' && isSongInPlaylist(song)) ? 'in-playlist' : ''}" data-song-id="${song.id}" onclick="window.toggleSongsPlaylist && window.toggleSongsPlaylist('${song.id}', true, event)" title="${(typeof isSongInPlaylist === 'function' && isSongInPlaylist(song)) ? ((window.i18n && window.i18n.t) ? window.i18n.t('playlistRemoveHint') : 'Di Playlist (Ketuk untuk menghapus)') : ((window.i18n && window.i18n.t) ? window.i18n.t('btnAddToPlaylist') : '+ Playlist')}">
             ${(typeof isSongInPlaylist === 'function' && isSongInPlaylist(song)) ? ((window.i18n && window.i18n.t) ? window.i18n.t('btnAddedToPlaylist') : '✓ Di Playlist') : ((window.i18n && window.i18n.t) ? window.i18n.t('btnAddToPlaylist') : '+ Playlist')}
@@ -959,7 +1179,7 @@ async function initApp() {
   // Delegated click & touch listener ensuring all song cards are responsive immediately without duplicate events
   if (songsListContainer) {
     songsListContainer.addEventListener('click', (e) => {
-      if (e.target.closest('.btn-offline-dl')) return;
+      if (e.target.closest('.btn-offline-dl') || e.target.closest('.btn-fav-song')) return;
       // 1. + Playlist button clicked (Toggle add/remove with instant UI response)
       const playlistBtn = e.target.closest('.btn-songs-playlist-add') || e.target.closest('.btn-cloud-playlist-add');
       if (playlistBtn) {
@@ -1018,9 +1238,18 @@ async function initApp() {
     if (!song) return;
     currentSong = song;
 
-    // Load saved per-song lyrics sync offset
+    // Load saved per-song lyrics sync offset & record recently played
     currentLyricOffsetMs = getLyricOffset(song.id);
     updateLyricSyncUI();
+    if (libraryPrefs && song.id) {
+      libraryPrefs.recordPlayed(song.id);
+      const customLrc = libraryPrefs.getCustomLrc(song.id);
+      if (customLrc) {
+        song.lrcContent = customLrc;
+        song.hasLyrics = true;
+      }
+    }
+    updateFloatingMiniPlayer();
 
     // Update Player Bar and Studio UI
     document.querySelectorAll('.current-song-title').forEach(el => el.textContent = song.title);
@@ -1110,10 +1339,15 @@ async function initApp() {
     lyricsContainer.innerHTML = `
       <div class="empty-lyrics">
         <p data-i18n="lyricsNotFound">${window.i18n.t('lyricsNotFound')}</p>
-        <button class="btn btn-secondary btn-sm" id="btnAttachLrc">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <span>${window.i18n.t('btnAddLyricsManual')}</span>
-        </button>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+          <button class="btn btn-secondary btn-sm" id="btnAttachLrc">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span>${window.i18n.t('btnAddLyricsManual')}</span>
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="window.openLrcEditorModal && window.openLrcEditorModal()">
+            ✨ Buat Lirik Sync
+          </button>
+        </div>
       </div>
     `;
 
@@ -1133,11 +1367,21 @@ async function initApp() {
       return;
     }
 
-    lyricsContainer.innerHTML = lrcParser.lines.map((line, idx) => `
-      <div class="lyric-line ${idx === activeLyricIndex ? 'active' : ''}" data-idx="${idx}" data-time="${line.time}">
-        ${line.text}
+    lyricsContainer.innerHTML = lrcParser.lines.map((line, idx) => {
+      let duetClass = '';
+      let duetBadge = '';
+      if (isDuetMode) {
+        const bucket = Math.floor(idx / 2) % 3;
+        if (bucket === 0) { duetClass = 'duet-p1'; duetBadge = '<span class="duet-tag">P1</span>'; }
+        else if (bucket === 1) { duetClass = 'duet-p2'; duetBadge = '<span class="duet-tag">P2</span>'; }
+        else { duetClass = 'duet-both'; duetBadge = '<span class="duet-tag">BARENG</span>'; }
+      }
+      return `
+      <div class="lyric-line ${duetClass} ${idx === activeLyricIndex ? 'active sweep-fill' : ''}" data-idx="${idx}" data-time="${line.time}">
+        ${duetBadge}${line.text}
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     // Allow clicking on a lyric line to jump audio
     lyricsContainer.querySelectorAll('.lyric-line').forEach(el => {
@@ -1150,6 +1394,21 @@ async function initApp() {
         }
       });
     });
+
+    // Double-tap anywhere on lyrics screen to toggle Fullscreen Focus Mode
+    if (!lyricsContainer.dataset.focusBound) {
+      lyricsContainer.dataset.focusBound = '1';
+      let lastLyricTap = 0;
+      lyricsContainer.addEventListener('click', () => {
+        const now = Date.now();
+        if (now - lastLyricTap < 320) {
+          toggleKaraokeFocusMode();
+          lastLyricTap = 0;
+        } else {
+          lastLyricTap = now;
+        }
+      });
+    }
   }
 
   function updateLyricSync(currentTime) {
@@ -1157,6 +1416,48 @@ async function initApp() {
 
     const adjustedTime = Math.max(0, currentTime + (currentLyricOffsetMs / 1000));
     const newIndex = lrcParser.getCurrentIndex(adjustedTime);
+
+    // 1. Skip Prelude pill (shown when intro >= 12s and > 4s remain before first lyric)
+    const skipBtn = document.getElementById('btnSkipPrelude');
+    const firstLyricTime = lrcParser.lines[0] ? lrcParser.lines[0].time : 0;
+    if (skipBtn) {
+      const showSkip = firstLyricTime >= 12 && adjustedTime < (firstLyricTime - 4) && audioElement && !audioElement.paused;
+      skipBtn.style.display = showSkip ? 'inline-flex' : 'none';
+    }
+
+    // 2. 3-second Countdown pill before first lyric or after long instrumental break
+    const cdPill = document.getElementById('lyricCountdownPill');
+    if (cdPill) {
+      const nextLine = lrcParser.lines[newIndex + 1];
+      const prevLine = newIndex >= 0 ? lrcParser.lines[newIndex] : null;
+      const gap = nextLine ? (nextLine.time - (prevLine ? prevLine.time : 0)) : 0;
+      const timeToNext = nextLine ? (nextLine.time - adjustedTime) : 99;
+      const isLongIntroOrBreak = (newIndex === -1 && firstLyricTime >= 4) || (prevLine && (!prevLine.text || prevLine.text.trim() === '' || gap >= 8));
+      if (nextLine && isLongIntroOrBreak && timeToNext > 0 && timeToNext <= 3.2 && audioElement && !audioElement.paused) {
+        cdPill.style.display = 'inline-flex';
+        const secLeft = Math.ceil(timeToNext);
+        const dots = cdPill.querySelectorAll('.cd-dot');
+        dots.forEach((d, i) => d.classList.toggle('lit', i < (4 - secLeft)));
+        const lbl = document.getElementById('lyricCountdownLabel');
+        if (lbl) lbl.textContent = `Masuk dalam ${secLeft}...`;
+      } else {
+        cdPill.style.display = 'none';
+      }
+    }
+
+    // 3. Smooth left-to-right Karaoke Sweep fill progress on active line
+    if (newIndex >= 0) {
+      const curLine = lrcParser.lines[newIndex];
+      const nextLine = lrcParser.lines[newIndex + 1];
+      const lineDur = nextLine ? Math.max(0.8, Math.min(8, nextLine.time - curLine.time)) : 3.5;
+      const pct = Math.max(8, Math.min(100, ((adjustedTime - curLine.time) / lineDur) * 100));
+      const activeEl = lyricsContainer.querySelector(`.lyric-line[data-idx="${newIndex}"]`);
+      if (activeEl) {
+        activeEl.classList.add('sweep-fill');
+        activeEl.style.setProperty('--sweep', `${pct.toFixed(1)}%`);
+      }
+    }
+
     if (newIndex !== activeLyricIndex) {
       activeLyricIndex = newIndex;
 
@@ -1486,8 +1787,13 @@ async function initApp() {
   audioElement.addEventListener('play', () => {
     updateMusicPlayButtonUI(true);
     if (typeof updatePlaylistPlayButtonUI === 'function') updatePlaylistPlayButtonUI(true);
+    if (lyricsContainer) lyricsContainer.classList.add('ambient-active');
+    updateFloatingMiniPlayer();
     if (window.AndroidStorage && typeof window.AndroidStorage.setBackgroundAudioActive === 'function') {
       try { window.AndroidStorage.setBackgroundAudioActive(true); } catch (e) {}
+    }
+    if (currentSong && window.AndroidStorage && typeof window.AndroidStorage.updateMediaNotification === 'function') {
+      try { window.AndroidStorage.updateMediaNotification(currentSong.title || 'SUSHEE Karaoke', formatArtistDisplay(currentSong.artist), true); } catch (e) {}
     }
     if (currentSong) setupMediaSession(currentSong);
   });
@@ -1495,8 +1801,13 @@ async function initApp() {
   audioElement.addEventListener('pause', () => {
     updateMusicPlayButtonUI(false);
     if (typeof updatePlaylistPlayButtonUI === 'function') updatePlaylistPlayButtonUI(false);
+    if (lyricsContainer) lyricsContainer.classList.remove('ambient-active');
+    updateFloatingMiniPlayer();
     if (window.AndroidStorage && typeof window.AndroidStorage.setBackgroundAudioActive === 'function') {
       try { window.AndroidStorage.setBackgroundAudioActive(false); } catch (e) {}
+    }
+    if (currentSong && window.AndroidStorage && typeof window.AndroidStorage.updateMediaNotification === 'function') {
+      try { window.AndroidStorage.updateMediaNotification(currentSong.title || 'SUSHEE Karaoke', formatArtistDisplay(currentSong.artist), false); } catch (e) {}
     }
   });
 

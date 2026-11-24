@@ -364,6 +364,10 @@
         <!-- Filter Chips -->
         <div class="filter-row">
           <button type="button" class="filter-chip active" data-filter="all" onclick="window.setSongFilter && window.setSongFilter('all')" data-i18n="filterAll">Semua</button>
+          <button type="button" class="filter-chip" data-filter="favorites" onclick="window.setSongFilter && window.setSongFilter('favorites')">❤️ Favorit</button>
+          <button type="button" class="filter-chip" data-filter="recent" onclick="window.setSongFilter && window.setSongFilter('recent')">🕒 Terakhir</button>
+          <button type="button" class="filter-chip" data-filter="offline" onclick="window.setSongFilter && window.setSongFilter('offline')">✓ Offline</button>
+          <button type="button" class="filter-chip" data-filter="lyrics" onclick="window.setSongFilter && window.setSongFilter('lyrics')">⭐ Ada Lirik</button>
           <button type="button" class="filter-chip" data-filter="cloud" onclick="window.setSongFilter && window.setSongFilter('cloud')" data-i18n="navCloud">Cloud</button>
           <button type="button" class="filter-chip" data-filter="local" onclick="window.setSongFilter && window.setSongFilter('local')" data-i18n="filterLocal">Penyimpanan HP</button>
         </div>
@@ -491,9 +495,19 @@
 
           </div>
 
-          <!-- Synchronized Lyrics Screen -->
-          <div class="lyrics-screen" id="lyricsContainer">
-            <!-- Dynamically populated LRC lines -->
+          <!-- Synchronized Lyrics Screen (Double-tap for Focus Mode) -->
+          <div class="lyrics-stage-wrap">
+            <div class="lyric-countdown-pill" id="lyricCountdownPill" style="display: none;" aria-live="polite">
+              <span class="cd-dot"></span><span class="cd-dot"></span><span class="cd-dot"></span>
+              <span id="lyricCountdownLabel">Siap...</span>
+            </div>
+            <button type="button" class="btn-exit-focus" id="btnExitFocusMode" style="display: none;" onclick="window.toggleKaraokeFocusMode && window.toggleKaraokeFocusMode(false)">✕ Keluar Fokus</button>
+            <div class="lyrics-screen" id="lyricsContainer" title="Ketuk 2x untuk Mode Fokus Layar Penuh">
+              <!-- Dynamically populated LRC lines -->
+            </div>
+            <button type="button" class="btn-skip-prelude" id="btnSkipPrelude" style="display: none;" onclick="window.skipKaraokePrelude && window.skipKaraokePrelude()">
+              Lewati Intro ⏩
+            </button>
           </div>
 
           <!-- Action Controls Bar (Positioned Directly Below Lyrics Screen) -->
@@ -709,6 +723,10 @@
                     <button type="button" class="btn-lyric-step" onclick="window.stepLyricOffset && window.stepLyricOffset(100)">+0.1s</button>
                     <button type="button" class="btn-lyric-step" onclick="window.stepLyricOffset && window.stepLyricOffset(500)">+0.5s</button>
                   </div>
+                  <div class="studio-extra-tools-row">
+                    <button type="button" class="btn-studio-tool" id="btnToggleDuetMode" onclick="window.toggleDuetMode && window.toggleDuetMode()">🎭 Mode Duet: OFF</button>
+                    <button type="button" class="btn-studio-tool" id="btnOpenLrcEditor" onclick="window.openLrcEditorModal && window.openLrcEditorModal()">✨ Buat / Sync Lirik</button>
+                  </div>
                 </div>
 
                 <div class="latency-section">
@@ -892,6 +910,20 @@
       </section>
 
     </main>
+
+    <!-- Floating Mini Player Bar (visible when playing & browsing other tabs) -->
+    <div class="floating-mini-player" id="floatingMiniPlayer" style="display: none;">
+      <div class="mini-player-info" onclick="window.switchTab && window.switchTab('viewKaraoke')">
+        <span class="mini-player-disc">🎵</span>
+        <div class="mini-player-text">
+          <span class="mini-player-title" id="miniPlayerTitle">-</span>
+          <span class="mini-player-artist" id="miniPlayerArtist">-</span>
+        </div>
+      </div>
+      <button type="button" class="mini-player-play-btn" id="btnMiniPlayerPlay" onclick="window.toggleMusicPlayback && window.toggleMusicPlayback()" aria-label="Play / Pause">
+        <svg id="miniPlayerPlayIcon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      </button>
+    </div>
 
     <!-- Bottom Navigation Bar -->
     <nav class="bottom-nav">
@@ -1252,6 +1284,81 @@ echo json_encode(['status' => 'success', 'server' => 'SUSHEE PHP Hosting Server'
       </div>
     </div>
 
+    <!-- Score Card Result Modal (Spotify Wrapped Style) -->
+    <div class="modal-overlay" id="scoreCardModal">
+      <div class="modal-card score-card-modal">
+        <div class="modal-header">
+          <h3 class="modal-title">🏆 Hasil Karaoke Anda</h3>
+          <button class="modal-close" onclick="document.getElementById('scoreCardModal').classList.remove('open')">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="score-card-body">
+          <p class="score-card-song" id="scoreCardSongTitle">-</p>
+          <p class="score-card-artist" id="scoreCardSongArtist">-</p>
+          <div class="score-grade-ring">
+            <span class="score-grade-big" id="scoreCardGrade">S</span>
+            <span class="score-num-big"><strong id="scoreCardScore">92</strong> / 100</span>
+          </div>
+          <div class="score-metrics-row">
+            <div class="score-metric-box">
+              <span>Stabilitas Nada</span>
+              <strong id="scoreCardPitch">90%</strong>
+            </div>
+            <div class="score-metric-box">
+              <span>Ketepatan Tempo</span>
+              <strong id="scoreCardTiming">95%</strong>
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px; margin-top: 16px;">
+            <button type="button" class="btn btn-primary" id="btnShareScoreCard" style="flex: 1;" onclick="window.shareCurrentScoreCard && window.shareCurrentScoreCard()">
+              📸 Bagikan Kartu Skor
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('scoreCardModal').classList.remove('open')">
+              Tutup
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tap-to-Sync LRC Lyric Creator Modal -->
+    <div class="modal-overlay" id="lrcEditorModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title">✨ Pembuat Lirik Sync (.LRC)</h3>
+          <button class="modal-close" onclick="window.closeLrcEditorModal && window.closeLrcEditorModal()">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="lrc-editor-body">
+          <div id="lrcEditorStepPaste">
+            <p style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 8px;">Tempel teks lirik lagu (1 baris per bait), lalu tekan <strong>Mulai Sync</strong> sambil memutar lagu.</p>
+            <textarea id="lrcEditorTextarea" class="lrc-editor-textarea" rows="7" placeholder="Baris lirik pertama...&#10;Baris lirik kedua...&#10;Baris lirik ketiga..."></textarea>
+            <button type="button" class="btn btn-primary" style="width: 100%; margin-top: 10px;" onclick="window.startLrcTapSync && window.startLrcTapSync()">
+              ▶️ Mulai Sync dengan Lagu Ini
+            </button>
+          </div>
+          <div id="lrcEditorStepTap" style="display: none;">
+            <div class="lrc-sync-preview">
+              <span class="lrc-sync-progress" id="lrcSyncProgress">Baris 1 / 1</span>
+              <div class="lrc-sync-current-line" id="lrcSyncCurrentLine">-</div>
+              <div class="lrc-sync-next-line" id="lrcSyncNextLine">-</div>
+            </div>
+            <button type="button" class="bt-tap-pad" id="btnStampLrcLine" onclick="window.stampNextLrcLine && window.stampNextLrcLine()">
+              <span class="bt-tap-icon">⏱️</span>
+              <span>TANDAI BARIS INI SEKARANG</span>
+            </button>
+            <div style="display: flex; gap: 8px; margin-top: 10px;">
+              <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="window.undoLastLrcStamp && window.undoLastLrcStamp()">↩️ Ulangi Baris</button>
+              <button type="button" class="btn btn-primary" style="flex: 1;" onclick="window.saveSyncedLrc && window.saveSyncedLrc(false)">💾 Simpan</button>
+              <button type="button" class="btn btn-secondary" onclick="window.saveSyncedLrc && window.saveSyncedLrc(true)" title="Simpan & Unduh file .lrc">⬇ .LRC</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- App Scripts in Correct Dependency Order (lame.min.js is lazy-loaded on MP3 export) -->
@@ -1267,6 +1374,9 @@ echo json_encode(['status' => 'success', 'server' => 'SUSHEE PHP Hosting Server'
   <script src="js/lyric-sync-manager.js?v=touch_fix_v3_1792439900000"></script>
   <script src="js/share-manager.js?v=touch_fix_v3_1792439900000"></script>
   <script src="js/vocal-scorer.js?v=touch_fix_v3_1792439900000"></script>
+  <script src="js/library-prefs.js?v=touch_fix_v3_1792439900000"></script>
+  <script src="js/lrc-editor.js?v=touch_fix_v3_1792439900000"></script>
+  <script src="js/score-card.js?v=touch_fix_v3_1792439900000"></script>
   <script src="js/app.js?v=touch_fix_v3_1792439900000"></script>
 
 </body>

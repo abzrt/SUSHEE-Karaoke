@@ -97,6 +97,34 @@ async function run() {
   const resSilent = scorer.detectPitch(silence, sampleRate);
   assert(resSilent.freq === 0, 'Silence buffer cleanly returns freq = 0 (noise gate active)');
 
+  console.log('\n=== E2E SUITE D2: LibraryPrefs & LrcEditor Behavioral Tests (v1.2.0) ===');
+  const lpCode = fs.readFileSync('js/library-prefs.js', 'utf8');
+  const lpStorage = makeMockStorage();
+  const lpSandbox = { window: {} };
+  new Function('window', 'localStorage', lpCode)(lpSandbox.window, lpStorage);
+  const lp = new lpSandbox.window.LibraryPrefs();
+  assert(lp.toggleFavorite('host_1') === true && lp.isFavorite('host_1') === true, 'LibraryPrefs toggles favorite ON and persists');
+  assert(lp.toggleFavorite('host_1') === false && lp.isFavorite('host_1') === false, 'LibraryPrefs toggles favorite OFF');
+  lp.recordPlayed('host_2');
+  lp.recordPlayed('host_3');
+  assert(lp.getRecentRank('host_3') === 0 && lp.getRecentRank('host_2') === 1, 'LibraryPrefs orders recently played songs newest-first');
+  lp.saveCustomLrc('host_2', '[00:05.00] Hello world');
+  assert(lp.getCustomLrc('host_2') === '[00:05.00] Hello world', 'LibraryPrefs saves & retrieves custom synced LRC');
+
+  const edCode = fs.readFileSync('js/lrc-editor.js', 'utf8');
+  const edSandbox = { window: {} };
+  new Function('window', edCode)(edSandbox.window);
+  const LE = edSandbox.window.LrcEditor;
+  const editor = new LE();
+  assert(LE.formatTimestamp(65.42) === '[01:05.42]', 'LrcEditor formats 65.42s as [01:05.42]');
+  assert(editor.loadPlainText('Line one\n\nLine two\n') === 2, 'LrcEditor parses 2 non-empty lyric lines');
+  editor.stampNext(12.5);
+  editor.stampNext(16.0);
+  assert(editor.isComplete() === true, 'LrcEditor marks complete after stamping all lines');
+  const builtLrc = editor.buildLrcText('Bliss', 'Muse');
+  assert(builtLrc.includes('[ti:Bliss]') && builtLrc.includes('[00:12.50] Line one') && builtLrc.includes('[00:16.00] Line two'), 'LrcEditor builds valid LRC output with metadata & timestamps');
+  assert(editor.undoLast() === true && editor.stamped.length === 1, 'LrcEditor undoLast reverts the last stamped line');
+
   console.log('\n=== E2E SUITE E: Live Preview Server Asset Delivery (http://localhost:5173) ===');
   const checkUrl = (urlPath) => new Promise((resolve) => {
     const req = http.get({ host: '127.0.0.1', port: 5173, path: urlPath, timeout: 2500 }, (res) => {
