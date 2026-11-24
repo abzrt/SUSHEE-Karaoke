@@ -4419,3 +4419,83 @@ select.form-input:disabled {
 .song-card .song-card-actions {
   gap: 5px !important;
 }
+
+/* Redesigned About SUSHEE Card (No repeated photo, theme-aware studio emblem) */
+.about-sushee-card {
+  margin-top: 22px;
+  padding: 16px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015));
+  border: 1px solid var(--border-subtle);
+  position: relative;
+  overflow: hidden;
+}
+.about-sushee-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.about-studio-emblem {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background: var(--grad-primary);
+  color: #07080d;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.about-emblem-wave {
+  position: absolute;
+  inset: -4px;
+  border-radius: 19px;
+  border: 1.5px solid var(--color-cyan);
+  opacity: 0.35;
+  animation: aboutPulseRing 2.8s ease-in-out infinite;
+}
+@keyframes aboutPulseRing {
+  0%, 100% { transform: scale(1); opacity: 0.35; }
+  50% { transform: scale(1.07); opacity: 0.08; }
+}
+.about-sushee-heading { flex: 1; min-width: 0; }
+.about-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.about-title-text {
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: #fff;
+  margin: 0;
+}
+.about-version-pill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--color-cyan);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--border-focus);
+}
+.about-feature-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+.about-chip {
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid var(--border-subtle);
+}
