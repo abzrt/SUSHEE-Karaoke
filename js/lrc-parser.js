@@ -56,19 +56,98 @@ class LrcParser {
         timestamps.push(totalSeconds);
       }
 
-      // Extract lyric text (remove all [xx:xx.xx] tags)
-      const text = trimmed.replace(timeTagRegex, '').trim();
+      // Extract lyric text (remove all [xx:xx.xx] tags) and parse optional Enhanced LRC <mm:ss.xx> word tags
+      const rawContent = trimmed.replace(timeTagRegex, '').trim();
+      const wordTagRegex = /<(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?>/g;
+      let cleanText = rawContent;
+      let parsedWords = null;
+
+      if (wordTagRegex.test(rawContent)) {
+        wordTagRegex.lastIndex = 0;
+        const segments = [];
+        let lastIdx = 0;
+        let lastTime = null;
+        let wm;
+        while ((wm = wordTagRegex.exec(rawContent)) !== null) {
+          if (lastTime !== null) {
+            const seg = rawContent.slice(lastIdx, wm.index).trim();
+            if (seg) segments.push({ text: seg, start: lastTime });
+          }
+          const mins = parseInt(wm[1], 10);
+          const secs = parseInt(wm[2], 10);
+          let ms = 0;
+          if (wm[3]) ms = wm[3].length === 3 ? parseInt(wm[3], 10) : parseInt(wm[3].padEnd(3, '0'), 10);
+          lastTime = Math.max(0, mins * 60 + secs + ms / 1000 + (this.offset / 1000));
+          lastIdx = wordTagRegex.lastIndex;
+        }
+        if (lastTime !== null) {
+          const tail = rawContent.slice(lastIdx).trim();
+          if (tail) segments.push({ text: tail, start: lastTime });
+        }
+        if (segments.length > 0) {
+          parsedWords = segments;
+          cleanText = segments.map(s => s.text).join(' ');
+        }
+      }
 
       for (const time of timestamps) {
         this.lines.push({
           time: Math.max(0, time + (this.offset / 1000)),
-          text: text
+          text: cleanText,
+          words: parsedWords ? parsedWords.map(w => ({ ...w })) : null
         });
       }
     }
 
     // Sort lines chronologically
     this.lines.sort((a, b) => a.time - b.time);
+
+    // Build smooth word-by-word timings for every line (exact for Enhanced LRC, syllable-weighted for standard LRC)
+    for (let i = 0; i < this.lines.length; i++) {
+      const line = this.lines[i];
+      const next = this.lines[i + 1];
+      const rawGap = next ? Math.max(0.5, next.time - line.time) : 4.0;
+
+      if (!line.text) {
+        line.words = [];
+        continue;
+      }
+
+      if (line.words && line.words.length > 0) {
+        for (let j = 0; j < line.words.length; j++) {
+          const w = line.words[j];
+          const nw = line.words[j + 1];
+          w.end = nw ? Math.max(w.start + 0.08, nw.start) : Math.max(w.start + 0.35, line.time + Math.min(rawGap, 6.0));
+        }
+      } else {
+        const tokens = line.text.split(/\s+/).filter(Boolean);
+        if (tokens.length === 0) {
+          line.words = [];
+          continue;
+        }
+        // Syllable/vowel-cluster & punctuation weights for natural singing cadence
+        const weights = tokens.map(tok => {
+          const vowels = (tok.toLowerCase().match(/[aeiouy]+/g) || []).length;
+          const base = Math.max(1, vowels) * 0.7 + Math.min(tok.length, 10) * 0.14;
+          const pause = /[,;:.!?]$/.test(tok) ? 0.55 : 0;
+          return base + pause;
+        });
+        const totalWeight = weights.reduce((a, b) => a + b, 0) || 1;
+        // Natural singing window: don't stretch a short phrase across a 15s instrumental solo
+        const naturalCap = Math.max(1.2, tokens.length * 0.55 + 0.65);
+        const singDur = Math.min(rawGap * 0.94, naturalCap);
+
+        let cursor = line.time;
+        line.words = tokens.map((tok, j) => {
+          const dur = Math.max(0.12, (weights[j] / totalWeight) * singDur);
+          const start = cursor;
+          const end = start + dur;
+          cursor = end;
+          return { text: tok, start, end };
+        });
+      }
+    }
+
     return this;
   }
 

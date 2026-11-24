@@ -1476,9 +1476,12 @@ async function initApp() {
         else if (bucket === 1) { duetClass = 'duet-p2'; duetBadge = '<span class="duet-tag">P2</span>'; }
         else { duetClass = 'duet-both'; duetBadge = '<span class="duet-tag">BARENG</span>'; }
       }
+      const wordsHtml = (line.words && line.words.length > 0)
+        ? line.words.map((w, wi) => `<span class="lyric-word" data-w-idx="${wi}" data-w-start="${w.start.toFixed(3)}" data-w-end="${w.end.toFixed(3)}">${escapeHtml(w.text)}</span>`).join(' ')
+        : escapeHtml(line.text);
       return `
-      <div class="lyric-line ${duetClass} ${idx === activeLyricIndex ? 'active sweep-fill' : ''}" data-idx="${idx}" data-time="${line.time}">
-        ${duetBadge}${line.text}
+      <div class="lyric-line ${duetClass} ${idx === activeLyricIndex ? 'active' : ''}" data-idx="${idx}" data-time="${line.time}">
+        ${duetBadge}${wordsHtml}
       </div>
     `;
     }).join('');
@@ -1545,20 +1548,43 @@ async function initApp() {
       }
     }
 
-    // 3. Smooth left-to-right Karaoke Sweep fill progress on active line
+    // 3. Silky 60-FPS per-word karaoke highlight on active line
     if (newIndex >= 0) {
-      const curLine = lrcParser.lines[newIndex];
-      const nextLine = lrcParser.lines[newIndex + 1];
-      const lineDur = nextLine ? Math.max(0.8, Math.min(8, nextLine.time - curLine.time)) : 3.5;
-      const pct = Math.max(8, Math.min(100, ((adjustedTime - curLine.time) / lineDur) * 100));
       const activeEl = lyricsContainer.querySelector(`.lyric-line[data-idx="${newIndex}"]`);
       if (activeEl) {
-        activeEl.classList.add('sweep-fill');
-        activeEl.style.setProperty('--sweep', `${pct.toFixed(1)}%`);
+        const wordEls = activeEl.querySelectorAll('.lyric-word');
+        wordEls.forEach(wEl => {
+          const ws = parseFloat(wEl.getAttribute('data-w-start'));
+          const we = parseFloat(wEl.getAttribute('data-w-end'));
+          if (isNaN(ws) || isNaN(we) || we <= ws) return;
+          if (adjustedTime >= we) {
+            wEl.style.setProperty('--wp', '100%');
+            wEl.classList.add('word-sung');
+            wEl.classList.remove('word-active');
+          } else if (adjustedTime <= ws) {
+            wEl.style.setProperty('--wp', '0%');
+            wEl.classList.remove('word-sung', 'word-active');
+          } else {
+            const wp = Math.max(0, Math.min(100, ((adjustedTime - ws) / (we - ws)) * 100));
+            wEl.style.setProperty('--wp', `${wp.toFixed(1)}%`);
+            wEl.classList.add('word-active');
+            wEl.classList.remove('word-sung');
+          }
+        });
       }
     }
 
     if (newIndex !== activeLyricIndex) {
+      // Clear word highlights on previous line cleanly
+      if (activeLyricIndex >= 0) {
+        const prevEl = lyricsContainer.querySelector(`.lyric-line[data-idx="${activeLyricIndex}"]`);
+        if (prevEl) {
+          prevEl.querySelectorAll('.lyric-word').forEach(wEl => {
+            wEl.style.removeProperty('--wp');
+            wEl.classList.remove('word-sung', 'word-active');
+          });
+        }
+      }
       activeLyricIndex = newIndex;
 
       // Update styling
@@ -1884,10 +1910,32 @@ async function initApp() {
     }
   }
 
+  // Silky 60 FPS lyric word-highlight animation loop while music is playing
+  let lyricRafId = null;
+  function startSmoothLyricRaf() {
+    if (lyricRafId !== null) return;
+    const tick = () => {
+      if (!audioElement || audioElement.paused || audioElement.ended) {
+        lyricRafId = null;
+        return;
+      }
+      updateLyricSync(audioElement.currentTime);
+      lyricRafId = requestAnimationFrame(tick);
+    };
+    lyricRafId = requestAnimationFrame(tick);
+  }
+  function stopSmoothLyricRaf() {
+    if (lyricRafId !== null) {
+      cancelAnimationFrame(lyricRafId);
+      lyricRafId = null;
+    }
+  }
+
   audioElement.addEventListener('play', () => {
     updateMusicPlayButtonUI(true);
     if (typeof updatePlaylistPlayButtonUI === 'function') updatePlaylistPlayButtonUI(true);
     if (lyricsContainer) lyricsContainer.classList.add('ambient-active');
+    startSmoothLyricRaf();
     updateFloatingMiniPlayer();
     if (window.AndroidStorage && typeof window.AndroidStorage.setBackgroundAudioActive === 'function') {
       try { window.AndroidStorage.setBackgroundAudioActive(true); } catch (e) { }
@@ -1899,6 +1947,7 @@ async function initApp() {
   });
 
   audioElement.addEventListener('pause', () => {
+    stopSmoothLyricRaf();
     updateMusicPlayButtonUI(false);
     if (typeof updatePlaylistPlayButtonUI === 'function') updatePlaylistPlayButtonUI(false);
     if (lyricsContainer) lyricsContainer.classList.remove('ambient-active');
