@@ -277,12 +277,10 @@ public class MainActivity extends BridgeActivity {
         });
         applyDarkSystemBarsWithWhiteIcons();
 
-        // Respect system bar insets on Android 15/16 (targetSdk 36) so WebView never overlaps status bar icons
+        // Zero extra inset padding because fitsSystemWindows=true already reserves exact status & nav bar height
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content), (view, windowInsets) -> {
-            androidx.core.graphics.Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-            view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
-            view.setBackgroundColor(Color.parseColor("#07080d"));
-            return windowInsets;
+            view.setPadding(0, 0, 0, 0);
+            return WindowInsetsCompat.CONSUMED;
         });
 
         // Optimize Android AudioManager for lowest hardware latency audio
