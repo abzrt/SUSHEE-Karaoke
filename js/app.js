@@ -1476,39 +1476,43 @@ async function initApp() {
         else if (bucket === 1) { duetClass = 'duet-p2'; duetBadge = '<span class="duet-tag">P2</span>'; }
         else { duetClass = 'duet-both'; duetBadge = '<span class="duet-tag">BARENG</span>'; }
       }
-      const wordsHtml = (line.words && line.words.length > 0)
-        ? line.words.map((w, wi) => `<span class="lyric-word" data-w-idx="${wi}" data-w-start="${w.start.toFixed(3)}" data-w-end="${w.end.toFixed(3)}">${escapeHtml(w.text)}</span>`).join(' ')
-        : escapeHtml(line.text);
       return `
       <div class="lyric-line ${duetClass} ${idx === activeLyricIndex ? 'active' : ''}" data-idx="${idx}" data-time="${line.time}">
-        ${duetBadge}${wordsHtml}
+        ${duetBadge}${escapeHtml(line.text)}
       </div>
     `;
     }).join('');
 
-    // Allow clicking on a lyric line to jump audio
-    lyricsContainer.querySelectorAll('.lyric-line').forEach(el => {
-      el.addEventListener('click', () => {
-        const time = parseFloat(el.getAttribute('data-time'));
-        if (!isNaN(time)) {
-          const targetTime = Math.max(0, time - (currentLyricOffsetMs / 1000));
-          audioElement.currentTime = targetTime;
-          updateLyricSync(targetTime);
-        }
-      });
-    });
-
-    // Double-tap anywhere on lyrics screen to toggle Fullscreen Focus Mode
+    // Single tap seeks to lyric line (debounced 260ms); double tap toggles Focus Mode WITHOUT seeking or interrupting the song
     if (!lyricsContainer.dataset.focusBound) {
       lyricsContainer.dataset.focusBound = '1';
       let lastLyricTap = 0;
-      lyricsContainer.addEventListener('click', () => {
+      let lyricSeekTimer = null;
+
+      lyricsContainer.addEventListener('click', (e) => {
         const now = Date.now();
-        if (now - lastLyricTap < 320) {
-          toggleKaraokeFocusMode();
+        if (now - lastLyricTap < 280) {
+          if (lyricSeekTimer) {
+            clearTimeout(lyricSeekTimer);
+            lyricSeekTimer = null;
+          }
           lastLyricTap = 0;
-        } else {
-          lastLyricTap = now;
+          toggleKaraokeFocusMode();
+          return;
+        }
+        lastLyricTap = now;
+        const lineEl = e.target && e.target.closest ? e.target.closest('.lyric-line') : null;
+        if (lineEl) {
+          const time = parseFloat(lineEl.getAttribute('data-time'));
+          if (!isNaN(time)) {
+            if (lyricSeekTimer) clearTimeout(lyricSeekTimer);
+            lyricSeekTimer = setTimeout(() => {
+              lyricSeekTimer = null;
+              const targetTime = Math.max(0, time - (currentLyricOffsetMs / 1000));
+              audioElement.currentTime = targetTime;
+              updateLyricSync(targetTime);
+            }, 280);
+          }
         }
       });
     }
@@ -1548,43 +1552,7 @@ async function initApp() {
       }
     }
 
-    // 3. Silky 60-FPS per-word karaoke highlight on active line
-    if (newIndex >= 0) {
-      const activeEl = lyricsContainer.querySelector(`.lyric-line[data-idx="${newIndex}"]`);
-      if (activeEl) {
-        const wordEls = activeEl.querySelectorAll('.lyric-word');
-        wordEls.forEach(wEl => {
-          const ws = parseFloat(wEl.getAttribute('data-w-start'));
-          const we = parseFloat(wEl.getAttribute('data-w-end'));
-          if (isNaN(ws) || isNaN(we) || we <= ws) return;
-          if (adjustedTime >= we) {
-            wEl.style.setProperty('--wp', '100%');
-            wEl.classList.add('word-sung');
-            wEl.classList.remove('word-active');
-          } else if (adjustedTime <= ws) {
-            wEl.style.setProperty('--wp', '0%');
-            wEl.classList.remove('word-sung', 'word-active');
-          } else {
-            const wp = Math.max(0, Math.min(100, ((adjustedTime - ws) / (we - ws)) * 100));
-            wEl.style.setProperty('--wp', `${wp.toFixed(1)}%`);
-            wEl.classList.add('word-active');
-            wEl.classList.remove('word-sung');
-          }
-        });
-      }
-    }
-
     if (newIndex !== activeLyricIndex) {
-      // Clear word highlights on previous line cleanly
-      if (activeLyricIndex >= 0) {
-        const prevEl = lyricsContainer.querySelector(`.lyric-line[data-idx="${activeLyricIndex}"]`);
-        if (prevEl) {
-          prevEl.querySelectorAll('.lyric-word').forEach(wEl => {
-            wEl.style.removeProperty('--wp');
-            wEl.classList.remove('word-sung', 'word-active');
-          });
-        }
-      }
       activeLyricIndex = newIndex;
 
       // Update styling
@@ -1910,32 +1878,10 @@ async function initApp() {
     }
   }
 
-  // Silky 60 FPS lyric word-highlight animation loop while music is playing
-  let lyricRafId = null;
-  function startSmoothLyricRaf() {
-    if (lyricRafId !== null) return;
-    const tick = () => {
-      if (!audioElement || audioElement.paused || audioElement.ended) {
-        lyricRafId = null;
-        return;
-      }
-      updateLyricSync(audioElement.currentTime);
-      lyricRafId = requestAnimationFrame(tick);
-    };
-    lyricRafId = requestAnimationFrame(tick);
-  }
-  function stopSmoothLyricRaf() {
-    if (lyricRafId !== null) {
-      cancelAnimationFrame(lyricRafId);
-      lyricRafId = null;
-    }
-  }
-
   audioElement.addEventListener('play', () => {
     updateMusicPlayButtonUI(true);
     if (typeof updatePlaylistPlayButtonUI === 'function') updatePlaylistPlayButtonUI(true);
     if (lyricsContainer) lyricsContainer.classList.add('ambient-active');
-    startSmoothLyricRaf();
     updateFloatingMiniPlayer();
     if (window.AndroidStorage && typeof window.AndroidStorage.setBackgroundAudioActive === 'function') {
       try { window.AndroidStorage.setBackgroundAudioActive(true); } catch (e) { }
@@ -1947,7 +1893,6 @@ async function initApp() {
   });
 
   audioElement.addEventListener('pause', () => {
-    stopSmoothLyricRaf();
     updateMusicPlayButtonUI(false);
     if (typeof updatePlaylistPlayButtonUI === 'function') updatePlaylistPlayButtonUI(false);
     if (lyricsContainer) lyricsContainer.classList.remove('ambient-active');
