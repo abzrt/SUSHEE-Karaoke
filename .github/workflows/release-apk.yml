@@ -66,15 +66,15 @@ jobs:
         if: steps.meta.outputs.should_release == 'true'
         run: npm install --no-audit --no-fund
 
-      - name: Run automated feature & behavioral tests
-        if: steps.meta.outputs.should_release == 'true'
-        run: npm test
-
       - name: Prepare web assets & sync Capacitor Android
         if: steps.meta.outputs.should_release == 'true'
         run: |
           node prepare-www.js
           npx cap sync android
+
+      - name: Run automated feature & behavioral tests
+        if: steps.meta.outputs.should_release == 'true'
+        run: npm test
 
       - name: Configure Android signing & build APK
         if: steps.meta.outputs.should_release == 'true'
