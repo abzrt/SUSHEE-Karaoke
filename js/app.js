@@ -317,6 +317,27 @@ async function initApp() {
   }
   window.saveSyncedLrc = saveSyncedLrc;
 
+  // --- ACCENT THEME SWITCHER (Cyan / Rose / VIP Gold / Emerald) ---
+  const THEME_STORAGE_KEY = 'sushee_ui_theme';
+  function setAppTheme(themeName = 'cyan', silent = false) {
+    const valid = ['cyan', 'rose', 'gold', 'emerald'].includes(themeName) ? themeName : 'cyan';
+    if (valid === 'cyan') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', valid);
+    try { localStorage.setItem(THEME_STORAGE_KEY, valid); } catch (e) {}
+    document.querySelectorAll('.theme-swatch-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-theme-choice') === valid);
+    });
+    if (!silent) {
+      const names = { cyan: 'Cyan Neon', rose: 'Rose Stage', gold: 'VIP Gold', emerald: 'Emerald Studio' };
+      showToast(`🎨 Tema diubah ke ${names[valid]}`, 'info');
+    }
+  }
+  window.setAppTheme = setAppTheme;
+  try {
+    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    if (savedTheme) setAppTheme(savedTheme, true);
+  } catch (e) {}
+
   // Bridge for Android MediaStyle Notification action buttons (Play/Pause & Next)
   window.handleMediaNotificationAction = function(action) {
     if (action === 'toggle') {
@@ -3227,7 +3248,11 @@ async function initApp() {
     const badge = document.getElementById('songsPlaylistCountBadge');
     const totalCount = document.getElementById('queueTotalCount');
     const oldCloudBadge = document.getElementById('cloudPlaylistCountBadge');
+    const playlistCard = document.getElementById('songsPlaylistCard');
     const countStr = songsPlaylist.length.toString();
+    if (playlistCard) {
+      playlistCard.classList.toggle('is-empty', songsPlaylist.length === 0);
+    }
     if (badge) {
       badge.textContent = countStr;
       badge.classList.remove('pulse-badge');

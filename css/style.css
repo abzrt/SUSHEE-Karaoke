@@ -4304,3 +4304,118 @@ select.form-input:disabled {
 .lrc-sync-progress { font-size: 0.72rem; color: var(--color-cyan); font-weight: 700; }
 .lrc-sync-current-line { font-size: 1.02rem; font-weight: 800; color: #fff; margin: 6px 0 4px; }
 .lrc-sync-next-line { font-size: 0.78rem; color: var(--text-secondary); }
+
+/* ==========================================================================
+   v1.2.0 UI & Color Polish (60-30-10 Hierarchy, 4 Accent Themes, Compact Cards)
+   ========================================================================== */
+
+/* Accent Themes */
+[data-theme="rose"] {
+  --color-cyan: #fb7185;
+  --color-violet: #be185d;
+  --border-focus: rgba(251, 113, 133, 0.5);
+  --grad-primary: linear-gradient(135deg, #be185d 0%, #fb7185 100%);
+  --grad-glow: radial-gradient(circle at 50% 0%, rgba(236, 72, 153, 0.22) 0%, transparent 70%);
+}
+[data-theme="gold"] {
+  --color-cyan: #facc15;
+  --color-violet: #d97706;
+  --border-focus: rgba(250, 204, 21, 0.5);
+  --grad-primary: linear-gradient(135deg, #b45309 0%, #facc15 100%);
+  --grad-glow: radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.20) 0%, transparent 70%);
+}
+[data-theme="emerald"] {
+  --color-cyan: #34d399;
+  --color-violet: #059669;
+  --border-focus: rgba(52, 211, 153, 0.5);
+  --grad-primary: linear-gradient(135deg, #059669 0%, #34d399 100%);
+  --grad-glow: radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.20) 0%, transparent 70%);
+}
+
+/* Theme Swatch Selector in Settings */
+.theme-swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.theme-swatch-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-main);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+.theme-swatch-btn.active {
+  border-color: var(--color-cyan);
+  background: rgba(255, 255, 255, 0.09);
+}
+.theme-swatch-btn .swatch-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.35);
+}
+
+/* 1. Header Micro-Polish: remove harsh glow on ID/EN toggle */
+.lang-toggle .lang-btn.active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+/* 2. Calm 60-30-10 Playlist Card + Compact 1-line mode when empty */
+.songs-playlist-card {
+  border-color: var(--border-subtle) !important;
+  box-shadow: none !important;
+}
+.songs-playlist-card.is-empty {
+  padding: 10px 14px !important;
+}
+.songs-playlist-card.is-empty .songs-playlist-modes,
+.songs-playlist-card.is-empty .songs-playlist-controller,
+.songs-playlist-card.is-empty .songs-playlist-subtitle,
+.songs-playlist-card.is-empty .playlist-subtitle,
+.songs-playlist-card.is-empty #songsPlaylistNowText {
+  display: none !important;
+}
+
+/* 3. Sleek Left-Accent Bar for Now-Playing Song Card (no harsh full-border glow) */
+.song-card.now-playing {
+  border-color: var(--border-subtle) !important;
+  border-left: 3px solid var(--color-cyan) !important;
+  background: rgba(255, 255, 255, 0.065) !important;
+  box-shadow: none !important;
+}
+
+/* 4. Roomier Song Cards: tone down passive metadata badges & compact actions so song titles fit cleanly */
+.song-card .song-badges .badge-format {
+  display: none;
+}
+.song-card .song-card-title {
+  font-size: 0.94rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.song-card .song-card-artist {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+.song-card .btn-songs-playlist-add {
+  padding: 5px 8px !important;
+  font-size: 0.7rem !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: var(--border-subtle) !important;
+}
+.song-card .song-card-actions {
+  gap: 5px !important;
+}

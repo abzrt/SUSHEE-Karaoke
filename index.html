@@ -831,6 +831,30 @@
         <div class="gdrive-card">
           <h3 class="switch-title" style="margin-bottom: 14px;" data-i18n="settingsTitle">Pengaturan Aplikasi</h3>
 
+          <!-- Accent Color Theme Switcher (4 Themes) -->
+          <div class="form-group" style="margin-bottom: 18px;">
+            <label class="form-label">🎨 Tema Warna Aplikasi</label>
+            <p class="switch-desc" style="margin-bottom: 10px;">Pilih aksen warna studio favorit Anda</p>
+            <div class="theme-swatch-grid" id="themeSwatchGrid">
+              <button type="button" class="theme-swatch-btn active" data-theme-choice="cyan" onclick="window.setAppTheme && window.setAppTheme('cyan')">
+                <span class="swatch-dot" style="background: linear-gradient(135deg, #7928ca, #00f2fe);"></span>
+                <span>Cyan Neon</span>
+              </button>
+              <button type="button" class="theme-swatch-btn" data-theme-choice="rose" onclick="window.setAppTheme && window.setAppTheme('rose')">
+                <span class="swatch-dot" style="background: linear-gradient(135deg, #be185d, #fb7185);"></span>
+                <span>Rose Stage</span>
+              </button>
+              <button type="button" class="theme-swatch-btn" data-theme-choice="gold" onclick="window.setAppTheme && window.setAppTheme('gold')">
+                <span class="swatch-dot" style="background: linear-gradient(135deg, #d97706, #facc15);"></span>
+                <span>VIP Gold</span>
+              </button>
+              <button type="button" class="theme-swatch-btn" data-theme-choice="emerald" onclick="window.setAppTheme && window.setAppTheme('emerald')">
+                <span class="swatch-dot" style="background: linear-gradient(135deg, #059669, #34d399);"></span>
+                <span>Emerald</span>
+              </button>
+            </div>
+          </div>
+
           <!-- Recording Format Selection -->
           <div class="form-group">
             <label class="form-label" data-i18n="recordingFormatSetting">Format Audio Hasil Rekaman</label>
