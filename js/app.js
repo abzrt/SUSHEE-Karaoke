@@ -338,6 +338,31 @@ async function initApp() {
     if (savedTheme) setAppTheme(savedTheme, true);
   } catch (e) { }
 
+  function updateOfflineStorageBadgeUI() {
+    const badge = document.getElementById('offlineStorageBadge');
+    if (!badge || !offlineManager) return;
+    const { count, totalBytes } = offlineManager.getSummary();
+    const mb = (totalBytes / (1024 * 1024)).toFixed(1);
+    badge.textContent = `${count} lagu • ${mb} MB`;
+  }
+  window.updateOfflineStorageBadgeUI = updateOfflineStorageBadgeUI;
+
+  async function clearOfflineSongsCache() {
+    if (!offlineManager) return;
+    const { count } = offlineManager.getSummary();
+    if (count === 0) {
+      showToast('Tidak ada lagu offline yang tersimpan.', 'info');
+      return;
+    }
+    await offlineManager.clearAll();
+    updateOfflineStorageBadgeUI();
+    renderSongList();
+    if (typeof renderCloudSongList === 'function') renderCloudSongList();
+    showToast(`🧹 ${count} lagu offline berhasil dibersihkan`, 'success');
+  }
+  window.clearOfflineSongsCache = clearOfflineSongsCache;
+  setTimeout(updateOfflineStorageBadgeUI, 600);
+
   // --- HYBRID IN-APP AUTO-UPDATER (PHP Hosting version.json + GitHub Releases) ---
   const autoUpdater = (typeof AutoUpdater === 'function') ? new AutoUpdater({ versionName: '1.2.0', versionCode: 8 }) : null;
   window.autoUpdater = autoUpdater;

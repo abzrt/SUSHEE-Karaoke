@@ -908,17 +908,16 @@
             </button>
           </div>
 
-          <!-- System Diagnostics & Self-Test Link -->
-          <div class="form-group" style="margin-top: 18px; padding: 14px; background: rgba(0, 242, 254, 0.05); border: 1px solid rgba(0, 242, 254, 0.2); border-radius: var(--border-radius-sm);">
+          <!-- Offline Storage Cache Manager -->
+          <div class="form-group" style="margin-top: 18px; padding: 14px; background: rgba(255, 255, 255, 0.035); border: 1px solid var(--border-subtle); border-radius: var(--border-radius-sm);">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-              <label class="form-label" style="margin-bottom: 0; color: var(--color-cyan);" data-i18n="diagSelfTestTitle">🧪 Uji Diagnostik Sistem (Self-Test)</label>
-              <span class="badge" style="background: rgba(0, 242, 254, 0.2); color: var(--color-cyan);" data-i18n="badgeAuto">Otomatis</span>
+              <label class="form-label" style="margin-bottom: 0; color: var(--color-cyan);">💾 Penyimpanan Lagu Offline</label>
+              <span class="badge badge-offline" id="offlineStorageBadge">0 lagu • 0 MB</span>
             </div>
-            <p class="switch-desc" style="margin-bottom: 10px;" data-i18n="diagSelfTestDesc">Jalankan pengujian menyeluruh (Storage, Audio DSP, Mic, LRC Sync, dan Reopen Lifecycle) untuk memastikan semua fitur berjalan normal.</p>
-            <a href="diagnostics.html" class="btn btn-primary" style="width: 100%; text-decoration: none; justify-content: center; gap: 8px;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-              <span data-i18n="btnOpenDiagnostics">Buka Halaman Uji Diagnostik</span>
-            </a>
+            <p class="switch-desc" style="margin-bottom: 10px;">Lagu & lirik yang Anda unduh tersimpan di memori perangkat agar bisa dinyanyikan tanpa internet.</p>
+            <button type="button" class="btn btn-secondary" id="btnClearOfflineCache" style="width: 100%; justify-content: center; gap: 8px;" onclick="window.clearOfflineSongsCache && window.clearOfflineSongsCache()">
+              🧹 Bersihkan Cache Lagu Offline
+            </button>
           </div>
 
           <!-- About Section -->

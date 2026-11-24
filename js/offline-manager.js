@@ -194,6 +194,25 @@ class OfflineSongManager {
     this._saveMeta();
   }
 
+  async clearAll() {
+    await this.ready;
+    if (this.db) {
+      await new Promise((resolve) => {
+        try {
+          const tx = this.db.transaction(this.storeName, 'readwrite');
+          tx.objectStore(this.storeName).clear();
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => resolve();
+        } catch (e) { resolve(); }
+      });
+    }
+    if (typeof caches !== 'undefined') {
+      try { await caches.delete(this.cacheName); } catch (e) {}
+    }
+    this.meta = {};
+    this._saveMeta();
+  }
+
   async getOfflinePlaybackData(song) {
     if (!song || !song.id || !this.isOffline(song.id)) return null;
     const rec = await this._getRecord(song.id);

@@ -1,5 +1,11 @@
 apply plugin: 'com.android.application'
 
+def keystorePropsFile = rootProject.file('keystore.properties')
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
 android {
     namespace = "com.antigravity.sushee"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +13,8 @@ android {
         applicationId "com.antigravity.sushee"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 7
-        versionName "1.1.4"
+        versionCode 8
+        versionName "1.2.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -18,10 +24,10 @@ android {
     }
     signingConfigs {
         release {
-            storeFile file('sushee-release.jks')
-            storePassword 'sushee2026'
-            keyAlias 'sushee'
-            keyPassword 'sushee2026'
+            storeFile file(keystoreProps.getProperty('storeFile', 'sushee-release.jks'))
+            storePassword keystoreProps.getProperty('storePassword', System.getenv('SUSHEE_STORE_PASSWORD') ?: '')
+            keyAlias keystoreProps.getProperty('keyAlias', 'sushee')
+            keyPassword keystoreProps.getProperty('keyPassword', System.getenv('SUSHEE_KEY_PASSWORD') ?: '')
             v1SigningEnabled true
             v2SigningEnabled true
         }

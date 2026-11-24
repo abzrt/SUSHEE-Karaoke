@@ -33,3 +33,6 @@ scratch/
 
 # Generated web bundle (rebuilt by prepare-www.js during build:apk)
 www/
+
+# Local signing credentials
+android/keystore.properties
