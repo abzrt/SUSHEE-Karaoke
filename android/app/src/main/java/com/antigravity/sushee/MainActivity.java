@@ -277,9 +277,11 @@ public class MainActivity extends BridgeActivity {
         });
         applyDarkSystemBarsWithWhiteIcons();
 
-        // Zero extra inset padding because fitsSystemWindows=true already reserves exact status & nav bar height
+        // Apply system bar insets ONCE natively and return CONSUMED so WebView CSS safe-area does not double-pad
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content), (view, windowInsets) -> {
-            view.setPadding(0, 0, 0, 0);
+            androidx.core.graphics.Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            view.setBackgroundColor(Color.parseColor("#07080d"));
             return WindowInsetsCompat.CONSUMED;
         });
 
