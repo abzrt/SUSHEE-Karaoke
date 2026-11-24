@@ -83,6 +83,7 @@ jobs:
           SUSHEE_KEY_PASSWORD: ${{ secrets.SUSHEE_KEY_PASSWORD }}
           RELEASE_TAG: ${{ steps.meta.outputs.tag }}
         run: |
+          sed -i 's/\r$//' android/gradlew
           chmod +x android/gradlew
           if [ -n "$SUSHEE_STORE_PASSWORD" ] && [ -n "$SUSHEE_KEY_PASSWORD" ] && [ -f android/app/sushee-release.jks ]; then
             echo "Building SIGNED release APK..."
