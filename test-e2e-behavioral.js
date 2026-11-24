@@ -125,6 +125,15 @@ async function run() {
   assert(builtLrc.includes('[ti:Bliss]') && builtLrc.includes('[00:12.50] Line one') && builtLrc.includes('[00:16.00] Line two'), 'LrcEditor builds valid LRC output with metadata & timestamps');
   assert(editor.undoLast() === true && editor.stamped.length === 1, 'LrcEditor undoLast reverts the last stamped line');
 
+  const auCode = fs.readFileSync('js/auto-updater.js', 'utf8');
+  const auSandbox = { window: {} };
+  new Function('window', auCode)(auSandbox.window);
+  const AU = auSandbox.window.AutoUpdater;
+  assert(AU.compareVersions('1.2.1', '1.2.0') === 1 && AU.compareVersions('1.2.0', '1.2.0') === 0 && AU.compareVersions('1.1.9', '1.2.0') === -1, 'AutoUpdater.compareVersions compares semver accurately');
+  const updater = new AU({ versionName: '1.2.0', versionCode: 8 });
+  assert(updater.isNewer({ versionName: '1.2.1', versionCode: 9 }, { versionName: '1.2.0', versionCode: 8 }) === true, 'AutoUpdater detects newer remote versionCode/versionName');
+  assert(updater.isNewer({ versionName: '1.2.0', versionCode: 8 }, { versionName: '1.2.0', versionCode: 8 }) === false, 'AutoUpdater returns false when already up to date');
+
   console.log('\n=== E2E SUITE E: Live Preview Server Asset Delivery (http://localhost:5173) ===');
   const checkUrl = (urlPath) => new Promise((resolve) => {
     const req = http.get({ host: '127.0.0.1', port: 5173, path: urlPath, timeout: 2500 }, (res) => {

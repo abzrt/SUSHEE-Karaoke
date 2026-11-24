@@ -78,7 +78,7 @@ async function initApp() {
         audioElement.webkitPreservesPitch = true;
         audioElement.mozPreservesPitch = true;
         audioElement.playbackRate = audioEngine.musicSpeed;
-      } catch (e) {}
+      } catch (e) { }
     }
   };
   window.enforcePlaybackSpeed = enforcePlaybackSpeed;
@@ -272,7 +272,7 @@ async function initApp() {
     updateLrcEditorTapUI();
     if (audioElement) {
       audioElement.currentTime = 0;
-      audioElement.play().catch(() => {});
+      audioElement.play().catch(() => { });
     }
   }
   window.startLrcTapSync = startLrcTapSync;
@@ -323,7 +323,7 @@ async function initApp() {
     const valid = ['cyan', 'rose', 'gold', 'emerald'].includes(themeName) ? themeName : 'cyan';
     if (valid === 'cyan') document.documentElement.removeAttribute('data-theme');
     else document.documentElement.setAttribute('data-theme', valid);
-    try { localStorage.setItem(THEME_STORAGE_KEY, valid); } catch (e) {}
+    try { localStorage.setItem(THEME_STORAGE_KEY, valid); } catch (e) { }
     document.querySelectorAll('.theme-swatch-btn').forEach(btn => {
       btn.classList.toggle('active', btn.getAttribute('data-theme-choice') === valid);
     });
@@ -336,10 +336,64 @@ async function initApp() {
   try {
     const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
     if (savedTheme) setAppTheme(savedTheme, true);
-  } catch (e) {}
+  } catch (e) { }
+
+  // --- HYBRID IN-APP AUTO-UPDATER (PHP Hosting version.json + GitHub Releases) ---
+  const autoUpdater = (typeof AutoUpdater === 'function') ? new AutoUpdater({ versionName: '1.2.0', versionCode: 8 }) : null;
+  window.autoUpdater = autoUpdater;
+
+  window.onApkDownloadProgress = function(percent, message) {
+    const wrap = document.getElementById('updateProgressWrap');
+    const bar = document.getElementById('updateProgressBar');
+    const txt = document.getElementById('updateProgressText');
+    const btn = document.getElementById('btnStartAppUpdate');
+    if (wrap) wrap.style.display = 'block';
+    if (percent < 0) {
+      if (txt) txt.textContent = message || 'Gagal mengunduh pembaruan.';
+      if (btn) btn.disabled = false;
+      return;
+    }
+    if (bar) bar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+    if (txt) txt.textContent = message || `Mengunduh... ${percent}%`;
+    if (percent >= 100 && btn) btn.disabled = false;
+  };
+
+  async function checkAppUpdate(manual = false) {
+    if (!autoUpdater) return;
+    if (manual) showToast('🔄 Memeriksa pembaruan terbaru...', 'info');
+    const info = await autoUpdater.checkForUpdate();
+    if (info && info.hasUpdate) {
+      const lbl = document.getElementById('updateVersionLabel');
+      const src = document.getElementById('updateSourceBadge');
+      const notes = document.getElementById('updateReleaseNotes');
+      const wrap = document.getElementById('updateProgressWrap');
+      const btn = document.getElementById('btnStartAppUpdate');
+      if (lbl) lbl.textContent = `v${info.currentVersion} → v${info.versionName}`;
+      if (src) src.textContent = info.source || 'Online';
+      if (notes) notes.textContent = info.releaseNotes || 'Pembaruan tersedia.';
+      if (wrap) wrap.style.display = 'none';
+      if (btn) btn.disabled = false;
+      const modal = document.getElementById('appUpdateModal');
+      if (modal) modal.classList.add('open');
+    } else if (manual) {
+      showToast(`✅ Aplikasi sudah versi terbaru (v${info ? info.currentVersion : '1.2.0'})`, 'success');
+    }
+  }
+  window.checkAppUpdate = checkAppUpdate;
+
+  function startAppUpdateNow() {
+    if (!autoUpdater || !autoUpdater.latestInfo || !autoUpdater.latestInfo.downloadUrl) return;
+    const btn = document.getElementById('btnStartAppUpdate');
+    if (btn) btn.disabled = true;
+    autoUpdater.startDownloadAndInstall(autoUpdater.latestInfo.downloadUrl);
+  }
+  window.startAppUpdateNow = startAppUpdateNow;
+
+  // Silent background check 3.5s after startup
+  setTimeout(() => { checkAppUpdate(false).catch(() => {}); }, 3500);
 
   // Bridge for Android MediaStyle Notification action buttons (Play/Pause & Next)
-  window.handleMediaNotificationAction = function(action) {
+  window.handleMediaNotificationAction = function (action) {
     if (action === 'toggle') {
       if (typeof window.toggleMusicPlayback === 'function') window.toggleMusicPlayback();
     } else if (action === 'next') {
@@ -558,7 +612,7 @@ async function initApp() {
     if (screenWakeLock) {
       try {
         await screenWakeLock.release();
-      } catch (e) {}
+      } catch (e) { }
       screenWakeLock = null;
     }
   }
@@ -569,14 +623,14 @@ async function initApp() {
     if (audioEngine && typeof audioEngine.resumeContext === 'function') {
       try {
         await audioEngine.resumeContext();
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // 2. Validate and refresh object URLs for local songs if needed
     if (storageScanner && storageScanner.songs) {
       storageScanner.songs.forEach(s => {
         if (s.audioBlob && (!s.audioUrl || s.audioUrl.length === 0)) {
-          try { s.audioUrl = URL.createObjectURL(s.audioBlob); } catch (e) {}
+          try { s.audioUrl = URL.createObjectURL(s.audioBlob); } catch (e) { }
         }
       });
     }
@@ -780,7 +834,7 @@ async function initApp() {
       audioElement.muted = false;
       try {
         audioElement.currentTime = 0;
-      } catch (e) {}
+      } catch (e) { }
 
       const playPromise = audioElement.play();
       if (playPromise !== undefined) {
@@ -941,7 +995,7 @@ async function initApp() {
         } else {
           try {
             window.close();
-          } catch (e) {}
+          } catch (e) { }
         }
       }, 300);
       return false;
@@ -963,7 +1017,7 @@ async function initApp() {
         handleAppBackButton();
       });
     }
-  } catch (e) {}
+  } catch (e) { }
 
   // --- LANGUAGE SWITCHING ---
   let lastLangSwitch = 0;
@@ -1111,7 +1165,7 @@ async function initApp() {
 
     let filtered = allSongs.filter(song => {
       const matchesSearch = (song.title && song.title.toLowerCase().includes(query)) ||
-                            (song.artist && song.artist.toLowerCase().includes(query));
+        (song.artist && song.artist.toLowerCase().includes(query));
       return matchesSearch;
     });
 
@@ -1141,10 +1195,10 @@ async function initApp() {
       <div class="song-card ${currentSong && currentSong.id === song.id ? 'now-playing' : ''}" data-song-id="${song.id}">
         <div class="song-card-avatar" style="${song.source === 'custom_host' ? 'background: rgba(0, 242, 254, 0.15); color: #00f2fe;' : ''}">
           <div class="music-disc-icon">
-            ${song.source === 'custom_host' ? 
-              `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>` :
-              `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>`
-            }
+            ${song.source === 'custom_host' ?
+        `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>` :
+        `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>`
+      }
           </div>
         </div>
         <div class="song-card-info">
@@ -1152,14 +1206,14 @@ async function initApp() {
           <p class="song-card-artist">${formatArtistDisplay(song.artist)}</p>
           <div class="song-badges">
             <span class="badge badge-format">${song.format || '.MP3'}</span>
-            ${song.source === 'custom_host' ? 
-              `<span class="badge" style="background: rgba(0, 242, 254, 0.15); color: var(--color-cyan); border: 1px solid rgba(0, 242, 254, 0.3);">PHP Hosting</span>` :
-              `<span class="badge badge-source">${(window.i18n && window.i18n.t) ? window.i18n.t('sourceBadgePhone') : 'HP'}</span>`
-            }
-            ${song.hasLyrics ? 
-              `<span class="badge badge-lyrics"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> ${window.i18n.t('badgeHasLyrics')}</span>` : 
-              `<span class="badge badge-no-lyrics">${window.i18n.t('badgeNoLyrics')}</span>`
-            }
+            ${song.source === 'custom_host' ?
+        `<span class="badge" style="background: rgba(0, 242, 254, 0.15); color: var(--color-cyan); border: 1px solid rgba(0, 242, 254, 0.3);">PHP Hosting</span>` :
+        `<span class="badge badge-source">${(window.i18n && window.i18n.t) ? window.i18n.t('sourceBadgePhone') : 'HP'}</span>`
+      }
+            ${song.hasLyrics ?
+        `<span class="badge badge-lyrics"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> ${window.i18n.t('badgeHasLyrics')}</span>` :
+        `<span class="badge badge-no-lyrics">${window.i18n.t('badgeNoLyrics')}</span>`
+      }
             ${(song.source === 'custom_host' && offlineManager && offlineManager.isOffline(song.id)) ? `<span class="badge badge-offline">✓ Offline</span>` : ''}
           </div>
         </div>
@@ -1181,7 +1235,7 @@ async function initApp() {
     }
   }
 
-  
+
   // SUSHEE_GLOBAL_PLAYLIST_CLICK_CAPTURE: Global capture-phase listener guarantees + Playlist clicks work 100%
   document.addEventListener('click', (e) => {
     const playlistBtn = e.target && e.target.closest && (e.target.closest('.btn-songs-playlist-add') || e.target.closest('.btn-cloud-playlist-add'));
@@ -1572,7 +1626,7 @@ async function initApp() {
         if (window.AndroidStorage && typeof window.AndroidStorage.enableRealtimeAudioMode === 'function') {
           try {
             window.AndroidStorage.enableRealtimeAudioMode();
-          } catch (e) {}
+          } catch (e) { }
         }
         audioEngine.setLatencyOffset(audioEngine.latencyOffsetMs);
 
@@ -1811,10 +1865,10 @@ async function initApp() {
     if (lyricsContainer) lyricsContainer.classList.add('ambient-active');
     updateFloatingMiniPlayer();
     if (window.AndroidStorage && typeof window.AndroidStorage.setBackgroundAudioActive === 'function') {
-      try { window.AndroidStorage.setBackgroundAudioActive(true); } catch (e) {}
+      try { window.AndroidStorage.setBackgroundAudioActive(true); } catch (e) { }
     }
     if (currentSong && window.AndroidStorage && typeof window.AndroidStorage.updateMediaNotification === 'function') {
-      try { window.AndroidStorage.updateMediaNotification(currentSong.title || 'SUSHEE Karaoke', formatArtistDisplay(currentSong.artist), true); } catch (e) {}
+      try { window.AndroidStorage.updateMediaNotification(currentSong.title || 'SUSHEE Karaoke', formatArtistDisplay(currentSong.artist), true); } catch (e) { }
     }
     if (currentSong) setupMediaSession(currentSong);
   });
@@ -1825,10 +1879,10 @@ async function initApp() {
     if (lyricsContainer) lyricsContainer.classList.remove('ambient-active');
     updateFloatingMiniPlayer();
     if (window.AndroidStorage && typeof window.AndroidStorage.setBackgroundAudioActive === 'function') {
-      try { window.AndroidStorage.setBackgroundAudioActive(false); } catch (e) {}
+      try { window.AndroidStorage.setBackgroundAudioActive(false); } catch (e) { }
     }
     if (currentSong && window.AndroidStorage && typeof window.AndroidStorage.updateMediaNotification === 'function') {
-      try { window.AndroidStorage.updateMediaNotification(currentSong.title || 'SUSHEE Karaoke', formatArtistDisplay(currentSong.artist), false); } catch (e) {}
+      try { window.AndroidStorage.updateMediaNotification(currentSong.title || 'SUSHEE Karaoke', formatArtistDisplay(currentSong.artist), false); } catch (e) { }
     }
   });
 
@@ -1848,7 +1902,7 @@ async function initApp() {
     if (typeof updatePlaylistPlayButtonUI === 'function') updatePlaylistPlayButtonUI(false);
     updateKaraokeUIState(false);
     if (window.AndroidStorage && typeof window.AndroidStorage.setBackgroundAudioActive === 'function') {
-      try { window.AndroidStorage.setBackgroundAudioActive(false); } catch (e) {}
+      try { window.AndroidStorage.setBackgroundAudioActive(false); } catch (e) { }
     }
 
     if (recorder && recorder.isRecording) {
@@ -2038,7 +2092,8 @@ async function initApp() {
       }
       if (toggleArrow) {
         toggleArrow.innerHTML = '<polyline points="6 9 12 15 18 9"/>';
-      }      // Ensure saved or active subtab is visible
+      }
+      // Ensure saved or active subtab is visible
       const savedSubtab = localStorage.getItem('sushee_active_studio_subtab');
       const activeTabBtn = document.querySelector('.studio-subtab.active');
       const currentTab = savedSubtab || (activeTabBtn ? activeTabBtn.getAttribute('data-subtab') : 'vocalTab');
@@ -2048,7 +2103,7 @@ async function initApp() {
       setTimeout(() => {
         try {
           container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        } catch (e) {}
+        } catch (e) { }
       }, 80);
       if (savePref) localStorage.setItem('sushee_studio_settings_open', '1');
     } else {
@@ -2089,7 +2144,7 @@ async function initApp() {
     if (!tabName) return;
     try {
       localStorage.setItem('sushee_active_studio_subtab', tabName);
-    } catch (e) {}
+    } catch (e) { }
     document.querySelectorAll('.studio-subtab').forEach(btn => {
       const match = btn.getAttribute('data-subtab') === tabName;
       if (match) {
@@ -2264,7 +2319,7 @@ async function initApp() {
         try {
           audioElement.preservesPitch = true;
           audioElement.playbackRate = val;
-        } catch (e) {}
+        } catch (e) { }
       }
       updateSpeedBadge(val);
     });
@@ -2481,7 +2536,7 @@ async function initApp() {
       gain.connect(ctx.destination);
       osc.start(when);
       osc.stop(when + 0.05);
-    } catch (e) {}
+    } catch (e) { }
   }
 
   function finishTapCalibration() {
@@ -2525,7 +2580,7 @@ async function initApp() {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       const ctx = (audioEngine && audioEngine.audioCtx) ? audioEngine.audioCtx : new AudioCtx();
       if (ctx.state === 'suspended') {
-        try { await ctx.resume(); } catch (e) {}
+        try { await ctx.resume(); } catch (e) { }
       }
 
       const TOTAL_BEATS = 6;
@@ -2629,8 +2684,8 @@ async function initApp() {
         if (calibrateRadar) calibrateRadar.classList.remove('pulsing');
         if (calibrateStatusTitle) calibrateStatusTitle.textContent = window.i18n.t('calibrateSuccess');
         if (calibrateStatusDesc) {
-          calibrateStatusDesc.textContent = result.mode === 'acoustic' 
-            ? window.i18n.t('detectedAcoustic') 
+          calibrateStatusDesc.textContent = result.mode === 'acoustic'
+            ? window.i18n.t('detectedAcoustic')
             : window.i18n.t('detectedHardware');
         }
 
@@ -3197,10 +3252,10 @@ async function initApp() {
       try {
         const u = new URL(hostingService.serverUrl);
         hostDisplay = u.hostname;
-      } catch (e) {}
+      } catch (e) { }
 
-      const statusTag = isConnected ? 
-        `<strong id="cloudStatusText" style="color: #00f2fe; font-weight: 700;">Terhubung</strong>` : 
+      const statusTag = isConnected ?
+        `<strong id="cloudStatusText" style="color: #00f2fe; font-weight: 700;">Terhubung</strong>` :
         (songCount > 0 ? `<strong id="cloudStatusText" style="color: #f59e0b; font-weight: 600;">Mode Cache Offline</strong>` : `<strong id="cloudStatusText" style="color: #00f2fe; font-weight: 600;">Menghubungkan...</strong>`);
 
       const songTag = songCount > 0 ? ` (${songCount} Lagu)` : '';
@@ -3222,7 +3277,7 @@ async function initApp() {
   // Immediately update status with current server connection state
   updateServerStatusUI(hostingService.isConnected, (hostingService.cachedSongs && hostingService.cachedSongs.length) || 0);
 
-    // --- SONGS PLAYLIST CONTROLLER (DEDICATED SEQUENTIAL, SHUFFLE & REPEAT PLAYBACK) ---
+  // --- SONGS PLAYLIST CONTROLLER (DEDICATED SEQUENTIAL, SHUFFLE & REPEAT PLAYBACK) ---
   let songsPlaylist = [];
   try {
     const saved = localStorage.getItem('sushee_songs_playlist') || localStorage.getItem('sushee_cloud_playlist');
@@ -3242,7 +3297,7 @@ async function initApp() {
     if (savedMode && ['sequential', 'shuffle', 'repeat_one'].includes(savedMode)) {
       playlistPlaybackMode = savedMode;
     }
-  } catch (e) {}
+  } catch (e) { }
 
   function updateSongsPlaylistBadgeUI() {
     const badge = document.getElementById('songsPlaylistCountBadge');
@@ -3279,7 +3334,7 @@ async function initApp() {
     playlistPlaybackMode = mode;
     try {
       localStorage.setItem('sushee_playlist_mode', mode);
-    } catch (e) {}
+    } catch (e) { }
     updatePlaylistModeUI();
 
     let toastText = 'Mode: Putar Berurut';
@@ -3298,15 +3353,15 @@ async function initApp() {
     try {
       localStorage.setItem('sushee_songs_playlist', JSON.stringify(songsPlaylist));
       localStorage.setItem('sushee_cloud_playlist', JSON.stringify(songsPlaylist));
-    } catch (e) {}
+    } catch (e) { }
     updateSongsPlaylistBadgeUI();
   }
 
   function updatePlaylistPlayButtonUI(isPlaying) {
     const playIcon = document.getElementById('songsPlaylistPlayIcon');
     const miniIcon = document.getElementById('miniPlayIcon');
-    const iconHtml = isPlaying ? 
-      '<rect x="5" y="4" width="4" height="16"/><rect x="15" y="4" width="4" height="16"/>' : 
+    const iconHtml = isPlaying ?
+      '<rect x="5" y="4" width="4" height="16"/><rect x="15" y="4" width="4" height="16"/>' :
       '<polygon points="5 3 19 12 5 21 5 3"/>';
 
     if (playIcon) playIcon.innerHTML = iconHtml;
@@ -3351,7 +3406,7 @@ async function initApp() {
     const title = typeof songOrId === 'object' ? songOrId.title : null;
     const artist = typeof songOrId === 'object' ? songOrId.artist : null;
     return songsPlaylist.some(s => s && (
-      (id && (s.id === id || s.cloudId === id || s.filename === id)) || 
+      (id && (s.id === id || s.cloudId === id || s.filename === id)) ||
       (title && s.title && s.title.toLowerCase() === title.toLowerCase() && (!artist || s.artist === artist)) ||
       (typeof songOrId === 'string' && s.title && s.title.toLowerCase() === songOrId.toLowerCase())
     ));
@@ -3367,9 +3422,9 @@ async function initApp() {
       const card = btn.closest('.song-card');
       const songId = btn.getAttribute('data-song-id') || btn.getAttribute('data-cloud-id') || (card && (card.getAttribute('data-song-id') || card.getAttribute('data-cloud-id')));
       const cardTitle = card ? card.querySelector('.song-card-title')?.textContent?.trim() : null;
-      
+
       const inPlaylist = songsPlaylist.some(s => s && (
-        (songId && (s.id === songId || s.cloudId === songId || s.filename === songId)) || 
+        (songId && (s.id === songId || s.cloudId === songId || s.filename === songId)) ||
         (cardTitle && s.title && s.title.toLowerCase() === cardTitle.toLowerCase())
       ));
 
@@ -3397,7 +3452,7 @@ async function initApp() {
         event.preventDefault();
         event.stopPropagation();
         if (event.stopImmediatePropagation) event.stopImmediatePropagation();
-      } catch (e) {}
+      } catch (e) { }
     }
     const song = findSongById(songOrId, (event && event.target) ? event.target.closest('.song-card') : null);
     if (!song) {
@@ -3765,10 +3820,10 @@ async function initApp() {
             <div class="song-badges">
               <span class="badge badge-format">${song.format || '.MP3'}</span>
               <span class="badge" style="background: rgba(0, 242, 254, 0.15); color: var(--color-cyan); border: 1px solid rgba(0, 242, 254, 0.3);">PHP Hosting</span>
-              ${song.hasLyrics ? 
-                `<span class="badge badge-lyrics"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> ${hasLyricsLabel}</span>` : 
-                `<span class="badge badge-no-lyrics">${noLyricsLabel}</span>`
-              }
+              ${song.hasLyrics ?
+          `<span class="badge badge-lyrics"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> ${hasLyricsLabel}</span>` :
+          `<span class="badge badge-no-lyrics">${noLyricsLabel}</span>`
+        }
               ${(offlineManager && offlineManager.isOffline(song.id)) ? `<span class="badge badge-offline">✓ Offline</span>` : ''}
             </div>
           </div>
@@ -4016,7 +4071,7 @@ async function initApp() {
       ]),
       new Promise(resolve => setTimeout(resolve, 500))
     ]);
-  } catch (e) {}
+  } catch (e) { }
 
   // 2. Immediate First Render from Local & Cached Data
   renderSongList();

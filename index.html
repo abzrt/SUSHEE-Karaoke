@@ -947,6 +947,9 @@
               <span class="about-chip">☁️ Offline Ready</span>
               <span class="about-chip">🎧 BT Sync</span>
             </div>
+            <button type="button" class="btn btn-secondary btn-sm" id="btnCheckAppUpdate" style="width: 100%; margin-top: 12px; justify-content: center; gap: 6px;" onclick="window.checkAppUpdate && window.checkAppUpdate(true)">
+              🔄 Cek Pembaruan Aplikasi
+            </button>
           </div>
         </div>
       </section>
@@ -1401,6 +1404,39 @@ echo json_encode(['status' => 'success', 'server' => 'SUSHEE PHP Hosting Server'
       </div>
     </div>
 
+    <!-- Hybrid Auto-Update Modal (PHP Hosting + GitHub Releases) -->
+    <div class="modal-overlay" id="appUpdateModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title">✨ Pembaruan Tersedia</h3>
+          <button class="modal-close" onclick="document.getElementById('appUpdateModal').classList.remove('open')">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div style="padding-top: 4px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px;">
+            <span style="font-size: 0.92rem; font-weight: 800; color: #fff;" id="updateVersionLabel">v1.2.0 → v1.2.1</span>
+            <span class="about-version-pill" id="updateSourceBadge">PHP Hosting</span>
+          </div>
+          <pre id="updateReleaseNotes" style="white-space: pre-wrap; font-family: inherit; font-size: 0.78rem; color: var(--text-secondary); background: rgba(255,255,255,0.04); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 10px; max-height: 150px; overflow-y: auto; margin-bottom: 12px;"></pre>
+          <div id="updateProgressWrap" style="display: none; margin-bottom: 12px;">
+            <div style="height: 8px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden;">
+              <div id="updateProgressBar" style="width: 0%; height: 100%; background: var(--grad-primary); transition: width 0.2s ease;"></div>
+            </div>
+            <p id="updateProgressText" style="font-size: 0.74rem; color: var(--color-cyan); margin-top: 6px; text-align: center;">Mengunduh...</p>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button type="button" class="btn btn-primary" id="btnStartAppUpdate" style="flex: 1;" onclick="window.startAppUpdateNow && window.startAppUpdateNow()">
+              ⬇️ Update Sekarang
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('appUpdateModal').classList.remove('open')">
+              Nanti
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- App Scripts in Correct Dependency Order (lame.min.js is lazy-loaded on MP3 export) -->
@@ -1419,6 +1455,7 @@ echo json_encode(['status' => 'success', 'server' => 'SUSHEE PHP Hosting Server'
   <script src="js/library-prefs.js?v=touch_fix_v3_1792439900000"></script>
   <script src="js/lrc-editor.js?v=touch_fix_v3_1792439900000"></script>
   <script src="js/score-card.js?v=touch_fix_v3_1792439900000"></script>
+  <script src="js/auto-updater.js?v=touch_fix_v3_1792439900000"></script>
   <script src="js/app.js?v=touch_fix_v3_1792439900000"></script>
 
 </body>

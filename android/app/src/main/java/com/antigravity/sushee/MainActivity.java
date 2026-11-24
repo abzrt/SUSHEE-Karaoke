@@ -273,6 +273,107 @@ public class MainActivity extends BridgeActivity {
         }
 
         @JavascriptInterface
+        public String getAppVersionName() {
+            try {
+                android.content.pm.PackageInfo info = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
+                return info.versionName != null ? info.versionName : "1.2.0";
+            } catch (Exception e) {
+                return "1.2.0";
+            }
+        }
+
+        @JavascriptInterface
+        public int getAppVersionCode() {
+            try {
+                android.content.pm.PackageInfo info = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    return (int) info.getLongVersionCode();
+                }
+                return info.versionCode;
+            } catch (Exception e) {
+                return 8;
+            }
+        }
+
+        @JavascriptInterface
+        public void downloadAndInstallApk(final String apkUrl) {
+            if (apkUrl == null || apkUrl.trim().isEmpty()) return;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.getPackageManager().canRequestPackageInstalls()) {
+                showToastOnUiThread("Izinkan pemasangan aplikasi dari SUSHEE, lalu tekan Update lagi.");
+                MainActivity.this.runOnUiThread(() -> {
+                    try {
+                        android.content.Intent settingsIntent = new android.content.Intent(
+                            android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                            Uri.parse("package:" + context.getPackageName())
+                        );
+                        startActivity(settingsIntent);
+                    } catch (Exception ignored) {}
+                });
+                return;
+            }
+            new Thread(() -> {
+                try {
+                    notifyUpdateProgress(5, "Menghubungkan ke server pembaruan...");
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection) new java.net.URL(apkUrl).openConnection();
+                    conn.setInstanceFollowRedirects(true);
+                    conn.setConnectTimeout(15000);
+                    conn.setReadTimeout(30000);
+                    conn.connect();
+                    if (conn.getResponseCode() != java.net.HttpURLConnection.HTTP_OK) {
+                        throw new Exception("HTTP " + conn.getResponseCode());
+                    }
+                    int total = conn.getContentLength();
+                    File apkFile = new File(context.getCacheDir(), "sushee_update.apk");
+                    try (java.io.InputStream is = conn.getInputStream();
+                         FileOutputStream fos = new FileOutputStream(apkFile)) {
+                        byte[] buf = new byte[16384];
+                        int read;
+                        long downloaded = 0;
+                        int lastPct = 5;
+                        while ((read = is.read(buf)) != -1) {
+                            fos.write(buf, 0, read);
+                            downloaded += read;
+                            if (total > 0) {
+                                int pct = Math.min(99, (int) ((downloaded * 100L) / total));
+                                if (pct >= lastPct + 3) {
+                                    lastPct = pct;
+                                    notifyUpdateProgress(pct, "Mengunduh pembaruan... " + pct + "%");
+                                }
+                            }
+                        }
+                        fos.flush();
+                    }
+                    notifyUpdateProgress(100, "Membuka installer Android...");
+                    Uri contentUri = androidx.core.content.FileProvider.getUriForFile(
+                        context,
+                        context.getPackageName() + ".fileprovider",
+                        apkFile
+                    );
+                    android.content.Intent installIntent = new android.content.Intent(android.content.Intent.ACTION_VIEW);
+                    installIntent.setDataAndType(contentUri, "application/vnd.android.package-archive");
+                    installIntent.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION | android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                    MainActivity.this.runOnUiThread(() -> startActivity(installIntent));
+                } catch (Exception e) {
+                    Log.e(TAG, "APK auto-update failed", e);
+                    notifyUpdateProgress(-1, "Gagal mengunduh: " + e.getMessage());
+                    showToastOnUiThread("Gagal mengunduh pembaruan: " + e.getMessage());
+                }
+            }).start();
+        }
+
+        private void notifyUpdateProgress(final int percent, final String message) {
+            MainActivity.this.runOnUiThread(() -> {
+                try {
+                    WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+                    if (webView != null) {
+                        String safeMsg = (message != null ? message : "").replace("'", "\\'");
+                        webView.evaluateJavascript("if (window.onApkDownloadProgress) { window.onApkDownloadProgress(" + percent + ", '" + safeMsg + "'); }", null);
+                    }
+                } catch (Exception ignored) {}
+            });
+        }
+
+        @JavascriptInterface
         public void exitApp() {
             MainActivity.this.runOnUiThread(MainActivity.this::finish);
         }
