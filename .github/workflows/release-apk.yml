@@ -65,10 +65,11 @@ jobs:
       - name: Accept Android SDK licenses & ensure API 36
         if: steps.meta.outputs.should_release == 'true'
         run: |
-          SDKMGR="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          if [ -x "$SDKMGR" ]; then
+          SDKMGR=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}" -name sdkmanager -type f 2>/dev/null | head -n 1)
+          echo "Found sdkmanager: $SDKMGR"
+          if [ -n "$SDKMGR" ] && [ -x "$SDKMGR" ]; then
             yes | "$SDKMGR" --licenses >/dev/null 2>&1 || true
-            "$SDKMGR" "platforms;android-36" "build-tools;36.0.0" >/dev/null 2>&1 || true
+            "$SDKMGR" "platforms;android-36" "build-tools;36.0.0" || true
           fi
 
       - name: Install Node dependencies
@@ -94,19 +95,27 @@ jobs:
         run: |
           sed -i 's/\r$//' android/gradlew
           chmod +x android/gradlew
+          set +e
           if [ -n "$SUSHEE_STORE_PASSWORD" ] && [ -n "$SUSHEE_KEY_PASSWORD" ] && [ -f android/app/sushee-release.jks ]; then
             echo "Building SIGNED release APK..."
-            cd android && ./gradlew assembleRelease -x lintVitalRelease --no-daemon
-            cd ..
-            cp android/app/build/outputs/apk/release/app-release.apk "SUSHEE-Karaoke-${RELEASE_TAG}.apk"
-            cp android/app/build/outputs/apk/release/app-release.apk "SUSHEE-Karaoke-Release.apk"
+            (cd android && ./gradlew assembleRelease -x lintVitalRelease --no-daemon) > gradle.log 2>&1
+            STATUS=$?
+            APK_SRC="android/app/build/outputs/apk/release/app-release.apk"
           else
             echo "::warning::SUSHEE_STORE_PASSWORD / SUSHEE_KEY_PASSWORD secrets not set. Falling back to assembleDebug."
-            cd android && ./gradlew assembleDebug --no-daemon
-            cd ..
-            cp android/app/build/outputs/apk/debug/app-debug.apk "SUSHEE-Karaoke-${RELEASE_TAG}.apk"
-            cp android/app/build/outputs/apk/debug/app-debug.apk "SUSHEE-Karaoke-Release.apk"
+            (cd android && ./gradlew assembleDebug --no-daemon) > gradle.log 2>&1
+            STATUS=$?
+            APK_SRC="android/app/build/outputs/apk/debug/app-debug.apk"
           fi
+          set -e
+          tail -n 60 gradle.log
+          if [ "$STATUS" -ne 0 ]; then
+            ERR_LINE=$(grep -E "FAILURE:|What went wrong:|> " gradle.log | tail -n 5 | tr '\n' ' ')
+            echo "::error::Gradle failed: ${ERR_LINE}"
+            exit "$STATUS"
+          fi
+          cp "$APK_SRC" "SUSHEE-Karaoke-${RELEASE_TAG}.apk"
+          cp "$APK_SRC" "SUSHEE-Karaoke-Release.apk"
 
       - name: Publish GitHub Release with APK
         if: steps.meta.outputs.should_release == 'true'
