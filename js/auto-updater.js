@@ -3,10 +3,13 @@
  */
 class AutoUpdater {
   constructor(options = {}) {
-    this.hostingVersionUrl = options.hostingVersionUrl || 'https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/version.json';
+    this.hostingVersionUrls = options.hostingVersionUrls || [
+      options.hostingVersionUrl || 'https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/version.json',
+      'https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SONGS/version.json'
+    ];
     this.githubLatestUrl = options.githubLatestUrl || 'https://api.github.com/repos/abzrt/SUSHEE-Karaoke/releases/latest';
-    this.fallbackVersionName = options.versionName || '1.2.0';
-    this.fallbackVersionCode = options.versionCode || 8;
+    this.fallbackVersionName = options.versionName || '1.2.1';
+    this.fallbackVersionCode = options.versionCode || 9;
     this.latestInfo = null;
   }
 
@@ -59,16 +62,20 @@ class AutoUpdater {
   }
 
   async _checkHosting() {
-    const sep = this.hostingVersionUrl.includes('?') ? '&' : '?';
-    const data = await this._fetchJsonWithTimeout(`${this.hostingVersionUrl}${sep}t=${Date.now()}`, 5500);
-    if (!data || !data.versionName || !data.apkUrl) return null;
-    return {
-      versionName: String(data.versionName).replace(/^v/i, ''),
-      versionCode: parseInt(data.versionCode, 10) || 0,
-      downloadUrl: data.apkUrl,
-      releaseNotes: data.releaseNotes || 'Perbaikan performa dan fitur terbaru SUSHEE Karaoke.',
-      source: 'PHP Hosting'
-    };
+    for (const baseUrl of this.hostingVersionUrls) {
+      const sep = baseUrl.includes('?') ? '&' : '?';
+      const data = await this._fetchJsonWithTimeout(`${baseUrl}${sep}t=${Date.now()}`, 5500);
+      if (data && data.versionName && data.apkUrl) {
+        return {
+          versionName: String(data.versionName).replace(/^v/i, ''),
+          versionCode: parseInt(data.versionCode, 10) || 0,
+          downloadUrl: data.apkUrl,
+          releaseNotes: data.releaseNotes || 'Perbaikan performa dan fitur terbaru SUSHEE Karaoke.',
+          source: 'PHP Hosting'
+        };
+      }
+    }
+    return null;
   }
 
   async _checkGitHub() {
@@ -112,9 +119,10 @@ class AutoUpdater {
     }
     this.latestInfo = {
       hasUpdate: false,
+      reachable: Boolean(remote || ghRemote),
       currentVersion: current.versionName,
       latestVersion: (remote || ghRemote || current).versionName,
-      source: remote ? 'PHP Hosting' : (ghRemote ? 'GitHub Releases' : 'Lokal')
+      source: remote ? 'PHP Hosting' : (ghRemote ? 'GitHub Releases' : 'Tidak Terjangkau')
     };
     return this.latestInfo;
   }

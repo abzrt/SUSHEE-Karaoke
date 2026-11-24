@@ -385,23 +385,41 @@ async function initApp() {
 
   async function checkAppUpdate(manual = false) {
     if (!autoUpdater) return;
-    if (manual) showToast('🔄 Memeriksa pembaruan terbaru...', 'info');
-    const info = await autoUpdater.checkForUpdate();
-    if (info && info.hasUpdate) {
-      const lbl = document.getElementById('updateVersionLabel');
-      const src = document.getElementById('updateSourceBadge');
-      const notes = document.getElementById('updateReleaseNotes');
-      const wrap = document.getElementById('updateProgressWrap');
-      const btn = document.getElementById('btnStartAppUpdate');
-      if (lbl) lbl.textContent = `v${info.currentVersion} → v${info.versionName}`;
-      if (src) src.textContent = info.source || 'Online';
-      if (notes) notes.textContent = info.releaseNotes || 'Pembaruan tersedia.';
-      if (wrap) wrap.style.display = 'none';
-      if (btn) btn.disabled = false;
-      const modal = document.getElementById('appUpdateModal');
-      if (modal) modal.classList.add('open');
-    } else if (manual) {
-      showToast(`✅ Aplikasi sudah versi terbaru (v${info ? info.currentVersion : '1.2.0'})`, 'success');
+    const checkBtn = document.getElementById('btnCheckAppUpdate');
+    if (manual) {
+      if (checkBtn) {
+        checkBtn.disabled = true;
+        checkBtn.textContent = '⏳ Memeriksa pembaruan...';
+      }
+      showToast('🔄 Memeriksa pembaruan terbaru...', 'info');
+    }
+    try {
+      const info = await autoUpdater.checkForUpdate();
+      if (info && info.hasUpdate) {
+        const lbl = document.getElementById('updateVersionLabel');
+        const src = document.getElementById('updateSourceBadge');
+        const notes = document.getElementById('updateReleaseNotes');
+        const wrap = document.getElementById('updateProgressWrap');
+        const btn = document.getElementById('btnStartAppUpdate');
+        if (lbl) lbl.textContent = `v${info.currentVersion} → v${info.versionName}`;
+        if (src) src.textContent = info.source || 'Online';
+        if (notes) notes.textContent = info.releaseNotes || 'Pembaruan tersedia.';
+        if (wrap) wrap.style.display = 'none';
+        if (btn) btn.disabled = false;
+        const modal = document.getElementById('appUpdateModal');
+        if (modal) modal.classList.add('open');
+      } else if (manual) {
+        if (info && info.reachable === false) {
+          showToast('⚠️ Server update belum tersedia (pastikan version.json di hosting / GitHub Release publik).', 'error');
+        } else {
+          showToast(`✅ Aplikasi sudah versi terbaru (v${info ? info.currentVersion : '1.2.1'})`, 'success');
+        }
+      }
+    } finally {
+      if (manual && checkBtn) {
+        checkBtn.disabled = false;
+        checkBtn.textContent = '🔄 Cek Pembaruan Aplikasi';
+      }
     }
   }
   window.checkAppUpdate = checkAppUpdate;
