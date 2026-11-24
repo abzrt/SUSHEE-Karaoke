@@ -49,11 +49,11 @@ jobs:
           fi
           echo "should_release=true" >> $GITHUB_OUTPUT
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         if: steps.meta.outputs.should_release == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Setup Java 21 (Temurin)
         if: steps.meta.outputs.should_release == 'true'
