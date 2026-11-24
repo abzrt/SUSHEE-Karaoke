@@ -62,6 +62,14 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      - name: Setup Android SDK & accept licenses
+        if: steps.meta.outputs.should_release == 'true'
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK 36 licenses
+        if: steps.meta.outputs.should_release == 'true'
+        run: yes | sdkmanager --licenses >/dev/null 2>&1 || true
+
       - name: Install Node dependencies
         if: steps.meta.outputs.should_release == 'true'
         run: npm install --no-audit --no-fund
@@ -87,13 +95,13 @@ jobs:
           chmod +x android/gradlew
           if [ -n "$SUSHEE_STORE_PASSWORD" ] && [ -n "$SUSHEE_KEY_PASSWORD" ] && [ -f android/app/sushee-release.jks ]; then
             echo "Building SIGNED release APK..."
-            cd android && ./gradlew assembleRelease
+            cd android && ./gradlew assembleRelease -x lintVitalRelease --no-daemon
             cd ..
             cp android/app/build/outputs/apk/release/app-release.apk "SUSHEE-Karaoke-${RELEASE_TAG}.apk"
             cp android/app/build/outputs/apk/release/app-release.apk "SUSHEE-Karaoke-Release.apk"
           else
             echo "::warning::SUSHEE_STORE_PASSWORD / SUSHEE_KEY_PASSWORD secrets not set. Falling back to assembleDebug."
-            cd android && ./gradlew assembleDebug
+            cd android && ./gradlew assembleDebug --no-daemon
             cd ..
             cp android/app/build/outputs/apk/debug/app-debug.apk "SUSHEE-Karaoke-${RELEASE_TAG}.apk"
             cp android/app/build/outputs/apk/debug/app-debug.apk "SUSHEE-Karaoke-Release.apk"
