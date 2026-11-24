@@ -38,6 +38,7 @@ public class MainActivity extends BridgeActivity {
     private static final int PERMISSION_REQ_CODE = 1001;
     private static final String TAG = "SUSHEE_MAIN";
     private StorageBridge storageBridge;
+    private volatile boolean backgroundAudioActive = false;
 
     public class StorageBridge {
         private final Context context;
@@ -198,7 +199,9 @@ public class MainActivity extends BridgeActivity {
 
         @JavascriptInterface
         public void setBackgroundAudioActive(final boolean active) {
+            backgroundAudioActive = active;
             try {
+                android.content.Intent serviceIntent = new android.content.Intent(context, AudioPlaybackService.class);
                 if (active) {
                     if (wakeLock == null) {
                         PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
@@ -211,11 +214,19 @@ public class MainActivity extends BridgeActivity {
                         wakeLock.acquire(180 * 60 * 1000L); // 3 hours timeout safety
                         Log.d(TAG, "Background audio WakeLock acquired");
                     }
+                    try {
+                        ContextCompat.startForegroundService(context, serviceIntent);
+                    } catch (Exception fgErr) {
+                        Log.w(TAG, "Foreground service start notice: " + fgErr.getMessage());
+                    }
                 } else {
                     if (wakeLock != null && wakeLock.isHeld()) {
                         wakeLock.release();
                         Log.d(TAG, "Background audio WakeLock released");
                     }
+                    try {
+                        context.stopService(serviceIntent);
+                    } catch (Exception ignored) {}
                 }
             } catch (Exception e) {
                 Log.w(TAG, "WakeLock management error: " + e.getMessage());
@@ -367,10 +378,13 @@ public class MainActivity extends BridgeActivity {
                 }
             }
 
-            // Storage & Music/Audio Access
+            // Storage & Music/Audio Access + Background Playback Notification (Android 13+)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // Android 13+
                 if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                     permissions.add(Manifest.permission.READ_MEDIA_AUDIO);
+                }
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    permissions.add(Manifest.permission.POST_NOTIFICATIONS);
                 }
             } else {
                 if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
@@ -433,7 +447,10 @@ public class MainActivity extends BridgeActivity {
         try {
             WebView webView = getBridge() != null ? getBridge().getWebView() : null;
             if (webView != null) {
-                // Resume JavaScript timers when screen is locked or app is in background so audio playback continues uninterrupted
+                // Keep WebView & JS timers running when switching apps or going to homescreen
+                if (backgroundAudioActive) {
+                    webView.onResume();
+                }
                 webView.resumeTimers();
             }
         } catch (Exception ignored) {}
@@ -445,6 +462,9 @@ public class MainActivity extends BridgeActivity {
         try {
             WebView webView = getBridge() != null ? getBridge().getWebView() : null;
             if (webView != null) {
+                if (backgroundAudioActive) {
+                    webView.onResume();
+                }
                 webView.resumeTimers();
             }
         } catch (Exception ignored) {}
@@ -453,6 +473,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onDestroy() {
         try {
+            stopService(new android.content.Intent(this, AudioPlaybackService.class));
             if (storageBridge != null) {
                 storageBridge.releaseWakeLock();
             }
