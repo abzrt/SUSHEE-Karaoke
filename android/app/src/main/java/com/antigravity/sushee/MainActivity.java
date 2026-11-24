@@ -275,26 +275,13 @@ public class MainActivity extends BridgeActivity {
                 }
             }
         });
-        Window window = getWindow();
-        if (window != null) {
-            WindowCompat.setDecorFitsSystemWindows(window, true);
-            window.getDecorView().setBackgroundColor(Color.parseColor("#07080d"));
-            window.setStatusBarColor(Color.parseColor("#07080d"));
-            window.setNavigationBarColor(Color.parseColor("#0a0c14"));
+        applyDarkSystemBarsWithWhiteIcons();
 
-            WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, window.getDecorView());
-            if (controller != null) {
-                // Dark status bar background (#07080d) requires crisp white icons (lightStatusBar = false)
-                controller.setAppearanceLightStatusBars(false);
-                controller.setAppearanceLightNavigationBars(false);
-                controller.show(WindowInsetsCompat.Type.statusBars());
-                controller.show(WindowInsetsCompat.Type.navigationBars());
-            }
-        }
-
-        // Ensure zero inset padding so the app sits flush between status bar and phone navigation bar without gaps
+        // Respect system bar insets on Android 15/16 (targetSdk 36) so WebView never overlaps status bar icons
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content), (view, windowInsets) -> {
-            view.setPadding(0, 0, 0, 0);
+            androidx.core.graphics.Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            view.setBackgroundColor(Color.parseColor("#07080d"));
             return windowInsets;
         });
 
@@ -313,6 +300,55 @@ public class MainActivity extends BridgeActivity {
 
         // Safely request permissions after window is rendered to prevent UI lockup
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::requestAppPermissions, 600);
+    }
+
+    private void applyDarkSystemBarsWithWhiteIcons() {
+        try {
+            Window window = getWindow();
+            if (window == null) return;
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            WindowCompat.setDecorFitsSystemWindows(window, true);
+            window.getDecorView().setBackgroundColor(Color.parseColor("#07080d"));
+            window.setStatusBarColor(Color.parseColor("#07080d"));
+            window.setNavigationBarColor(Color.parseColor("#0a0c14"));
+
+            WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, window.getDecorView());
+            if (controller != null) {
+                // Dark status bar (#07080d) requires crisp WHITE icons (lightStatusBar = false)
+                controller.setAppearanceLightStatusBars(false);
+                controller.setAppearanceLightNavigationBars(false);
+                controller.show(WindowInsetsCompat.Type.statusBars());
+                controller.show(WindowInsetsCompat.Type.navigationBars());
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                android.view.WindowInsetsController nativeController = window.getInsetsController();
+                if (nativeController != null) {
+                    nativeController.setSystemBarsAppearance(
+                        0,
+                        android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                            | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+                    );
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "System bar appearance setup warning", e);
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        applyDarkSystemBarsWithWhiteIcons();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            applyDarkSystemBarsWithWhiteIcons();
+        }
     }
 
     public void requestAppPermissions() {
