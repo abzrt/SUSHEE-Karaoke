@@ -364,7 +364,7 @@ async function initApp() {
   setTimeout(updateOfflineStorageBadgeUI, 600);
 
   // --- HYBRID IN-APP AUTO-UPDATER (PHP Hosting version.json + GitHub Releases) ---
-  const autoUpdater = (typeof AutoUpdater === 'function') ? new AutoUpdater({ versionName: '1.2.0', versionCode: 8 }) : null;
+  const autoUpdater = (typeof AutoUpdater === 'function') ? new AutoUpdater({ versionName: '1.2.1', versionCode: 9 }) : null;
   window.autoUpdater = autoUpdater;
 
   window.onApkDownloadProgress = function(percent, message) {

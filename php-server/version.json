@@ -1,6 +1,6 @@
 {
-  "versionName": "1.2.0",
-  "versionCode": 8,
+  "versionName": "1.2.1",
+  "versionCode": 9,
   "apkUrl": "https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SUSHEE-Karaoke-Release.apk",
   "releaseNotes": "- Karaoke Sweep Fill, Countdown Intro & tombol Lewati Intro\n- 4 Pilihan Tema Warna (Cyan Neon, Rose Stage, VIP Gold, Emerald)\n- Favorit, Riwayat, Mode Duet, Pembuat Lirik Tap-to-Sync & Kartu Skor PNG\n- Kontrol Putar/Jeda/Berikutnya di notifikasi & layar kunci Android\n- Hybrid Auto-Update otomatis (PHP Hosting + GitHub Releases)"
 }
