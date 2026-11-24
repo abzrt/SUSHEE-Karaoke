@@ -4022,8 +4022,13 @@ select.form-input:disabled {
 }
 .btn-modal-share:active { transform: scale(0.97); }
 .btn-share-rec {
-  color: var(--color-cyan) !important;
-  border-color: rgba(0, 242, 254, 0.35) !important;
+  background: rgba(139, 92, 246, 0.15) !important;
+  color: #a78bfa !important;
+  border: 1px solid rgba(139, 92, 246, 0.42) !important;
+}
+.btn-share-rec:hover, .btn-share-rec:active {
+  background: rgba(139, 92, 246, 0.28) !important;
+  border-color: rgba(167, 139, 250, 0.7) !important;
 }
 
 /* v1.2.0 Pro UX: Karaoke Sweep, Ambient Glow, Countdown, Skip Prelude, Focus Mode, Duet, Favorites, Mini Player, Score Card & LRC Editor */
