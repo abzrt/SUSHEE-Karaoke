@@ -62,13 +62,14 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Setup Android SDK & accept licenses
+      - name: Accept Android SDK licenses & ensure API 36
         if: steps.meta.outputs.should_release == 'true'
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android SDK 36 licenses
-        if: steps.meta.outputs.should_release == 'true'
-        run: yes | sdkmanager --licenses >/dev/null 2>&1 || true
+        run: |
+          SDKMGR="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ -x "$SDKMGR" ]; then
+            yes | "$SDKMGR" --licenses >/dev/null 2>&1 || true
+            "$SDKMGR" "platforms;android-36" "build-tools;36.0.0" >/dev/null 2>&1 || true
+          fi
 
       - name: Install Node dependencies
         if: steps.meta.outputs.should_release == 'true'
