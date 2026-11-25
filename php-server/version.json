@@ -1,6 +1,6 @@
 {
-  "versionName": "1.2.3",
-  "versionCode": 11,
+  "versionName": "1.2.4",
+  "versionCode": 12,
   "apkUrl": "https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SUSHEE-Karaoke-Release.apk",
-  "releaseNotes": "- Dukungan Dynamic Island / Live Updates (Android 16/17, Now Bar, Hyper Island, Live Alerts) via Native MediaSession & MediaStyle\n- Kontrol Sebelumnya, Putar/Jeda, Berikutnya dari kapsul status bar, layar kunci & headset Bluetooth\n- Pencarian judul & penyanyi otomatis realtime (iTunes, YouTube Music, LRCLIB)\n- Hybrid Auto-Update otomatis (PHP Hosting + GitHub Releases)"
+  "releaseNotes": "- Tampilkan logo resmi SUSHEE Karaoke di Dynamic Island / Live Updates & layar kunci setiap kali memutar lagu\n- Dukungan Dynamic Island / Live Updates (Android 16/17, Now Bar, Hyper Island, Live Alerts) via Native MediaSession & MediaStyle\n- Pencarian judul & penyanyi otomatis realtime (iTunes, YouTube Music, LRCLIB)\n- Hybrid Auto-Update otomatis (PHP Hosting + GitHub Releases)"
 }
