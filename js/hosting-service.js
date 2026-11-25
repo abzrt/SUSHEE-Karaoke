@@ -33,6 +33,20 @@ class HostingServerService {
     this.serverUrl = this.cleanUrl(savedUrl);
     this.cachedSongs = [];
     this.isConnected = false;
+    this._rtMetaCache = {};
+    this._rtInFlight = new Set();
+
+    try {
+      const rtCached = localStorage.getItem('sushee_rt_meta_cache_v1');
+      if (rtCached) {
+        const parsedRt = JSON.parse(rtCached);
+        if (parsedRt && typeof parsedRt === 'object') this._rtMetaCache = parsedRt;
+      }
+      if (localStorage.getItem('sushee_meta_cache_v') !== '2') {
+        localStorage.removeItem('sushee_cached_hosting_songs');
+        localStorage.setItem('sushee_meta_cache_v', '2');
+      }
+    } catch (e) {}
 
     // Load instantly from persistent cache if available
     try {
@@ -67,6 +81,12 @@ class HostingServerService {
    */
   cleanSongMetadata(song) {
     if (!song) return song;
+    const rtKey = song.id || song.filename;
+    const rtHit = rtKey && this._rtMetaCache && this._rtMetaCache[rtKey];
+    if (rtHit && rtHit.title && rtHit.artist) {
+      return { ...song, title: rtHit.title, artist: rtHit.artist };
+    }
+
     let title = (song.title || '').trim();
     let artist = (song.artist || '').trim();
     const rawFile = (song.filename || '').trim();
@@ -74,9 +94,29 @@ class HostingServerService {
     const stemPattern = /(_+(bs_roformer|roformer|mel_band|mdx|demucs|mt_\d+|mt\s*\d+|demon[-_]voices|other|vocals[-_]back|vocals|instrumental|karaoke|drums|bass|lead|backing|stem)[^.]*)/gi;
     const titleStemPattern = /\b(bs\s+roformer(\s+mt\s*\d+)?|roformer|other|vocals\s+back|instrumental|karaoke\s+track)\b/gi;
 
-    const needsCleaning = (artist === 'Karaoke Track' || !artist) || titleStemPattern.test(title) || stemPattern.test(rawFile);
+    const hasBadArtist = !artist || artist === 'Karaoke Track' || /^p\s+o\s+m\s+e$/i.test(artist);
+    const hasBadTitle = !title || titleStemPattern.test(title) || stemPattern.test(title);
+    const needsCleaning = hasBadArtist || hasBadTitle;
 
     if (needsCleaning) {
+      let resolvedFromLrc = false;
+      if (song.lrcUrl) {
+        try {
+          const lrcBase = decodeURIComponent(song.lrcUrl.split('/').pop() || '').replace(/\.lrc$/i, '').replace(/\s*\(\d+\)$/, '').trim();
+          if (lrcBase.includes(' - ')) {
+            const lrcParts = lrcBase.split(' - ');
+            const lrcTitle = lrcParts[0].trim();
+            const lrcArtist = lrcParts.slice(1).join(' - ').trim();
+            if (lrcTitle && lrcArtist && !/^p\s+o\s+m\s+e$/i.test(lrcArtist)) {
+              title = lrcTitle;
+              artist = lrcArtist;
+              resolvedFromLrc = true;
+            }
+          }
+        } catch (e) {}
+      }
+
+      if (!resolvedFromLrc) {
       let base = rawFile ? rawFile.replace(/\.[^/.]+$/, '') : title;
       base = base.replace(stemPattern, '');
       base = base.replace(/(_+other|_vocals-back|_vocals|_instrumental|_karaoke|-karaoke|\(karaoke\)|\(instrumental\)|\(\d+\))$/gi, '');
@@ -92,12 +132,13 @@ class HostingServerService {
           'muse', 'paramore', 'seventeen', 'sideline', 'wind walkers', 'evanescence',
           'charlie puth', 'bad omens', 'dark sarah', 'harra', 'ira green', 'karmin',
           'ophidian rite', 'rain division', 'scary pockets', 'shadow of intent',
-          'the pretty wild', 'within temptation', 'xandria', 'zhiend', 'last goal! party',
+          'the pretty wild', 'within temptation', 'xandria', 'zhiend', 'last goal! party', 'last goal party',
           'dayseeker', 'lifehouse', 'overgrown', 'the offspring', 'keenan te', 'gwen stefani',
           'hoobastank', 'incubus', 'i prevail', 'hindia', 'maroon 5', 'daughtry', 'benson boone',
           'pierce the veil', 'bruno mars', '311', 'kilms', 'putri ariani', 'spoon',
-          'thousand below', 'padi', 'hailee steinfeld', 'alien ant farm', 'red hot chilli peppers',
-          'michelle branch', 'garbage', 'dua lipa', 'bernadya', 'naff', 'bring me the horizon'
+          'thousand below', 'padi', 'hailee steinfeld', 'alien ant farm', 'red hot chilli peppers', 'red hot chili peppers',
+          'michelle branch', 'garbage', 'dua lipa', 'bernadya', 'naff', 'bring me the horizon',
+          'st loco', 'battle beast'
         ];
 
         let foundArtist = null;
@@ -137,6 +178,7 @@ class HostingServerService {
           title = uc(words.replace(titleStemPattern, '').trim());
           if (!artist || artist === 'Karaoke Track') artist = 'Karaoke Track';
         }
+      }
       }
     }
 
@@ -390,6 +432,127 @@ class HostingServerService {
       console.warn("Gagal mengunduh file LRC dari hosting:", err);
     }
     return null;
+  }
+
+  /**
+   * Determine if a song's title/artist should be verified in real-time via iTunes Search API
+   */
+  needsRealtimeMetadataLookup(song) {
+    if (!song) return false;
+    const key = song.id || song.filename;
+    if (!key) return false;
+    if (this._rtMetaCache && this._rtMetaCache[key]) return false;
+    if (this._rtInFlight && this._rtInFlight.has(key)) return false;
+    const artist = (song.artist || '').trim();
+    const title = (song.title || '').trim();
+    if (!artist || artist === 'Karaoke Track' || /^p\s+o\s+m\s+e$/i.test(artist)) return true;
+    if (!song.lrcUrl) return true;
+    if (artist.split(/\s+/).length === 1 && title.split(/\s+/).length >= 3 && (song.filename || '').includes('-')) return true;
+    return false;
+  }
+
+  /**
+   * Real-time online lookup (iTunes Search API) to verify & fix wrong song titles/artists.
+   * Uses strict >=75% token overlap validation to prevent false positives and caches results locally.
+   */
+  async resolveSongMetadataRealtime(songs, onUpdate) {
+    if (!Array.isArray(songs) || songs.length === 0 || typeof fetch !== 'function') return;
+    const queue = songs.filter(s => this.needsRealtimeMetadataLookup(s));
+    if (queue.length === 0) return;
+
+    const stemPattern = /(_+(bs_roformer|roformer|mel_band|mdx|demucs|mt_\d+|mt\s*\d+|demon[-_]voices|other|vocals[-_]back|vocals|instrumental|karaoke|drums|bass|lead|backing|stem)[^.]*)/gi;
+    const stopWords = new Set(['acoustic', 'version', 'live', 'remaster', 'remastered', 'feat', 'ft', 'official', 'video', 'audio', 'lyric', 'lyrics', 'cover', 'epic', 'orchestral', 'cinematic', 'band', 'single', 'edit', 'radio', 'mix', '2008', '2026']);
+    const tokenize = (s) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+    const coreTokens = (s) => tokenize(s).filter(w => w.length >= 2 && !stopWords.has(w));
+
+    const saveCache = () => {
+      try {
+        localStorage.setItem('sushee_rt_meta_cache_v1', JSON.stringify(this._rtMetaCache));
+        if (this.cachedSongs && this.cachedSongs.length > 0) {
+          localStorage.setItem('sushee_cached_hosting_songs', JSON.stringify(this.cachedSongs));
+        }
+      } catch (e) {}
+    };
+
+    const resolveOne = async (song) => {
+      const key = song.id || song.filename;
+      if (!key || this._rtInFlight.has(key) || this._rtMetaCache[key]) return;
+      this._rtInFlight.add(key);
+      try {
+        const rawBase = (song.filename ? song.filename.replace(/\.[^/.]+$/, '') : `${song.artist || ''} ${song.title || ''}`)
+          .replace(stemPattern, '').replace(/[-_]+/g, ' ').trim();
+        const qTokens = coreTokens(rawBase);
+        if (qTokens.length < 2) {
+          this._rtMetaCache[key] = { keep: true };
+          return;
+        }
+        const term = qTokens.join(' ');
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 6000);
+        const resp = await fetch(`https://itunes.apple.com/search?media=music&entity=song&limit=5&term=${encodeURIComponent(term)}`, { signal: controller.signal });
+        clearTimeout(timer);
+        if (!resp || !resp.ok) return;
+        const data = await resp.json();
+        const results = (data && Array.isArray(data.results)) ? data.results : [];
+
+        let best = null;
+        let bestScore = 0;
+        for (const r of results) {
+          if (!r.trackName || !r.artistName) continue;
+          const cArtist = new Set(tokenize(r.artistName));
+          const cTrack = new Set(tokenize(r.trackName));
+          const cAll = new Set([...cArtist, ...cTrack]);
+          let matched = 0, artistHits = 0, trackHits = 0;
+          for (const t of qTokens) {
+            if (cAll.has(t)) matched++;
+            if (cArtist.has(t)) artistHits++;
+            if (cTrack.has(t)) trackHits++;
+          }
+          const ratio = matched / qTokens.length;
+          if (ratio >= 0.75 && artistHits >= 1 && trackHits >= 1 && ratio > bestScore) {
+            bestScore = ratio;
+            best = r;
+          }
+        }
+
+        if (best) {
+          let resolvedTitle = best.trackName.trim();
+          const resolvedArtist = best.artistName.trim();
+          if (/\bacoustic\b/i.test(rawBase) && !/\bacoustic\b/i.test(resolvedTitle)) {
+            resolvedTitle = `${resolvedTitle} (Acoustic)`;
+          }
+          this._rtMetaCache[key] = { title: resolvedTitle, artist: resolvedArtist };
+          const changed = (song.title !== resolvedTitle || song.artist !== resolvedArtist);
+          song.title = resolvedTitle;
+          song.artist = resolvedArtist;
+          const idx = this.cachedSongs.findIndex(cs => (cs.id && cs.id === song.id) || (cs.filename && cs.filename === song.filename));
+          if (idx >= 0) {
+            this.cachedSongs[idx] = { ...this.cachedSongs[idx], title: resolvedTitle, artist: resolvedArtist };
+          }
+          saveCache();
+          if (changed && typeof onUpdate === 'function') {
+            onUpdate(song);
+          }
+        } else {
+          this._rtMetaCache[key] = { keep: true };
+          saveCache();
+        }
+      } catch (e) {
+        // Network/timeout error: do not cache failure so it retries next time online
+      } finally {
+        this._rtInFlight.delete(key);
+      }
+    };
+
+    // Polite concurrency of 2 to avoid API throttling while keeping UI responsive
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < queue.length) {
+        const nextSong = queue[cursor++];
+        await resolveOne(nextSong);
+      }
+    };
+    await Promise.all([worker(), worker()]);
   }
 }
 

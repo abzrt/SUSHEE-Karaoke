@@ -1372,6 +1372,11 @@ async function initApp() {
     // Update Player Bar and Studio UI
     document.querySelectorAll('.current-song-title').forEach(el => el.textContent = song.title);
     document.querySelectorAll('.current-song-artist').forEach(el => el.textContent = formatArtistDisplay(song.artist));
+    if (hostingService && typeof hostingService.resolveSongMetadataRealtime === 'function') {
+      hostingService.resolveSongMetadataRealtime([song], (updated) => {
+        applyRealtimeSongMetadataToUI(updated);
+      });
+    }
 
     const applyAudioAndLyrics = (resolvedAudioUrl, resolvedLrcText) => {
       if (currentSong !== song) return; // user switched song while resolving offline blob
@@ -3921,6 +3926,23 @@ async function initApp() {
     });
   }
 
+  function applyRealtimeSongMetadataToUI(updated) {
+    if (!updated || !updated.id) return;
+    document.querySelectorAll(`.song-card[data-song-id="${updated.id}"]`).forEach(card => {
+      const tEl = card.querySelector('.song-card-title');
+      const aEl = card.querySelector('.song-card-artist');
+      if (tEl) tEl.textContent = updated.title;
+      if (aEl) aEl.textContent = formatArtistDisplay(updated.artist);
+    });
+    if (currentSong && currentSong.id === updated.id) {
+      currentSong.title = updated.title;
+      currentSong.artist = updated.artist;
+      document.querySelectorAll('.current-song-title').forEach(el => el.textContent = updated.title);
+      document.querySelectorAll('.current-song-artist').forEach(el => el.textContent = formatArtistDisplay(updated.artist));
+      updateFloatingMiniPlayer();
+    }
+  }
+
   async function renderCloudSongList() {
     if (!cloudListContainer) return;
     const query = (cloudSearchInput ? cloudSearchInput.value : '').trim();
@@ -3959,6 +3981,9 @@ async function initApp() {
         updateServerStatusUI(hostingService.isConnected, songs.length);
         renderCloudCards(songs);
         renderSongList(); // Also update combined library view
+        if (typeof hostingService.resolveSongMetadataRealtime === 'function') {
+          hostingService.resolveSongMetadataRealtime(songs, applyRealtimeSongMetadataToUI);
+        }
       } else if (initialList.length > 0) {
         updateServerStatusUI(hostingService.isConnected, initialList.length);
         renderCloudCards(initialList);
