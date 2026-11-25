@@ -225,7 +225,7 @@ const translations = {
     btnRequestStorage: "Minta Izin Penyimpanan",
     aboutTitle: "Tentang SUSHEE",
     aboutDesc: "Aplikasi Karaoke Android SUSHEE Modern Minimalis dengan Web Audio DSP & Perekaman Simultan.",
-    version: "Versi 1.2.2 (Android Edition)",
+    version: "Versi 1.2.3 (Android Edition)",
 
     // Dynamic Toasts
     toastLangSwitched: "Bahasa diubah ke Bahasa Indonesia",
@@ -517,7 +517,7 @@ const translations = {
     btnRequestStorage: "Grant Storage Access",
     aboutTitle: "About SUSHEE",
     aboutDesc: "SUSHEE Modern Minimalist Android Karaoke App with StarMaker DSP & Dual-track Recording.",
-    version: "Version 1.2.2 (Android Edition)",
+    version: "Version 1.2.3 (Android Edition)",
 
     // Dynamic Toasts
     toastLangSwitched: "Language switched to English",

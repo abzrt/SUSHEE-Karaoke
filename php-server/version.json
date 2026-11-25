@@ -1,6 +1,6 @@
 {
-  "versionName": "1.2.2",
-  "versionCode": 10,
+  "versionName": "1.2.3",
+  "versionCode": 11,
   "apkUrl": "https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SUSHEE-Karaoke-Release.apk",
-  "releaseNotes": "- Perbaikan judul & penyanyi lagu agar tidak tertimpa metadata stem\n- Pencarian judul & penyanyi otomatis realtime (iTunes, YouTube Music, LRCLIB)\n- Kontrol Putar/Jeda/Berikutnya di notifikasi & layar kunci Android\n- Hybrid Auto-Update otomatis (PHP Hosting + GitHub Releases)"
+  "releaseNotes": "- Dukungan Dynamic Island / Live Updates (Android 16/17, Now Bar, Hyper Island, Live Alerts) via Native MediaSession & MediaStyle\n- Kontrol Sebelumnya, Putar/Jeda, Berikutnya dari kapsul status bar, layar kunci & headset Bluetooth\n- Pencarian judul & penyanyi otomatis realtime (iTunes, YouTube Music, LRCLIB)\n- Hybrid Auto-Update otomatis (PHP Hosting + GitHub Releases)"
 }

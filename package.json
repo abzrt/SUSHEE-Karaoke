@@ -1,6 +1,6 @@
 {
   "name": "sushee-karaoke-android",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "SUSHEE - Songbook Karaoke Android dengan Efek Vokal StarMaker, Perekaman Simultan, dan Scan File (.mp3, .m4a, .wav, .lrc)",
   "main": "index.html",
   "scripts": {
