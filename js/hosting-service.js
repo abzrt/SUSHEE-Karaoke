@@ -37,7 +37,7 @@ class HostingServerService {
     this._rtInFlight = new Set();
 
     try {
-      const rtCached = localStorage.getItem('sushee_rt_meta_cache_v1');
+      const rtCached = localStorage.getItem('sushee_rt_meta_cache_v2');
       if (rtCached) {
         const parsedRt = JSON.parse(rtCached);
         if (parsedRt && typeof parsedRt === 'object') this._rtMetaCache = parsedRt;
@@ -94,7 +94,7 @@ class HostingServerService {
     const stemPattern = /(_+(bs_roformer|roformer|mel_band|mdx|demucs|mt_\d+|mt\s*\d+|demon[-_]voices|other|vocals[-_]back|vocals|instrumental|karaoke|drums|bass|lead|backing|stem)[^.]*)/gi;
     const titleStemPattern = /\b(bs\s+roformer(\s+mt\s*\d+)?|roformer|other|vocals\s+back|instrumental|karaoke\s+track)\b/gi;
 
-    const hasBadArtist = !artist || artist === 'Karaoke Track' || /^p\s+o\s+m\s+e$/i.test(artist);
+    const hasBadArtist = !artist || artist === 'Karaoke Track';
     const hasBadTitle = !title || titleStemPattern.test(title) || stemPattern.test(title);
     const needsCleaning = hasBadArtist || hasBadTitle;
 
@@ -107,7 +107,7 @@ class HostingServerService {
             const lrcParts = lrcBase.split(' - ');
             const lrcTitle = lrcParts[0].trim();
             const lrcArtist = lrcParts.slice(1).join(' - ').trim();
-            if (lrcTitle && lrcArtist && !/^p\s+o\s+m\s+e$/i.test(lrcArtist)) {
+            if (lrcTitle && lrcArtist) {
               title = lrcTitle;
               artist = lrcArtist;
               resolvedFromLrc = true;
@@ -435,7 +435,7 @@ class HostingServerService {
   }
 
   /**
-   * Determine if a song's title/artist should be verified in real-time via iTunes Search API
+   * Determine if a song's title/artist should be verified in real-time via iTunes / YouTube Music / LRCLIB
    */
   needsRealtimeMetadataLookup(song) {
     if (!song) return false;
@@ -445,14 +445,14 @@ class HostingServerService {
     if (this._rtInFlight && this._rtInFlight.has(key)) return false;
     const artist = (song.artist || '').trim();
     const title = (song.title || '').trim();
-    if (!artist || artist === 'Karaoke Track' || /^p\s+o\s+m\s+e$/i.test(artist)) return true;
+    if (!artist || artist === 'Karaoke Track') return true;
     if (!song.lrcUrl) return true;
     if (artist.split(/\s+/).length === 1 && title.split(/\s+/).length >= 3 && (song.filename || '').includes('-')) return true;
     return false;
   }
 
   /**
-   * Real-time online lookup (iTunes Search API) to verify & fix wrong song titles/artists.
+   * Real-time online lookup (iTunes Search API -> YouTube Music -> LRCLIB) to verify & fix wrong song titles/artists.
    * Uses strict >=75% token overlap validation to prevent false positives and caches results locally.
    */
   async resolveSongMetadataRealtime(songs, onUpdate) {
@@ -467,11 +467,48 @@ class HostingServerService {
 
     const saveCache = () => {
       try {
-        localStorage.setItem('sushee_rt_meta_cache_v1', JSON.stringify(this._rtMetaCache));
+        localStorage.setItem('sushee_rt_meta_cache_v2', JSON.stringify(this._rtMetaCache));
         if (this.cachedSongs && this.cachedSongs.length > 0) {
           localStorage.setItem('sushee_cached_hosting_songs', JSON.stringify(this.cachedSongs));
         }
       } catch (e) {}
+    };
+
+    const fetchJson = async (url, timeoutMs = 6000) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const resp = await fetch(url, { signal: controller.signal });
+        clearTimeout(timer);
+        if (!resp || !resp.ok) return null;
+        return await resp.json();
+      } catch (e) {
+        clearTimeout(timer);
+        return null;
+      }
+    };
+
+    const pickBestMatch = (candidates, qTokens) => {
+      let best = null;
+      let bestScore = 0;
+      for (const c of candidates) {
+        if (!c || !c.trackName || !c.artistName) continue;
+        const cArtist = new Set(tokenize(c.artistName));
+        const cTrack = new Set(tokenize(c.trackName));
+        const cAll = new Set([...cArtist, ...cTrack]);
+        let matched = 0, artistHits = 0, trackHits = 0;
+        for (const t of qTokens) {
+          if (cAll.has(t)) matched++;
+          if (cArtist.has(t)) artistHits++;
+          if (cTrack.has(t)) trackHits++;
+        }
+        const ratio = matched / qTokens.length;
+        if (ratio >= 0.75 && artistHits >= 1 && trackHits >= 1 && ratio > bestScore) {
+          bestScore = ratio;
+          best = c;
+        }
+      }
+      return best;
     };
 
     const resolveOne = async (song) => {
@@ -487,31 +524,32 @@ class HostingServerService {
           return;
         }
         const term = qTokens.join(' ');
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 6000);
-        const resp = await fetch(`https://itunes.apple.com/search?media=music&entity=song&limit=5&term=${encodeURIComponent(term)}`, { signal: controller.signal });
-        clearTimeout(timer);
-        if (!resp || !resp.ok) return;
-        const data = await resp.json();
-        const results = (data && Array.isArray(data.results)) ? data.results : [];
-
+        const enc = encodeURIComponent(term);
         let best = null;
-        let bestScore = 0;
-        for (const r of results) {
-          if (!r.trackName || !r.artistName) continue;
-          const cArtist = new Set(tokenize(r.artistName));
-          const cTrack = new Set(tokenize(r.trackName));
-          const cAll = new Set([...cArtist, ...cTrack]);
-          let matched = 0, artistHits = 0, trackHits = 0;
-          for (const t of qTokens) {
-            if (cAll.has(t)) matched++;
-            if (cArtist.has(t)) artistHits++;
-            if (cTrack.has(t)) trackHits++;
+
+        // Source 1: iTunes Search API
+        const itData = await fetchJson(`https://itunes.apple.com/search?media=music&entity=song&limit=5&term=${enc}`);
+        if (itData && Array.isArray(itData.results)) {
+          best = pickBestMatch(itData.results, qTokens);
+        }
+
+        // Source 2: YouTube Music (Piped Music Songs endpoint, CORS-enabled)
+        if (!best) {
+          const ytData = await fetchJson(`https://api.piped.private.coffee/search?q=${enc}&filter=music_songs`);
+          if (ytData && Array.isArray(ytData.items)) {
+            const ytCandidates = ytData.items.slice(0, 6).map(item => ({
+              trackName: (item.title || '').trim(),
+              artistName: (item.uploaderName || '').replace(/\s*-\s*Topic$/i, '').trim()
+            }));
+            best = pickBestMatch(ytCandidates, qTokens);
           }
-          const ratio = matched / qTokens.length;
-          if (ratio >= 0.75 && artistHits >= 1 && trackHits >= 1 && ratio > bestScore) {
-            bestScore = ratio;
-            best = r;
+        }
+
+        // Source 3: LRCLIB Search API
+        if (!best) {
+          const lrcData = await fetchJson(`https://lrclib.net/api/search?q=${enc}`);
+          if (Array.isArray(lrcData)) {
+            best = pickBestMatch(lrcData.slice(0, 5), qTokens);
           }
         }
 
