@@ -439,8 +439,14 @@ async function initApp() {
   window.handleMediaNotificationAction = function (action) {
     if (action === 'toggle') {
       if (typeof window.toggleMusicPlayback === 'function') window.toggleMusicPlayback();
+    } else if (action === 'play') {
+      if (audioElement && audioElement.paused && typeof window.toggleMusicPlayback === 'function') window.toggleMusicPlayback();
+    } else if (action === 'pause') {
+      if (audioElement && !audioElement.paused && typeof window.toggleMusicPlayback === 'function') window.toggleMusicPlayback();
     } else if (action === 'next') {
       if (typeof window.nextSongsPlaylistSong === 'function') window.nextSongsPlaylistSong();
+    } else if (action === 'prev') {
+      if (typeof window.prevSongsPlaylistSong === 'function') window.prevSongsPlaylistSong();
     }
   };
 
