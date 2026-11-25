@@ -9,6 +9,9 @@ import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.Icon;
 import android.media.MediaMetadata;
 import android.media.session.MediaSession;
@@ -17,6 +20,8 @@ import android.os.Build;
 import android.os.IBinder;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
+import androidx.core.content.ContextCompat;
+import java.io.InputStream;
 
 /**
  * Foreground Media Playback Service with native MediaSession + MediaStyle &
@@ -49,10 +54,34 @@ public class AudioPlaybackService extends Service {
         initMediaSession();
     }
 
-    private void initMediaSession() {
-        try {
-            appArtwork = BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher);
+    private Bitmap loadAppLogoBitmap() {
+        // 1. Try high-res SUSHEE logo PNG bundled in Capacitor assets
+        try (InputStream is = getAssets().open("public/assets/icon-512.png")) {
+            Bitmap bmp = BitmapFactory.decodeStream(is);
+            if (bmp != null) return bmp;
         } catch (Exception ignored) {}
+
+        // 2. Fallback: render Adaptive Icon Drawable (R.mipmap.ic_launcher) to a real Bitmap
+        try {
+            Drawable drawable = ContextCompat.getDrawable(this, R.mipmap.ic_launcher);
+            if (drawable != null) {
+                if (drawable instanceof BitmapDrawable && ((BitmapDrawable) drawable).getBitmap() != null) {
+                    return ((BitmapDrawable) drawable).getBitmap();
+                }
+                int size = 256;
+                Bitmap bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+                Canvas canvas = new Canvas(bmp);
+                drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+                drawable.draw(canvas);
+                return bmp;
+            }
+        } catch (Exception ignored) {}
+
+        return null;
+    }
+
+    private void initMediaSession() {
+        appArtwork = loadAppLogoBitmap();
         mediaSession = new MediaSession(this, "SUSHEE_KARAOKE_SESSION");
         mediaSession.setCallback(new MediaSession.Callback() {
             @Override
@@ -93,6 +122,8 @@ public class AudioPlaybackService extends Service {
                     .putString(MediaMetadata.METADATA_KEY_ALBUM, "SUSHEE Karaoke");
             if (appArtwork != null) {
                 metaBuilder.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, appArtwork);
+                metaBuilder.putBitmap(MediaMetadata.METADATA_KEY_ART, appArtwork);
+                metaBuilder.putBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON, appArtwork);
             }
             mediaSession.setMetadata(metaBuilder.build());
 
