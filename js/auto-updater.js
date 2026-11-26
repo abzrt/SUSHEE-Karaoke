@@ -8,8 +8,8 @@ class AutoUpdater {
       'https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SONGS/version.json'
     ];
     this.githubLatestUrl = options.githubLatestUrl || 'https://api.github.com/repos/abzrt/SUSHEE-Karaoke/releases/latest';
-    this.fallbackVersionName = options.versionName || '1.2.5';
-    this.fallbackVersionCode = options.versionCode || 13;
+    this.fallbackVersionName = options.versionName || '1.2.6';
+    this.fallbackVersionCode = options.versionCode || 14;
     this.latestInfo = null;
   }
 

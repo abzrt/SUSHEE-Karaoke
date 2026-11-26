@@ -1,6 +1,6 @@
 {
-  "versionName": "1.2.5",
-  "versionCode": 13,
+  "versionName": "1.2.6",
+  "versionCode": 14,
   "apkUrl": "https://abzrtsushee.co-id.id/SUSHEE%20Karaoke/SUSHEE-Karaoke-Release.apk",
-  "releaseNotes": "- Hilangkan toast rutin yang mengganggu saat memutar lagu & ganti mode\n- Tombol keluar Mode Fokus disederhanakan menjadi ikon ✕ bulat\n- Peringatan countdown masuk lagu hanya muncul di awal lagu & tidak lagi menimpa lirik\n- Logo SUSHEE Karaoke di Dynamic Island / Live Updates & pencarian metadata realtime"
+  "releaseNotes": "- Dukungan penuh High Refresh Rate 120 Hz / 144 Hz (120 FPS) di Android untuk scroll lirik & visualizer ultra-halus\n- Hilangkan toast rutin yang mengganggu saat memutar lagu & ganti mode\n- Tombol keluar Mode Fokus disederhanakan menjadi ikon ✕ bulat\n- Peringatan countdown masuk lagu hanya muncul di awal lagu & tidak lagi menimpa lirik"
 }
