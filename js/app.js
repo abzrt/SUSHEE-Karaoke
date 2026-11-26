@@ -749,6 +749,11 @@ async function initApp() {
   let lastToastTime = 0;
   function showToast(message, type = 'info') {
     if (!message) return;
+    // Suppress routine playback/UI toggle toasts; keep errors, warnings & essential confirmations
+    if (type !== 'error' && type !== 'warning') {
+      const keepEssential = /keluar|exit|pembaruan|versi terbaru|update|tersimpan|saved|offline|skor karaoke|kalibrasi|calibrat|izin|permission|granted/i.test(String(message));
+      if (!keepEssential) return;
+    }
     const now = Date.now();
     // Prevent duplicate identical toasts within 1800ms
     if (message === lastToastMsg && (now - lastToastTime) < 1800) {
@@ -1561,17 +1566,15 @@ async function initApp() {
       skipBtn.style.display = showSkip ? 'inline-flex' : 'none';
     }
 
-    // 2. 3-second Countdown pill before first lyric or after long instrumental break
+    // 2. 3-second Countdown pill ONLY at the beginning of the song (before first lyric)
     const cdPill = document.getElementById('lyricCountdownPill');
     if (cdPill) {
-      const nextLine = lrcParser.lines[newIndex + 1];
-      const prevLine = newIndex >= 0 ? lrcParser.lines[newIndex] : null;
-      const gap = nextLine ? (nextLine.time - (prevLine ? prevLine.time : 0)) : 0;
-      const timeToNext = nextLine ? (nextLine.time - adjustedTime) : 99;
-      const isLongIntroOrBreak = (newIndex === -1 && firstLyricTime >= 4) || (prevLine && (!prevLine.text || prevLine.text.trim() === '' || gap >= 8));
-      if (nextLine && isLongIntroOrBreak && timeToNext > 0 && timeToNext <= 3.2 && audioElement && !audioElement.paused) {
+      const firstLine = lrcParser.lines[0];
+      const timeToFirst = firstLine ? (firstLine.time - adjustedTime) : 99;
+      const isSongIntro = (newIndex === -1 && firstLyricTime >= 4);
+      if (firstLine && isSongIntro && timeToFirst > 0 && timeToFirst <= 3.2 && audioElement && !audioElement.paused) {
         cdPill.style.display = 'inline-flex';
-        const secLeft = Math.ceil(timeToNext);
+        const secLeft = Math.ceil(timeToFirst);
         const dots = cdPill.querySelectorAll('.cd-dot');
         dots.forEach((d, i) => d.classList.toggle('lit', i < (4 - secLeft)));
         const lbl = document.getElementById('lyricCountdownLabel');
