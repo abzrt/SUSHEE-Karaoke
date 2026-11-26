@@ -451,7 +451,42 @@ public class MainActivity extends BridgeActivity {
         );
 
         // Safely request permissions after window is rendered to prevent UI lockup
+        requestHighestRefreshRate();
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::requestAppPermissions, 600);
+    }
+
+    private void requestHighestRefreshRate() {
+        try {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+            Window window = getWindow();
+            if (window == null) return;
+            android.view.Display display = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+                ? getDisplay()
+                : getWindowManager().getDefaultDisplay();
+            if (display == null) return;
+            android.view.Display.Mode currentMode = display.getMode();
+            android.view.Display.Mode[] supportedModes = display.getSupportedModes();
+            if (currentMode == null || supportedModes == null || supportedModes.length == 0) return;
+
+            android.view.Display.Mode bestMode = currentMode;
+            for (android.view.Display.Mode mode : supportedModes) {
+                if (mode.getPhysicalWidth() == currentMode.getPhysicalWidth()
+                    && mode.getPhysicalHeight() == currentMode.getPhysicalHeight()
+                    && mode.getRefreshRate() > bestMode.getRefreshRate()) {
+                    bestMode = mode;
+                }
+            }
+
+            android.view.WindowManager.LayoutParams lp = window.getAttributes();
+            if (lp.preferredDisplayModeId != bestMode.getModeId() || lp.preferredRefreshRate != bestMode.getRefreshRate()) {
+                lp.preferredDisplayModeId = bestMode.getModeId();
+                lp.preferredRefreshRate = bestMode.getRefreshRate();
+                window.setAttributes(lp);
+                Log.d(TAG, "High refresh rate enabled: " + bestMode.getRefreshRate() + " Hz");
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "High refresh rate setup warning: " + e.getMessage());
+        }
     }
 
     private void applyDarkSystemBarsWithWhiteIcons() {
@@ -493,6 +528,7 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         applyDarkSystemBarsWithWhiteIcons();
+        requestHighestRefreshRate();
     }
 
     @Override
